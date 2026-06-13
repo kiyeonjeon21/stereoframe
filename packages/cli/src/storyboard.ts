@@ -597,6 +597,11 @@ ShotDefaults (inherited by every shot; any shot may override):
                    "contact-shadow") whenever you set a backdrop. "road" suits vehicles.
   finish?        : { exposure?, samples?=2, bloom?, bloomThreshold?, vignette?, contrast?,
                      saturation?, grain?, chromaticAberration?, lightSweep?, ground?:"contact-shadow" }
+                   SANE RANGES (stay in these or the film flickers/blows out):
+                   exposure 0.4-1.1 · bloom 0.06-0.16 · bloomThreshold 0.80-0.95 (NEVER below
+                   0.6 — low threshold makes the whole image bloom and pulse) · vignette 0.3-0.6 ·
+                   contrast 1.0-1.15 · saturation 1.0-1.35 · grain 0-0.03 (keep tiny; it changes
+                   every frame) · chromaticAberration 0-0.12 · lightSweep 0.05-0.24.
   lighting?      : { preset:"studio"|"soft"|"sunset" } | "auto" (metal-aware rig) |
                    { key?, fill?, rim? } each { color:"#hex", intensity, position:"x y z" }
 

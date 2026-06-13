@@ -287,6 +287,10 @@ thing to avoid. Default to the flagship arc:
   crossfade-out shot — it's dropped).
 - **Colour = lighting + grade:** complementary split (cyan key / magenta rim, or
   teal/amber), per-beat `exposure`/`vignette`/`saturation`, `lightSweep` 0.1–0.24.
+  **Keep the grade sane or it flickers:** `bloomThreshold` 0.80–0.95 (never <0.6 — a low
+  threshold blooms the whole image and pulses), `bloom` 0.06–0.16, `grain` ≤0.03 (it
+  changes every frame). Judge motion on a **full render**, not `--draft` (draft is a
+  fast, heavily-compressed preview — the compression itself shimmers on dark scenes).
 - Use the model facts: stand up a genuinely-flat device with `pose`; metal → `lighting:"auto"`.
 
 Reference plans: `killer-demos/supercar/flagship/index.html` (the hand-authored
