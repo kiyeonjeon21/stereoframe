@@ -21,10 +21,7 @@ import {
   type Storyboard,
 } from "./storyboard";
 import { renderProject } from "./render";
-import { resolveEnvKey } from "./gen";
-
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-const DEFAULT_MODEL = "gpt-4o";
+import { getLLMProvider, type ChatMessage } from "./llm";
 
 export interface BriefOptions {
   brief: string; // inline text or a path to a .md/.txt file
@@ -32,19 +29,9 @@ export interface BriefOptions {
   outDir: string;
   render?: boolean;
   draft?: boolean;
+  llmProvider?: string;
   llmModel?: string;
   key?: string;
-}
-
-/** OpenAI key from --key, env, or a `.env` found walking up from projectDir. */
-export function resolveOpenAIKey(projectDir: string, explicit?: string): string {
-  const key = resolveEnvKey("OPENAI_API_KEY", projectDir, explicit);
-  if (!key) {
-    throw new Error(
-      "no OpenAI key — set OPENAI_API_KEY in your shell or project .env (https://platform.openai.com/api-keys), or pass --key.",
-    );
-  }
-  return key;
 }
 
 /** Pull the first JSON object out of an LLM response (handles ```json fences / prose). */
@@ -83,7 +70,7 @@ export function manifestFacts(m: ModelManifest): string {
   ].join("\n");
 }
 
-export function buildMessages(brief: string, manifest: ModelManifest): Array<{ role: string; content: string }> {
+export function buildMessages(brief: string, manifest: ModelManifest): ChatMessage[] {
   const system = `You are a world-class product-film director and director of photography for "stereoframe", a deterministic 3D-video framework. You translate a creative brief into a STORYBOARD PLAN (strict JSON) that compiles into a cinematic film from a single 3D model.
 
 ${STORYBOARD_SCHEMA_DOC}
@@ -114,29 +101,6 @@ export function repairMessage(errors: string[]): string {
   return `That plan failed validation with these errors:\n- ${errors.join("\n- ")}\nReturn a corrected full JSON plan that fixes every error. JSON only.`;
 }
 
-async function openaiChat(
-  messages: Array<{ role: string; content: string }>,
-  key: string,
-  model: string,
-): Promise<string> {
-  const res = await fetch(OPENAI_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.8,
-      response_format: { type: "json_object" },
-    }),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${text.slice(0, 400)}`);
-  const data = JSON.parse(text);
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("OpenAI returned no content");
-  return content;
-}
-
 /** Normalize the LLM object into a Storyboard (unwrap {plan:…}, coerce model). */
 function asPlan(obj: unknown): Storyboard {
   const o = obj as Record<string, unknown>;
@@ -146,8 +110,8 @@ function asPlan(obj: unknown): Storyboard {
 
 export async function runBrief(opts: BriefOptions): Promise<{ dir: string; plan: Storyboard; duration?: number }> {
   const projectDir = process.cwd();
-  const key = resolveOpenAIKey(projectDir, opts.key);
-  const llmModel = opts.llmModel ?? process.env.OPENAI_MODEL ?? DEFAULT_MODEL;
+  const provider = getLLMProvider(opts.llmProvider);
+  const chatOpts = { projectDir, key: opts.key, model: opts.llmModel };
 
   const glb = resolve(opts.model);
   if (!existsSync(glb)) throw new Error(`brief: model not found: ${opts.model}`);
@@ -156,9 +120,9 @@ export async function runBrief(opts: BriefOptions): Promise<{ dir: string; plan:
   console.log(`inspecting ${basename(glb)}…`);
   const manifest = await inspectModel({ model: glb, silent: true, write: false });
 
-  console.log(`directing via ${llmModel} (one creative call)…`);
+  console.log(`directing via ${provider.name}:${opts.llmModel ?? provider.defaultModel} (one creative call)…`);
   const messages = buildMessages(briefText, manifest);
-  let raw = await openaiChat(messages, key, llmModel);
+  let raw = await provider.chat(messages, chatOpts);
   let plan = asPlan(extractJson(raw));
 
   // Force the model reference + dimensions the tool controls.
@@ -173,7 +137,7 @@ export async function runBrief(opts: BriefOptions): Promise<{ dir: string; plan:
     console.log(`  plan had ${errors.length} issue(s) — asking for one repair…`);
     messages.push({ role: "assistant", content: raw });
     messages.push({ role: "user", content: repairMessage(errors) });
-    raw = await openaiChat(messages, key, llmModel);
+    raw = await provider.chat(messages, chatOpts);
     plan = asPlan(extractJson(raw));
     plan.model = relative(outDir, glb) || basename(glb);
     plan.width ??= 1920;

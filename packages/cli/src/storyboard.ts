@@ -529,7 +529,10 @@ export async function buildStoryboard(opts: BuildStoryboardOptions): Promise<{ d
     if (!basenames.has(modelPath)) {
       const existing = [...basenames.values()].includes(base);
       if (existing) throw new Error(`storyboard: two different models share the basename "${base}" — rename one`);
-      copyFileSync(modelPath, join(dir, "assets", base));
+      const destPath = join(dir, "assets", base);
+      // Skip the copy when the model already lives at the destination (the one-shot
+      // `brief --gen` writes the GLB straight into the out dir's assets/).
+      if (resolve(modelPath) !== resolve(destPath)) copyFileSync(modelPath, destPath);
       basenames.set(modelPath, base);
     }
 

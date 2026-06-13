@@ -69,7 +69,16 @@ stereoframe brief "a dark neon showroom reveal, hard-cut ignition, flythrough, \
 
 `brief` sends your paragraph to an LLM that writes a rich, model-aware
 `plan.json` (it inspects the GLB), validates + repairs it, then compiles and renders
-— saving the brief as `brief.md` (provenance). Needs `OPENAI_API_KEY`.
+— saving the brief as `brief.md` (provenance). LLM via `--llm-provider openai`
+(default) `| anthropic`; needs the matching API key.
+
+**One command, end to end** — generate the model *and* direct it from one invocation:
+
+```bash
+stereoframe brief "a dark luxury reveal ending on the wordmark CHRONO, amber/steel, ~16s" \
+  --gen "a luxury chronograph wristwatch, steel case, blue dial" --via-image --render
+# prompt → image (gpt-image-2) → 3D (Meshy) → directed plan (LLM) → MP4
+```
 
 Under the hood it's a **storyboard plan** — a JSON shot list (camera / lighting /
 grade / backdrop / atmosphere / secondary-motion / crossfade per beat) that compiles

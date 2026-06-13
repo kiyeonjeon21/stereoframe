@@ -9,7 +9,7 @@
  * Non-interactive by default: plain-text output, no prompts, meaningful exit
  * codes — designed so coding agents can scaffold → edit → render in a loop.
  */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { basename } from "node:path";
 import { addBlock, listBlocks } from "./blocks";
@@ -77,10 +77,11 @@ USAGE
       --title "<text>" optional title overlay
       --bg <color>     background color (preset default otherwise)
   stereoframe brief "<brief>" | <brief.md>   natural-language directing → a cinematic plan.json (via an LLM)
-      --model <glb>    the model to direct (required)
+      --model <glb>    direct an existing model, OR generate one first (one-shot):
+      --gen "<prompt>"   generate the model from text (add --via-image / --images / --image-model)
       --dir <dir>      output project dir (default: <brief> slug or film)
       --render         compile + render the result to mp4 (--draft for fast)
-      --llm-model <n>  LLM model (default gpt-4o; or OPENAI_MODEL); needs OPENAI_API_KEY
+      --llm-provider   openai (default) | anthropic        --llm-model <id>   --llm-key <key>
   stereoframe storyboard <plan.json>   compile a shot plan (JSON) into a multi-shot directed film
       --dir <dir>      output project dir (default: <title> slug or <stem>-film)
       --render         render the compiled film to mp4 (--draft for fast)
@@ -267,9 +268,17 @@ async function main(): Promise<void> {
     }
     case "brief": {
       const brief = positional.join(" ").trim();
-      const model = options.get("model");
-      if (!brief || typeof model !== "string") {
-        throw new Error('usage: stereoframe brief "<brief>" | <brief.md> --model <model.glb> [--dir out] [--render] [--draft] [--llm-model <name>]');
+      const modelOpt = options.get("model");
+      const genPrompt = typeof options.get("gen") === "string" ? (options.get("gen") as string) : undefined;
+      const imagesOpt = options.get("images");
+      const imageOpt = options.get("image");
+      // One-shot: --gen "<model prompt>" (text/--via-image) or --image(s) generates the
+      // model first; otherwise an existing --model GLB is required.
+      const oneShot = genPrompt !== undefined || typeof imagesOpt === "string" || typeof imageOpt === "string";
+      if (!brief || (!oneShot && typeof modelOpt !== "string")) {
+        throw new Error(
+          'usage: stereoframe brief "<brief>" (--model <glb> | --gen "<model prompt>" [--via-image] | --images a,b,c) [--render] [--llm-provider openai|anthropic] [--llm-model <id>]',
+        );
       }
       const slug = brief
         .toLowerCase()
@@ -277,14 +286,48 @@ async function main(): Promise<void> {
         .replace(/^-|-$/g, "")
         .slice(0, 32) || "film";
       const outDir = typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${slug}-film`;
+
+      let model: string;
+      if (oneShot) {
+        mkdirSync(resolve(outDir, "assets"), { recursive: true });
+        const gopts = {
+          projectDir: outDir,
+          out: "assets/model.glb",
+          texture: options.get("no-texture") !== true,
+          polycount: options.has("polycount") ? Number(options.get("polycount")) : undefined,
+          key: typeof options.get("key") === "string" ? (options.get("key") as string) : undefined, // Meshy
+        };
+        if (typeof imagesOpt === "string" || typeof imageOpt === "string") {
+          const images =
+            typeof imagesOpt === "string"
+              ? imagesOpt.split(",").map((s) => s.trim()).filter(Boolean)
+              : [imageOpt as string];
+          model = await genFromImages({ images, ...gopts });
+        } else if (options.has("via-image")) {
+          model = await genViaImage({
+            prompt: genPrompt!,
+            ...gopts,
+            imageKey: typeof options.get("image-key") === "string" ? (options.get("image-key") as string) : undefined,
+            imageProvider: typeof options.get("image-provider") === "string" ? (options.get("image-provider") as string) : undefined,
+            imageModel: typeof options.get("image-model") === "string" ? (options.get("image-model") as string) : undefined,
+            imageSize: typeof options.get("size") === "string" ? (options.get("size") as string) : undefined,
+          });
+        } else {
+          model = await genModel({ prompt: genPrompt!, ...gopts });
+        }
+      } else {
+        model = modelOpt as string;
+      }
+
       await runBrief({
         brief,
         model,
         outDir,
         render: options.get("render") === true,
         draft: options.get("draft") === true,
+        llmProvider: typeof options.get("llm-provider") === "string" ? (options.get("llm-provider") as string) : undefined,
         llmModel: typeof options.get("llm-model") === "string" ? (options.get("llm-model") as string) : undefined,
-        key: typeof options.get("key") === "string" ? (options.get("key") as string) : undefined,
+        key: typeof options.get("llm-key") === "string" ? (options.get("llm-key") as string) : undefined, // LLM
       });
       return;
     }
