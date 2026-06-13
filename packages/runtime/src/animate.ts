@@ -10,9 +10,18 @@
  *   fade-in    — material opacity ramp
  *   float      — sinusoidal bob on Y        (amplitude, period)
  */
-import { CatmullRomCurve3, Material, Mesh, Vector3, type Object3D } from "three";
+import {
+  CatmullRomCurve3,
+  Color,
+  Material,
+  Mesh,
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
+  Vector3,
+  type Object3D,
+} from "three";
 import type { CompiledScene } from "./scene";
-import { parseAngleDeg, parseNumber, parseSeconds, parseVec3 } from "./parse";
+import { parseAngleDeg, parseColorString, parseNumber, parseSeconds, parseVec3 } from "./parse";
 import * as verbs from "./verbs";
 import type { XYZ } from "./verbs";
 
@@ -67,6 +76,7 @@ function makeOpacitySetter(obj: Object3D): (factor: number) => void {
 }
 
 export function compileAnimations(compiled: CompiledScene): void {
+  const variantEls: Array<{ el: Element; timing: verbs.VerbTiming }> = [];
   for (const el of Array.from(compiled.host.querySelectorAll("sf-animate"))) {
     const verb = (el.getAttribute("verb") ?? "").toLowerCase();
 
@@ -80,6 +90,7 @@ export function compileAnimations(compiled: CompiledScene): void {
       "move": 2,
       "crossfade-clip": 0.5,
       "camera-path": 8,
+      "variant": 0.8,
     };
     // Verb timing uses bare start/duration attributes (seconds) — data-start/
     // data-duration are HyperFrames *clip* timing and would trip its linter.
@@ -92,6 +103,12 @@ export function compileAnimations(compiled: CompiledScene): void {
       ease: el.getAttribute("ease"),
       defaultEase: verb === "bounce-in" ? "back.out" : "power1.out",
     });
+
+    if (verb === "variant") {
+      // Collected and compiled as ordered chains after this loop.
+      variantEls.push({ el, timing });
+      continue;
+    }
 
     const target = resolveTarget(compiled, el.getAttribute("target"));
     if (!target) {
@@ -233,6 +250,105 @@ export function compileAnimations(compiled: CompiledScene): void {
           period: parseNumber(el.getAttribute("period"), 4),
         }),
       );
+    }
+  }
+
+  compileVariantChains(compiled, variantEls);
+}
+
+interface VariantState {
+  color: Color;
+  roughness: number | null;
+  metalness: number | null;
+}
+
+type LitMaterial = MeshStandardMaterial | MeshPhysicalMaterial;
+
+/**
+ * `variant` — material colorway transitions (configurator-style).
+ *
+ * Variants on the same target (and material filter) form a chain in start
+ * order: each one's from-state is the previous one's to-state, resolved at
+ * compile time so every writer stays a pure function of t. A base writer
+ * restores the original state first; each variant only writes once its
+ * window has begun — so the latest active variant wins, and seeking
+ * backwards past every variant lands on the base look.
+ */
+function compileVariantChains(
+  compiled: CompiledScene,
+  variantEls: Array<{ el: Element; timing: verbs.VerbTiming }>,
+): void {
+  const groups = new Map<string, Array<{ el: Element; timing: verbs.VerbTiming }>>();
+  for (const entry of variantEls) {
+    const key = `${entry.el.getAttribute("target") ?? ""}|${entry.el.getAttribute("material") ?? "*"}`;
+    (groups.get(key) ?? groups.set(key, []).get(key)!).push(entry);
+  }
+
+  const tmp = new Color();
+  for (const entries of groups.values()) {
+    const first = entries[0]!;
+    const target = resolveTarget(compiled, first.el.getAttribute("target"));
+    if (!target) continue;
+    const nameFilter = first.el.getAttribute("material");
+
+    const materials: LitMaterial[] = [];
+    const seen = new Set<Material>();
+    target.traverse((child) => {
+      const m = (child as Mesh).material;
+      for (const mat of Array.isArray(m) ? m : m ? [m] : []) {
+        if (seen.has(mat)) continue;
+        seen.add(mat);
+        if (!(mat instanceof MeshStandardMaterial)) continue; // Physical extends Standard
+        if (nameFilter && mat.name !== nameFilter) continue;
+        materials.push(mat);
+      }
+    });
+    if (materials.length === 0) continue;
+
+    // Base state from the first material (variants drive the group uniformly).
+    const base: VariantState = {
+      color: materials[0]!.color.clone(),
+      roughness: materials[0]!.roughness,
+      metalness: materials[0]!.metalness,
+    };
+    compiled.seekFns.push(() => {
+      for (const mat of materials) {
+        mat.color.copy(base.color);
+        if (base.roughness !== null) mat.roughness = base.roughness;
+        if (base.metalness !== null) mat.metalness = base.metalness;
+      }
+    });
+
+    entries.sort((a, b) => a.timing.start - b.timing.start);
+    let from = base;
+    for (const { el, timing } of entries) {
+      const to: VariantState = {
+        color: el.getAttribute("color")
+          ? new Color(parseColorString(el.getAttribute("color"), "#ffffff"))
+          : from.color.clone(),
+        roughness: el.getAttribute("roughness")
+          ? parseNumber(el.getAttribute("roughness"), 0.5)
+          : from.roughness,
+        metalness: el.getAttribute("metalness")
+          ? parseNumber(el.getAttribute("metalness"), 0)
+          : from.metalness,
+      };
+      const fromState = from;
+      compiled.seekFns.push((t) => {
+        if (t < timing.start) return; // earlier writers own this range
+        const p = verbs.easedProgress(t, timing);
+        tmp.lerpColors(fromState.color, to.color, p);
+        for (const mat of materials) {
+          mat.color.copy(tmp);
+          if (to.roughness !== null && fromState.roughness !== null) {
+            mat.roughness = fromState.roughness + (to.roughness - fromState.roughness) * p;
+          }
+          if (to.metalness !== null && fromState.metalness !== null) {
+            mat.metalness = fromState.metalness + (to.metalness - fromState.metalness) * p;
+          }
+        }
+      });
+      from = to;
     }
   }
 }

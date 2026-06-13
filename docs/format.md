@@ -146,6 +146,21 @@ three.js Water 애드온(반사/굴절/태양 글린트). `stereoframe add ocean
 | `normals` | assets/waternormals.jpg | 노멀맵 경로 |
 | `sun-direction`/`sun-color` | 0.7 0.6 0.3 / #ffffff | sf-sky 있으면 자동 대체 |
 
+### `<sf-metaball>` — 마칭큐브 블롭 (블록)
+
+액체/구이(goo) 블롭. 볼 중심이 시드 궤도의 닫힌식(`f(seed_i, t)`)이라 매 시킹마다 필드를 처음부터 재구성 — 무상태, 임의 시킹 안전. 머티리얼 속성은 sf-mesh 어휘(color/material/roughness/…)를 그대로 사용.
+
+| 속성 | 기본값 | 설명 |
+|---|---|---|
+| `count`/`seed` | 5 / 1 | 블롭 수 / PRNG 시드 |
+| `resolution` | 56 | 마칭큐브 해상도(높을수록 매끈, 느림) |
+| `scale` | 2 | 월드 크기(필드 폭 = 2×scale) |
+| `speed` | 0.7 | 궤도 속도 배율 |
+| `strength`/`isolation` | 0.7 / 60 | 블롭 융합 정도 |
+| `position` | 0 0 0 | 클러스터 중심 |
+
+연출 팁: sf-scene의 `background`를 생략(투명)하고 DOM 타이포를 sf-scene **앞 순서**에 두면 블롭이 글자를 가리는 레퍼런스 연출이 된다 (`examples/metaball`).
+
 ### `<sf-animate>` — 의미론적 동사
 
 공통 속성: `target`(`camera` 또는 `#id`), `verb`, `start`(초, 기본 0), `duration`(초), `ease`.
@@ -165,6 +180,7 @@ three.js Water 애드온(반사/굴절/태양 글린트). `stereoframe add ocean
 | `bounce-in` | duration 기본 0.6, ease 기본 `back.out` | 스케일 0→원래값 등장 |
 | `fade-in` | duration 기본 0.6 | 머티리얼 opacity 0→원래값 |
 | `float` | `amplitude`(0.1), `period`(4) | Y축 사인 부유. 연속 |
+| `variant` | `color`/`roughness`/`metalness`(전환 목표값), `material`(GLB 머티리얼 이름 필터), duration 기본 0.8 | 머티리얼 컬러웨이 전환(컨피그레이터). 같은 타깃의 여러 variant는 start 순으로 체인 — 이전 결과가 다음의 시작 상태(컴파일 타임 해석, 역방향 시킹 안전) |
 
 ### Easing 어휘 (GSAP 호환 이름)
 

@@ -33,7 +33,7 @@ jobs:
 
       - name: Lint + validate examples
         run: |
-          for d in hello-standalone character-run-standalone ocean-flythrough glass-hero paper-swarm multi-shot; do
+          for d in hello-standalone character-run-standalone ocean-flythrough glass-hero paper-swarm multi-shot variant-demo metaball; do
             echo "=== $d"
             node packages/cli/dist/cli.js update "examples/$d"
             node packages/cli/dist/cli.js lint "examples/$d"

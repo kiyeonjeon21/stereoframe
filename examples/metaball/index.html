@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #efece5; }
+      body { font-family: ui-sans-serif, system-ui, sans-serif; }
+      /* Typography sits BEHIND the transparent 3D canvas: the blobs occlude it. */
+      #headline {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -54%);
+        font-size: 170px; font-weight: 900; line-height: 0.95; letter-spacing: -0.03em;
+        text-align: center; color: #17171a; white-space: nowrap;
+      }
+      sf-scene { position: absolute; inset: 0; }
+      #footer {
+        position: absolute; bottom: 60px; width: 100%; text-align: center;
+        font-size: 22px; letter-spacing: 0.24em; text-transform: uppercase; color: #8d8a80;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="headline">MAKE THEM<br />LOOK TWICE.</div>
+
+    <sf-scene duration="9" width="1920" height="1080">
+      <sf-camera fov="35" position="0 0 6" look-at="0 0 0"></sf-camera>
+      <sf-light type="hemisphere" color="#ffffff" intensity="2.2"></sf-light>
+      <sf-light type="directional" color="#ffffff" intensity="2.6" position="4 5 6"></sf-light>
+      <sf-light type="point" color="#ff5c5c" intensity="30" position="-4 2 3"></sf-light>
+      <sf-light type="point" color="#4c7dff" intensity="26" position="4 -3 2"></sf-light>
+
+      <sf-metaball id="goo" count="6" seed="9" resolution="64" scale="2.2"
+                   material="physical" color="#f4f2ec" roughness="0.07"
+                   clearcoat="1" speed="0.55" strength="0.75"
+                   position="0 0 0"></sf-metaball>
+
+      <sf-animate target="#goo" verb="turntable" rpm="1.2" axis="y"></sf-animate>
+      <sf-animate target="camera" verb="dolly" toward="0 0 0" distance="0.7"
+                  start="0" duration="9" ease="sine.inOut"></sf-animate>
+      <sf-animate target="#footer" verb="fade-in" start="1.2" duration="1"></sf-animate>
+    </sf-scene>
+
+    <div id="footer" class="clip" data-start="1.2">stereoframe · metaball</div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

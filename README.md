@@ -45,6 +45,8 @@ examples/
   glass-hero/              transmission glass panels ("Designed in glass")
   paper-swarm/             sf-swarm typography choreography
   multi-shot/              16s three-shot trailer (swarm → glass → ocean, crossfades)
+  variant-demo/            colorway switching with the variant verb
+  metaball/                gooey blobs occluding typography (sf-metaball)
   hello-cube/              HyperFrames embed: raw three.js + hf-seek
   product-turntable/       HyperFrames embed: GLB + HDRI + verbs
   verbs-demo/              HyperFrames embed: six-verb rehearsal
@@ -67,7 +69,7 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 
 ## Status
 
-v0 (Tier 3b): standalone CLI pipeline (init/lint/validate/render/preview/add/update, Puppeteer + ffmpeg), **3D-aware verification** (`lint`: markup/asset/time-purity static checks; `validate`: headless probes for lighting, framing, black frames, and seek idempotency — the determinism contract, machine-checked), **multi-shot compositions** (each sf-scene is a shot with cut/crossfade transitions and shot-local time), declarative scenes, GLB/HDRI preloading, ten animation verbs incl. character clip crossfades, camera follow, and `camera-path` spline flythroughs, stateless GPU particles, visual blocks (`sf-sky`, `sf-ocean`, `sf-swarm` typography choreography), glass/physical materials (transmission, rounded-box, emissive), DOM title overlays, deterministic local renders (frame-hash-identical across runs). HyperFrames embed mode retained. Roadmap: variant verb + metaball block, npm publish, Docker bit-parity CI.
+v0 (Tier 3b): standalone CLI pipeline (init/lint/validate/render/preview/add/update, Puppeteer + ffmpeg), **3D-aware verification** (`lint`: markup/asset/time-purity static checks; `validate`: headless probes for lighting, framing, black frames, and seek idempotency — the determinism contract, machine-checked), **multi-shot compositions** (each sf-scene is a shot with cut/crossfade transitions and shot-local time), declarative scenes, GLB/HDRI preloading, eleven animation verbs incl. character clip crossfades, camera follow, `camera-path` spline flythroughs, and `variant` colorway switching, stateless GPU particles, visual blocks (`sf-sky`, `sf-ocean`, `sf-swarm` typography choreography, `sf-metaball` goo), glass/physical materials (transmission, rounded-box, emissive), DOM title overlays, deterministic local renders (frame-hash-identical across runs). HyperFrames embed mode retained. Roadmap: audio mux, alpha output, Docker bit-parity CI.
 
 ## License
 

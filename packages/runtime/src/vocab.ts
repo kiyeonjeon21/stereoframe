@@ -17,6 +17,7 @@ export const ELEMENT_NAMES = [
   "sf-sky",
   "sf-ocean",
   "sf-swarm",
+  "sf-metaball",
   "sf-animate",
 ] as const;
 
@@ -31,6 +32,7 @@ export const VERB_NAMES = [
   "bounce-in",
   "fade-in",
   "float",
+  "variant",
 ] as const;
 
 /** sf-* attributes whose value is a local asset path the renderer fetches. */

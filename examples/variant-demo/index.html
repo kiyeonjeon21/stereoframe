@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+      body { font-family: ui-sans-serif, system-ui, sans-serif; }
+      sf-scene { position: absolute; inset: 0; }
+      .colorway {
+        position: absolute; bottom: 100px; width: 100%; text-align: center;
+        font-size: 40px; font-weight: 700; letter-spacing: 0.22em;
+        text-transform: uppercase; color: #e4e4e7;
+      }
+    </style>
+  </head>
+  <body>
+    <sf-scene duration="9" width="1920" height="1080" background="#101014">
+      <sf-camera fov="33" position="0 0.9 5.2" look-at="0 0 0"></sf-camera>
+      <sf-light preset="studio"></sf-light>
+
+      <sf-mesh geometry="cylinder" args="1.9 2.1 0.1" color="#1f2430"
+               roughness="0.35" metalness="0.6" position="0 -1.15 0"></sf-mesh>
+
+      <sf-mesh id="gadget" geometry="rounded-box" args="1.4 2.6 0.32 0.16"
+               color="#2563eb" metalness="0.55" roughness="0.3"
+               position="0 0.2 0" rotation="0 -20 0"></sf-mesh>
+
+      <sf-animate target="#gadget" verb="turntable" rpm="3.5"></sf-animate>
+      <sf-animate target="camera" verb="orbit" around="0 0.2 0" radius="5.2"
+                  from="0deg" to="24deg" height="0.7"
+                  start="0" duration="9" ease="sine.inOut"></sf-animate>
+
+      <!-- colorway chain: cobalt → sunset orange → matte sage -->
+      <sf-animate target="#gadget" verb="variant" color="#f97316" roughness="0.18"
+                  start="3" duration="0.8" ease="power2.inOut"></sf-animate>
+      <sf-animate target="#gadget" verb="variant" color="#9ca888" roughness="0.65" metalness="0.1"
+                  start="6" duration="0.8" ease="power2.inOut"></sf-animate>
+    </sf-scene>
+
+    <div class="colorway clip" data-start="0.4" data-duration="2.6">Cobalt</div>
+    <div class="colorway clip" data-start="3.4" data-duration="2.6">Sunset</div>
+    <div class="colorway clip" data-start="6.4">Sage</div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

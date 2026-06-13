@@ -83,6 +83,9 @@ Verbs (`start`/`duration` in seconds, `ease` = GSAP-compatible names like `power
 | `fade-in` | rise (px, DOM only) | opacity entrance (3D materials or DOM) |
 | `float` | amplitude, period | gentle hover (continuous) |
 | `camera-path` | points ("x y z, x y z, …"), look (ahead\|none) | spline flythroughs/walkthroughs |
+| `variant` | color/roughness/metalness, material (name filter) | colorway switches (configurators); chain multiple at different starts |
+
+Block: `sf-metaball` (count, seed, resolution, scale, speed + sf-mesh material attrs) — gooey blobs. Omit the scene `background` and place DOM typography BEFORE the sf-scene to get text occluded by the blobs (see examples/metaball).
 
 ## Ocean flythrough recipe
 

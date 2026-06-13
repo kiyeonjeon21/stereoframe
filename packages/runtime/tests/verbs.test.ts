@@ -234,6 +234,29 @@ describe("staggered-progress", () => {
   });
 });
 
+describe("metaball orbits", () => {
+  test("seeded orbits are reproducible and positions are pure in t", () => {
+    const { makeOrbits, orbitPosition } =
+      require("../src/blocks/metaball") as typeof import("../src/blocks/metaball");
+    const a = makeOrbits(4, 7, 0.7);
+    const b = makeOrbits(4, 7, 0.7);
+    expect(a).toEqual(b);
+    const p1 = orbitPosition(a[0]!, 1.23);
+    orbitPosition(a[0]!, 9.9);
+    expect(orbitPosition(a[0]!, 1.23)).toEqual(p1);
+    // stays inside the unit field with margin
+    for (const o of a) {
+      for (const t of [0, 1.7, 4.2, 11]) {
+        const p = orbitPosition(o, t);
+        expect(p.x).toBeGreaterThan(0);
+        expect(p.x).toBeLessThan(1);
+        expect(p.y).toBeGreaterThan(0);
+        expect(p.y).toBeLessThan(1);
+      }
+    }
+  });
+});
+
 describe("float", () => {
   test("sinusoidal bob is a pure function of t", () => {
     const target = makeTarget({ position: { x: 0, y: 3, z: 0 } });

@@ -11,6 +11,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { buildMetaball } from "./blocks/metaball";
 import { buildOcean, type OceanBuild } from "./blocks/ocean";
 import { buildSky } from "./blocks/sky";
 import { buildSwarm } from "./blocks/swarm";
@@ -332,6 +333,11 @@ export function compileScene(host: HTMLElement): CompiledScene {
       scene.add(swarm.mesh);
       if (el.id) objectsById.set(el.id, swarm.mesh);
       seekFns.push(swarm.writer);
+    } else if (tag === "sf-metaball") {
+      const metaball = buildMetaball(el, buildMeshMaterial(el));
+      scene.add(metaball.mesh);
+      if (el.id) objectsById.set(el.id, metaball.mesh);
+      seekFns.push(metaball.writer);
     }
   }
 
