@@ -291,6 +291,11 @@ thing to avoid. Default to the flagship arc:
   threshold blooms the whole image and pulses), `bloom` 0.06–0.16, `grain` ≤0.03 (it
   changes every frame). Judge motion on a **full render**, not `--draft` (draft is a
   fast, heavily-compressed preview — the compression itself shimmers on dark scenes).
+- **Anti-flicker on shiny/metal subjects:** stacking a fast camera orbit + a subject `spin`
+  + a high `lightSweep` makes the reflections *sparkle* (specular aliasing — worst when the
+  subject fills the frame, e.g. the hero). Per shot use EITHER a camera move OR a subject
+  spin (small `sway`/`float` is fine), keep hero/orbit sweeps modest (~30–60°, not 300°),
+  `lightSweep` ≤0.1 on metal, and `finish.samples:3` where a glossy subject fills the frame.
 - Use the model facts: stand up a genuinely-flat device with `pose`; metal → `lighting:"auto"`.
 
 Reference plans: `killer-demos/supercar/flagship/index.html` (the hand-authored

@@ -630,5 +630,11 @@ CINEMATIC DIRECTION (aim for a real film, not a turntable):
 - Set backdrop + secondaryMotion on (almost) every shot. Put atmosphere:"dust" on the
   cold-open (followed by a cut) and the final hero.
 - Colour = lighting + grade: complementary split (e.g. cyan key / magenta rim), per-beat
-  exposure/vignette/saturation, light-sweep 0.1-0.24 for the specular highlight sweep.
+  exposure/vignette/saturation, light-sweep 0.06-0.12 for the specular highlight sweep.
+- ANTI-FLICKER (important for glossy/metal subjects): do NOT stack fast motions — a fast
+  camera orbit + a subject spin + a high light-sweep all churn the sharp reflections and make
+  the surface SPARKLE (specular aliasing). Per shot, prefer EITHER a camera move OR a subject
+  spin (a small sway/float is fine alongside either). Keep camera "hero"/orbit sweeps modest
+  (~30-60 deg, not 300+). Keep light-sweep <=0.1 on metal. Use finish.samples:3 on the hero /
+  any beat where a shiny subject fills the frame.
 - Determinism: atmosphere never on a crossfade-out shot. Keep everything a function of time.`;
