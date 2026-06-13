@@ -1,77 +1,79 @@
-# Stereoframe 자연어 요청 가이드
+# Prompting Guide
 
-stereoframe으로 영상을 만들 때는 마크업이 아니라 **연출 의도**를 말하면 된다. 마크업 번역은 스킬(`skills/stereoframe/SKILL.md`)을 읽은 에이전트의 일이다. 이 문서는 좋은 첫 결과물과 빠른 정제 루프를 얻는 요청 방법을 정리한다.
+When making a video with stereoframe, describe your **directorial intent**, not the markup. Translating intent into markup is the job of an agent that has read the skill (`skills/stereoframe/SKILL.md`). This document covers how to request a good first result and a fast refinement loop.
 
-## 요청에 담을 다섯 가지
+## Five things to put in a request
 
-| # | 항목 | 예 |
+| # | item | example |
 |---|---|---|
-| 1 | **무엇을** | 제품 GLB, 텍스트, 캐릭터, 추상 씬 |
-| 2 | **분위기** | "골든아워", "다크 스튜디오", "밝은 종이 질감" |
-| 3 | **길이/포맷** | "8초", "1080p", "세로(1080×1920)" |
-| 4 | **샷 흐름** | "①타이틀 → ②제품 → ③엔딩" — 멀티샷은 샷 리스트가 가장 강력 |
-| 5 | **텍스트/카피** | 정확한 문구 — 에이전트가 지어내면 안 되는 유일한 부분 |
+| 1 | **what** | a product GLB, text, a character, an abstract scene |
+| 2 | **mood** | "golden hour", "dark studio", "bright paper texture" |
+| 3 | **length/format** | "8 seconds", "1080p", "vertical (1080×1920)" |
+| 4 | **shot flow** | "① title → ② product → ③ ending" — a shot list is the strongest form for multi-shot |
+| 5 | **text/copy** | the exact wording — the one thing the agent should never invent |
 
-## 고도별 예시
+## Examples by altitude
 
-**높은 고도 — 대부분 이걸로 충분:**
+**High altitude — enough most of the time:**
 
-> "내 헬멧 GLB로 10초 제품 영상. 어두운 스튜디오, 천천히 돌면서 카메라가 살짝 호를 그리고, 하단에 'Titan Mk-II' 타이틀."
+> "A 10-second product video with my helmet GLB. Dark studio, slow rotation while the camera arcs slightly, 'Titan Mk-II' title at the bottom."
 
-**샷 단위 — 트레일러류:**
+**Shot-level — trailers:**
 
-> "15초 트레일러: ①'LAUNCH WEEK' 글자가 종이 조각으로 모임 → ②유리 패널 위에 'March 24' → ③바다 위로 날아가며 엔딩 로고. 샷 사이는 크로스페이드."
+> "A 15-second trailer: ① the words 'LAUNCH WEEK' assemble from paper scraps → ② 'March 24' over a glass panel → ③ fly over the ocean to an ending logo. Crossfade between shots."
 
-**반복 정제 — 첫 렌더 후의 핵심 루프:**
+**Iterative refinement — the core loop after the first render:**
 
-> "2번 샷 0.5초 길게" · "카메라 더 낮게" · "타이틀 등장 1초 늦추고 bounce 말고 fade로" · "파티클을 호박색으로"
+> "Make shot 2 half a second longer" · "Camera lower" · "Delay the title by a second and use fade instead of bounce" · "Make the particles amber"
 
-마크업이 선언적이라 부분 수정이 diff 한 줄이고, 렌더가 결정론적이라 "그 부분만 바뀐" 결과가 보장된다. 에이전트는 렌더 전에 `stereoframe lint`(정적)와 `validate`(헤드리스 — 조명/구도/검은 프레임/시킹 멱등성)로 자기 결과를 검증하므로, 대부분의 실수는 영상을 보기 전에 잡힌다. 한 번에 완벽한 프롬프트를 쓰려 하지 말고 이 정제 루프를 돌리는 것이 가장 빠르다 (한 방 생성보다 분해된 반복 정제가 품질이 좋다는 것은 연구로도 확인된 패턴이다 — Keyframer, MoVer).
+Because the markup is declarative, a partial edit is a one-line diff, and because rendering is deterministic, you get a result where only that part changed. The agent verifies its own output before rendering with `stereoframe lint` (static) and `validate` (headless — lighting, framing, black frames, seek idempotency), so most mistakes are caught before you ever watch the video. Don't try to write the perfect prompt in one go — running this refinement loop is fastest (decomposed iterative refinement beating one-shot generation is a research-backed pattern — Keyframer, MoVer).
 
-## 맡길 것 vs 직접 줄 것
+## Leave to the agent vs. give explicitly
 
-| 에이전트에게 맡기세요 (기본값이 튜닝돼 있음) | 직접 주세요 |
+| Leave to the agent (defaults are tuned) | Give explicitly |
 |---|---|
-| 카메라 좌표, fov, easing 이름 | 정확한 문구/카피 |
-| 라이팅 수치, 노출, 톤매핑 | 에셋 파일(GLB/HDRI) 또는 "프로시저럴로" 명시 |
-| 파티클 수/시드, 샷 길이 미세 배분 | 브랜드 컬러(있다면) |
-| 유리/물 머티리얼 파라미터 | 전체 길이와 용도(SNS/발표/시연) |
+| camera coordinates, fov, easing names | the exact wording/copy |
+| lighting values, exposure, tone-mapping | asset files (GLB/HDRI), or say "procedural" |
+| particle count/seed, fine shot-length splits | brand colors (if any) |
+| glass/water material parameters | total length and intended use (social/presentation/demo) |
 
-**에셋 규칙**: 모델·환경맵이 필요한 요청은 GLB/HDRI 파일을 주거나 "프리미티브로 추상적으로"라고 명시한다. 렌더 중 원격 fetch는 결정론 위반이라 에이전트가 CDN 에셋을 쓰지 않는다 (CC0 소스: Poly Haven HDRI, Khronos 샘플 GLB).
+**Asset rule**: for requests that need models or environment maps, provide the GLB/HDRI files or say "abstract with primitives". The agent won't use CDN assets because remote fetches during render break determinism (CC0 sources: Poly Haven HDRIs, Khronos sample GLBs).
 
-## 현재 어휘의 사정권
+## What's in range of the current vocabulary
 
-**한 번에 되는 것** — 턴테이블/오빗/돌리/스플라인 플라이스루 카메라, 캐릭터 클립 전환(idle→run)+추적 카메라, 종이 스웜 타이포그래피, 유리 패널(transmission), 바다/하늘(골든아워), 파티클(분수/눈/먼지), 멀티샷 컷/크로스페이드, DOM 자막/타이틀.
+**Works in one pass** — turntable/orbit/dolly/spline-flythrough cameras, character clip transitions (idle→run) with a follow camera, paper-swarm typography, glass panels (transmission), ocean/sky (golden hour), particles (fountain/snow/dust), metaball goo, material colorway switching (variant), multi-shot cuts/crossfades, DOM titles/captions.
 
-**아직 안 되는 것** — 요청하면 escape hatch로 시도하거나 한계를 답한다: 메타볼/액체, 물리 시뮬(무너짐·충돌), 사실적 인간, 오디오, 와이프/셰이더 트랜지션, 3D 텍스트 메시(자막은 DOM 오버레이로 처리).
+**Not yet** — the agent will try the escape hatch or tell you the limit: physics simulation (collapse/collision), photorealistic humans, audio, wipe/shader transitions, 3D text meshes (captions are handled as DOM overlays).
 
-## 가장 효율적인 패턴: 레퍼런스 + 차이
+## Most efficient pattern: reference + difference
 
-검증된 예제(`examples/`)에서 출발해 차이만 말하면 첫 렌더 적중률이 가장 높다:
+Starting from a proven example (`examples/`) and stating only the difference gives the highest first-render hit rate:
 
-> "ocean-flythrough 느낌인데 밤바다로, 부표 대신 등대 GLB(첨부), 끝에 'COMING SOON'"
+> "Like ocean-flythrough but a night sea, a lighthouse GLB instead of the buoy (attached), 'COMING SOON' at the end"
 
-| 레퍼런스 예제 | 스타일 |
+| reference example | style |
 |---|---|
-| `product-turntable` | 제품 영상 (HDRI 스튜디오 + 턴테이블 + 오빗) |
-| `character-run-standalone` | 캐릭터 샷 (클립 전환 + 팔로우 캠 + 파티클) |
-| `ocean-flythrough` | 자연 플라이스루 (하늘/바다 + 카메라 경로) |
-| `glass-hero` | 다크 유리 히어로 (transmission + 글로우) |
-| `paper-swarm` | 타이포 모션그래픽 (종이 조각 집결) |
-| `multi-shot` | 멀티샷 트레일러 (컷/크로스페이드 구성) |
+| `product-turntable` | product video (HDRI studio + turntable + orbit) |
+| `character-run-standalone` | character shot (clip transition + follow cam + particles) |
+| `ocean-flythrough` | nature flythrough (sky/ocean + camera path) |
+| `glass-hero` | dark glass hero (transmission + glow) |
+| `paper-swarm` | typography motion graphics (paper scraps gathering) |
+| `metaball` | gooey blobs occluding typography |
+| `variant-demo` | colorway switching with the variant verb |
+| `multi-shot` | multi-shot trailer (cut/crossfade structure) |
 
-같은 시각 스타일이 반복해서 필요해지면 **"이거 블록으로 만들어줘"** — 어휘(`sf-*` 요소)로 승격되어 다음부터는 속성 몇 개로 재사용된다.
+When the same visual style is needed repeatedly, say **"make this a block"** — it gets promoted into the vocabulary (an `sf-*` element) and is reusable with a few attributes thereafter.
 
-## 요청 템플릿
+## Request template
 
 ```
-[용도] 제품 출시 트레일러 / SNS 티저 / 발표 오프닝 …
-[길이/포맷] 12초, 1920×1080
-[샷 흐름] ① … → ② … → ③ …  (전환: 컷/크로스페이드)
-[분위기] …
-[카피] 타이틀 "…", 자막 "…"
-[에셋] 첨부 GLB/HDRI 또는 "프로시저럴"
-[기타] 브랜드 컬러 #…, 레퍼런스 예제 …
+[Use] product launch trailer / social teaser / presentation opener …
+[Length/format] 12 seconds, 1920×1080
+[Shot flow] ① … → ② … → ③ …  (transition: cut/crossfade)
+[Mood] …
+[Copy] title "…", caption "…"
+[Assets] attached GLB/HDRI or "procedural"
+[Other] brand color #…, reference example …
 ```
 
-다 채울 필요는 없다 — 빈 칸은 에이전트가 기본값으로 채우고, 렌더를 보고 정제하면 된다.
+You don't have to fill it all in — the agent fills blanks with defaults, and you refine after seeing the render.

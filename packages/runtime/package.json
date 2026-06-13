@@ -1,8 +1,8 @@
 {
   "name": "stereoframe-runtime",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Declarative, deterministic 3D scene runtime for stereoframe — three.js driven by seek time.",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/kiyeonjeon21/stereoframe",
