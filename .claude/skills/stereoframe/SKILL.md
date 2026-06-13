@@ -49,6 +49,7 @@ stereoframe render --draft     # fast iteration render → renders/*.mp4
 stereoframe render             # quality render (crf 18)
 stereoframe preview            # browser playback at http://127.0.0.1:<port>/?sf-preview
 stereoframe gen "<prompt>"     # text-to-3D: generate a textured GLB into assets/ (Meshy)
+stereoframe bake --target <id> # freeze a mode="forward" sim's InstancedMesh into a seekable cache for <sf-baked>
 stereoframe add ocean          # install a block's assets + print its markup
 stereoframe blocks             # list available blocks
 stereoframe update             # refresh assets/stereoframe.js after upgrading
@@ -122,6 +123,7 @@ Verbs (`start`/`duration` in seconds, `ease` = GSAP-compatible names like `power
 Blocks:
 - `sf-metaball` (count, seed, resolution, scale, speed + sf-mesh material attrs) — gooey blobs. Omit the scene `background` and place DOM typography BEFORE the sf-scene to get text occluded by the blobs (see examples/metaball).
 - `sf-scatter` (geometry/args + material, count, seed, area, distribution box\|sphere, scale-min/max, spin, float, palette) — a seeded field of instanced objects (forest/debris/grid) with per-instance spin+float; deterministic.
+- `sf-baked` (src=.bake.json + geometry/args + material) — replay a baked simulation as a pure function of t (seekable again). Author a `mode="forward"` sim, `stereoframe bake --target <id>`, then `<sf-baked>`. See examples/baked-flock.
 
 ## Ocean flythrough recipe
 

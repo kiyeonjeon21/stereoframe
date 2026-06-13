@@ -1,0 +1,32 @@
+<!doctype html>
+<!--
+  baked-flock — playback of a baked simulation. The flocking sim (a forward,
+  history-dependent boids sim) is in sim.html (mode="forward"); it was frozen with
+  `stereoframe bake . --target flock --fps 30` into assets/flock.bake.{bin,json}.
+  This scene replays it with <sf-baked> as a pure function of t — so it's fully
+  SEEKABLE again (random-access, multi-shot, crossfade, preview all work).
+  `validate` passes the idempotency probe: the recapture path closing the loop.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #06080f; }
+      sf-scene { position: absolute; inset: 0; }
+    </style>
+  </head>
+  <body>
+    <sf-scene duration="4" width="1920" height="1080" background="#06080f"
+              environment="room" exposure="1.0" samples="2" bloom="0.14" bloom-threshold="0.85" vignette="0.34">
+      <sf-camera fov="42" position="0 0.5 11" look-at="0 0 0"></sf-camera>
+      <sf-light type="hemisphere" color="#2a3450" intensity="0.6"></sf-light>
+      <sf-light type="directional" color="#9db8ff" intensity="1.3" position="4 6 5"></sf-light>
+      <sf-baked src="assets/flock.bake.json" geometry="icosahedron" args="0.16 0"
+                material="standard" color="#9db8ff" emissive="#21407a" emissive-intensity="0.8" roughness="0.4"></sf-baked>
+      <sf-animate target="camera" verb="orbit" around="0 0 0" radius="11"
+                  from="-18deg" to="18deg" height="0.5" start="0" duration="4" ease="sine.inOut"></sf-animate>
+    </sf-scene>
+    <script type="module">import "./assets/stereoframe.js";</script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "target": "flock",
+  "kind": "instanceMatrix",
+  "count": 80,
+  "stride": 16,
+  "fps": 30,
+  "frames": 120,
+  "duration": 4,
+  "bin": "flock.bake.bin",
+  "interpolate": "step"
+}

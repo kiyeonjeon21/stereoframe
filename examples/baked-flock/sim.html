@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset=UTF-8><style>
+*{margin:0;padding:0}html,body{width:1920px;height:1080px;overflow:hidden;background:#06080f}
+sf-scene{position:absolute;inset:0}
+</style></head><body>
+<sf-scene mode="forward" duration="4" width="1920" height="1080" environment="room" exposure="1.0" samples="2">
+  <sf-camera fov="42" position="0 0.5 11" look-at="0 0 0"></sf-camera>
+  <sf-light type="hemisphere" color="#2a3450" intensity="0.6"></sf-light>
+  <sf-light type="directional" color="#9db8ff" intensity="1.3" position="4 6 5"></sf-light>
+</sf-scene>
+<script type="stereoframe">
+  const T = sf.THREE, N = 80;
+  const mesh = new T.InstancedMesh(new T.IcosahedronGeometry(0.16, 0),
+    new T.MeshStandardMaterial({ color: 0x9db8ff, emissive: 0x21407a, emissiveIntensity: 0.8, roughness: 0.4 }), N);
+  mesh.frustumCulled = false; sf.scene.add(mesh); sf.objects.set("flock", mesh);
+  let s = 99173; const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0, s / 4294967296); // seeded
+  const pos = [], vel = [];
+  for (let i = 0; i < N; i++) {
+    pos.push(new T.Vector3((rnd()-0.5)*7, (rnd()-0.5)*4, (rnd()-0.5)*7));
+    vel.push(new T.Vector3((rnd()-0.5)*2, (rnd()-0.5)*2, (rnd()-0.5)*2));
+  }
+  const m = new T.Matrix4(), q = new T.Quaternion(), scl = new T.Vector3(1,1,1), c = new T.Vector3(), a = new T.Vector3(), d = new T.Vector3();
+  sf.onSeek((t, dt) => {
+    if (dt > 0) {
+      for (let i = 0; i < N; i++) {
+        a.subVectors(c, pos[i]).multiplyScalar(0.5);                 // cohesion to center
+        for (let j = 0; j < N; j++) if (i !== j) {
+          const dist = pos[i].distanceTo(pos[j]);
+          if (dist < 1.0) a.add(d.subVectors(pos[i], pos[j]).multiplyScalar(0.9 / (dist + 0.05))); // separation
+        }
+        vel[i].addScaledVector(a, dt).clampLength(0, 2.6);
+        pos[i].addScaledVector(vel[i], dt);
+      }
+    }
+    for (let i = 0; i < N; i++) { m.compose(pos[i], q, scl); mesh.setMatrixAt(i, m); }
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+</script>
+<script type="module">import "./assets/stereoframe.js";</script>
+</body></html>

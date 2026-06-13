@@ -58,12 +58,16 @@ It runs with no setup using Meshy's free test mode (returns a sample model); set
 
 ```
 packages/runtime/    stereoframe-runtime → dist/stereoframe.js (three.js r184 bundled)
-packages/cli/        stereoframe → `stereoframe` bin (stage/inspect/init/gen/lint/validate/render/preview/add/update)
+packages/cli/        stereoframe → `stereoframe` bin (stage/inspect/init/gen/lint/validate/render/bake/preview/add/update)
 examples/
   hello-standalone/        CLI-scaffolded starter (no HyperFrames)
   character-run-standalone/ Fox run cycle + follow cam + particles, own pipeline
   ocean-flythrough/        sf-sky + sf-ocean + camera-path golden-hour flight
   glass-hero/              transmission glass panels ("Designed in glass")
+  shader-flow/             generative flow field authored with <sf-shader> (GLSL)
+  type-poster/             editorial motion poster: bold type occluded by an iridescent matcap form
+  forward-trails/          mode="forward" — an accumulating motion trail (live state)
+  baked-flock/             a baked forward boids sim replayed seekably via <sf-baked>
   product-teardown/        hand-directed 5-shot film: hero → teardown → per-part spotlights (inspect + isolate + callouts)
   paper-swarm/             sf-swarm typography choreography
   multi-shot/              16s three-shot trailer (swarm → glass → ocean, crossfades)
@@ -102,11 +106,15 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 
 **Authoring (declarative 3D-video framework)**
 - Plain-HTML scenes; GLB/HDRI preload gate; multi-shot compositions (each `sf-scene` is a shot — cut/crossfade, shot-local time).
-- Fourteen analytic verbs — turntable, orbit, dolly, move, follow, camera-path, crossfade-clip, bounce-in, fade-in, float, sway, explode, isolate, variant — with GSAP-compatible easing.
+- Seventeen analytic verbs — turntable, orbit, dolly, move, follow, camera-path, **path**, **morph**, **deform**, crossfade-clip, bounce-in, fade-in, float, sway, explode, isolate, variant — with GSAP-compatible easing.
 - Materials — glass/physical (transmission, rounded-box, emissive) and matcaps (pearl/chrome/iridescent/clay/holo).
-- Stateless GPU particles (fountain/snow/dust); visual blocks (`sf-sky`, `sf-ocean`, `sf-swarm` typography, `sf-metaball`).
+- Generative & instancing blocks — **`sf-shader`** (author GLSL directly: fullscreen/mesh, auto-wired uTime + noise toolkit), **`sf-scatter`** (seeded instanced fields), stateless GPU particles (fountain/snow/dust), `sf-sky`/`sf-ocean`/`sf-swarm`/`sf-metaball`.
 - Post-processing — supersampling AA, `environment="room"` reflections, bloom, vignette, film grain, chromatic aberration, color grade (all deterministic).
 - Custom shaders via the `sf.THREE` escape hatch; DOM title overlays.
+
+**Live simulation, kept seekable**
+- **`mode="forward"`** — opt a scene out of seek-idempotency for genuine live/stateful sim (cloth, fluid, accumulating trails, flocking); writers get a `dt`. Cost: capture-only, no random-access seek.
+- **`stereoframe bake` + `<sf-baked>`** — freeze a forward sim into a per-frame cache and replay it as a pure function of `t`, so it's fully seekable again and drops into multi-shot. (forward-trails → baked-flock.)
 
 **Pipeline & verification**
 - CLI — init / gen / inspect / lint / validate / render / preview / add / update (Puppeteer + ffmpeg).

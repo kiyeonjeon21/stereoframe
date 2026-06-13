@@ -15,6 +15,7 @@ import { basename } from "node:path";
 import { addBlock, listBlocks } from "./blocks";
 import { genModel } from "./gen";
 import { inspectModel } from "./inspect";
+import { bakeProject } from "./bake";
 import { buildAutoCallouts, explodeTiming, PRESETS, stageModel, type Preset } from "./stage";
 import { lintHtml, type Finding } from "./lint";
 import { renderProject } from "./render";
@@ -60,6 +61,9 @@ USAGE
       --out <path>     output file (default renders/render_<timestamp>.mp4)
       --crf <n>        x264 quality, lower = better (default 18)
       --draft          fast low-quality render for iteration
+  stereoframe bake [dir]               freeze a forward-mode sim into a seekable cache for <sf-baked>
+      --target <id>    the InstancedMesh element id to bake (required)
+      --fps <n>        bake frame rate (default 30)
   stereoframe preview [dir]            serve with looping wall-clock playback
       --port <n>       fixed port (default: random)
   stereoframe stage <model.glb>        auto-direct a GLB into a cinematic motion graphic
@@ -109,6 +113,20 @@ async function main(): Promise<void> {
     case "validate": {
       const findings = await validateProject(dir);
       reportFindings("validate", findings, options.get("json") === true);
+      return;
+    }
+    case "bake": {
+      const target = options.get("target");
+      if (typeof target !== "string") {
+        throw new Error("usage: stereoframe bake [dir] --target <element-id> [--fps n] [--out file.bin]");
+      }
+      const out = await bakeProject({
+        projectDir: dir,
+        target,
+        fps: options.has("fps") ? Number(options.get("fps")) : undefined,
+        out: typeof options.get("out") === "string" ? (options.get("out") as string) : undefined,
+      });
+      console.log(`baked → ${out}`);
       return;
     }
     case "render": {

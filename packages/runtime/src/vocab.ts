@@ -19,6 +19,7 @@ export const ELEMENT_NAMES = [
   "sf-swarm",
   "sf-metaball",
   "sf-scatter",
+  "sf-baked",
   "sf-shader",
   "sf-animate",
   "sf-callout",

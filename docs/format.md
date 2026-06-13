@@ -206,6 +206,17 @@ A field of objects — a forest, a debris cloud, a tile grid — from one elemen
 | `float` | 0 | per-instance vertical bob amplitude |
 | `palette` | — | comma-separated colors assigned per instance (e.g. `#fff,#f43,#18181b`) |
 
+### `<sf-baked>` — replay a baked simulation (block)
+
+The recapture path for live sim. Author a forward/stateful sim in a `mode="forward"` scene, freeze it with `stereoframe bake <dir> --target <id>` (records the target InstancedMesh's per-frame transforms into `<id>.bake.bin` + a `.json` manifest), then replay it here as a pure function of `t` — so the result is fully **seekable** again (random-access, multi-shot, crossfade, preview) and passes `validate`'s idempotency probe. See `examples/baked-flock` (sim in `sim.html`).
+
+| attribute | default | description |
+|---|---|---|
+| `src` | — | path to the `.bake.json` manifest (the `.bin` is resolved next to it) |
+| `geometry`/`args`, `material`/… | box / standard | the instanced primitive + material to draw at each baked transform (full sf-mesh material vocabulary) |
+
+The instance `count`, frame count, and fps come from the manifest. Playback uses nearest-frame (step) sampling. The bake cache is the frozen ground truth — commit the `.bin`/`.json` as the source of truth for that take.
+
 ### `<sf-animate>` — semantic verbs
 
 Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, default 0), `duration` (seconds), `ease`.

@@ -23,6 +23,7 @@ import { buildOcean, type OceanBuild } from "./blocks/ocean";
 import { buildSky } from "./blocks/sky";
 import { buildSwarm } from "./blocks/swarm";
 import { buildScatter } from "./blocks/scatter";
+import { buildBaked } from "./blocks/baked";
 import { buildShader } from "./blocks/shader";
 import { buildParticles } from "./particles";
 import type { ShotSpec } from "./shots";
@@ -421,6 +422,12 @@ export function compileScene(host: HTMLElement): CompiledScene {
       scene.add(scatter.mesh);
       if (el.id) objectsById.set(el.id, scatter.mesh);
       seekFns.push(scatter.writer);
+    } else if (tag === "sf-baked") {
+      const baked = buildBaked(el, buildGeometry(el), buildMeshMaterial(el));
+      scene.add(baked.group);
+      if (el.id) objectsById.set(el.id, baked.group);
+      pending.push(baked.pending);
+      seekFns.push(baked.writer);
     } else if (tag === "sf-shader") {
       const fullscreen = el.hasAttribute("fullscreen");
       const geometry = fullscreen ? new THREE.PlaneGeometry(2, 2) : buildGeometry(el);
