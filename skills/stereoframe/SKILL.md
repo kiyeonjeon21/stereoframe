@@ -20,6 +20,8 @@ Presets: `reveal` (dramatic dark spiral-in + rim light), `hero-orbit` (clean stu
 
 When a user gives you a model (or you `gen` one) and wants "an Apple-ad-style reveal / a product video", reach for `stage` first.
 
+**Inspect before you direct.** `stereoframe inspect product.glb` segments + tags the GLB and prints its parts — name, kind, triangle count, material character (glass/metal/fabric/emissive/matte), where each sits (top/base/left/right/front/back/core), and size rank. It also writes `product.segments.json`. The part **indices/names it reports are exactly what `isolate`/`explode`/`sf-callout` target** (they share the same `collectParts` boundary), so this is how you stop guessing: inspect, learn that part 2 is `Glass`, then author `part="Glass"` by name. It also tells you up front if a model is single-mesh (explode/isolate/per-part callouts won't separate it) or rigged. Run it first whenever you plan to isolate or callout a specific feature. `--json` emits the manifest for programmatic use.
+
 ## Workflow
 
 ```bash

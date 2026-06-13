@@ -197,7 +197,7 @@ Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, defau
 | `float` | `amplitude` (0.1), `period` (4) | sinusoidal bob on Y; continuous |
 | `sway` | `amount` (6, degrees), `period` (5) | continuous multi-axis secondary motion (gentle wobble) — makes a form feel alive; analytic, seekable |
 | `explode` | `distance` (1.5) | exploded view — separate a model's parts outward from its center over the window. Needs a **multi-component** GLB (separate part meshes); single-mesh or rigged-character models have nothing to separate (no effect) |
-| `isolate` | `part` (index, required), `dim` (0.8) | feature spotlight — fade every *other* part's material toward black over the window so one component reads as the hero. `dim` is how far the rest darken (1 = fully). Needs a multi-component GLB; pair with a slow `dolly`/`orbit` toward the part |
+| `isolate` | `part` (index or name, required), `dim` (0.8) | feature spotlight — fade every *other* part's material toward black over the window so one component reads as the hero. `dim` is how far the rest darken (1 = fully). Needs a multi-component GLB; pair with a slow `dolly`/`orbit` toward the part. `part` accepts a name (`part="Glass"`) — run `stereoframe inspect <model>` to learn the names |
 | `variant` | `color`/`roughness`/`metalness` (target values), `material` (GLB material name filter), duration default 0.8 | material colorway transitions (configurators). Multiple variants on one target chain in start order — each one's from-state is the previous one's result (resolved at compile time, backward-seek safe) |
 
 ### Easing vocabulary (GSAP-compatible names)
@@ -211,7 +211,7 @@ A thin leader line from a feature to a floating typographic label — the signat
 | attribute | default | description |
 |---|---|---|
 | `target` | — | `#id` of an `sf-model`/object to anchor on (tracks it through turntable/orbit) |
-| `part` | — | with `target`: which component to point at (index into the same part list `explode`/`isolate` use). Omit to anchor the whole object's center |
+| `part` | — | with `target`: which component to point at — an index or a name (`part="Glass"`), into the same part list `explode`/`isolate` use (run `stereoframe inspect` to learn names). Omit to anchor the whole object's center |
 | `point` | — | `x y z` fixed world point to anchor on, instead of `target`/`part` |
 | `value` | — | the big headline line (e.g. `48MP`, `Titanium`) — optional |
 | `text` | — | the small uppercase caption under the value |

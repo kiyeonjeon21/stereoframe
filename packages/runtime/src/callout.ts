@@ -18,9 +18,9 @@
  * fixed world point instead. Runs in `overlayFns` (after camera lookAt).
  */
 import { Box3, Vector3 } from "three";
-import { collectParts } from "./animate";
+import { collectParts, resolvePartIndex } from "./animate";
 import { getEase, type EaseFn } from "./ease";
-import { parseNumber, parseSeconds, parseVec3 } from "./parse";
+import { parseSeconds, parseVec3 } from "./parse";
 import type { CompiledScene } from "./scene";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -74,8 +74,7 @@ function resolveAnchor(
   const partAttr = el.getAttribute("part");
   if (partAttr !== null) {
     const parts = collectParts(obj);
-    const idx = Math.max(0, Math.min(parts.length - 1, Math.round(parseNumber(partAttr, 0))));
-    node = parts[idx]!;
+    node = parts[resolvePartIndex(parts, partAttr, 0)]!;
   }
   const box = new Box3();
   // World AABB center, recomputed each seek so it tracks turntable/orbit motion.

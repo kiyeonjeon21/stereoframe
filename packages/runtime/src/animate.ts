@@ -39,6 +39,24 @@ export function collectParts(root: Object3D): Object3D[] {
   return node.children.length > 1 ? [...node.children] : [node];
 }
 
+/**
+ * Resolve a `part` attribute to an index. Accepts a numeric index OR a part
+ * name (case-insensitive, exact then substring) — so `part="Glass"` works once
+ * `stereoframe inspect` has told the author the part names. Falls back to the
+ * given index (clamped) when unmatched.
+ */
+export function resolvePartIndex(parts: Object3D[], spec: string | null, fallback = 0): number {
+  const clamp = (i: number) => Math.max(0, Math.min(parts.length - 1, i));
+  if (spec == null) return clamp(fallback);
+  const s = spec.trim();
+  if (/^-?\d+$/.test(s)) return clamp(Math.round(Number(s)));
+  const lower = s.toLowerCase();
+  const name = (p: Object3D) => (p.name ?? "").toLowerCase();
+  let idx = parts.findIndex((p) => name(p) === lower);
+  if (idx < 0) idx = parts.findIndex((p) => name(p).includes(lower));
+  return idx >= 0 ? idx : clamp(fallback);
+}
+
 function resolveTarget(compiled: CompiledScene, spec: string | null): Object3D | null {
   if (!spec) return null;
   if (spec === "camera") return compiled.camera;
@@ -299,10 +317,7 @@ export function compileAnimations(compiled: CompiledScene): void {
       // goes to it (the "detail section" beat). Needs a multi-part model.
       const parts = collectParts(target);
       if (parts.length <= 1) continue;
-      const targetIdx = Math.max(
-        0,
-        Math.min(parts.length - 1, Math.round(parseNumber(el.getAttribute("part"), 0))),
-      );
+      const targetIdx = resolvePartIndex(parts, el.getAttribute("part"), 0);
       // `dim=1` fully blacks out the rest. Default 0.85 leaves a faint ghost.
       const dim = Math.min(1, parseNumber(el.getAttribute("dim"), 0.85));
       interface DimState {

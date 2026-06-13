@@ -14,6 +14,7 @@ import { join, resolve } from "node:path";
 import { basename } from "node:path";
 import { addBlock, listBlocks } from "./blocks";
 import { genModel } from "./gen";
+import { inspectModel } from "./inspect";
 import { PRESETS, stageModel, type Preset } from "./stage";
 import { lintHtml, type Finding } from "./lint";
 import { renderProject } from "./render";
@@ -67,6 +68,8 @@ USAGE
       --duration <s>   seconds (default 8)
       --title "<text>" optional title overlay
       --bg <color>     background color (preset default otherwise)
+  stereoframe inspect <model.glb>      segment + tag a GLB: list its parts (name, material, where, size)
+      --json           print the manifest as JSON instead of a table
   stereoframe gen "<prompt>"           generate a 3D model (GLB) from text via Meshy
       --dir <dir>      project dir (default .)
       --out <path>     output path (default assets/<slug>.glb)
@@ -123,6 +126,12 @@ async function main(): Promise<void> {
       console.log(`preview: ${handle.url}?sf-preview`);
       console.log("press ctrl-c to stop");
       return; // server keeps the process alive
+    }
+    case "inspect": {
+      const model = positional[0];
+      if (!model) throw new Error("usage: stereoframe inspect <model.glb> [--json]");
+      await inspectModel({ model, json: options.get("json") === true });
+      return;
     }
     case "stage": {
       const model = positional[0];
