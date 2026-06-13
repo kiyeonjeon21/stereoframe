@@ -1,0 +1,63 @@
+<!doctype html>
+<!--
+  forward-trails — the escape valve for live simulation. A motion trail is
+  *accumulated*: each frame appends the head's position to a ring buffer. That's
+  history-dependent (impossible as a pure f(t)), so the scene opts out of
+  seek-idempotency with mode="forward". The render loop is monotonic, so it
+  captures correctly; `validate` reports forward_only_scene (not an error) and
+  skips the idempotency probe. To put a sim like this into a multi-shot piece,
+  bake it (stereoframe bake) into a seekable asset.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #06080f; }
+      sf-scene { position: absolute; inset: 0; }
+    </style>
+  </head>
+  <body>
+    <sf-scene mode="forward" duration="6" width="1920" height="1080" background="#06080f"
+              environment="room" exposure="1.0" samples="2" bloom="0.5" bloom-threshold="0.6" vignette="0.4">
+      <sf-camera fov="40" position="0 0.5 9" look-at="0 0 0"></sf-camera>
+      <sf-light type="hemisphere" color="#2a3450" intensity="0.6"></sf-light>
+      <sf-light type="directional" color="#9db8ff" intensity="1.2" position="4 6 5"></sf-light>
+    </sf-scene>
+
+    <script type="stereoframe">
+      const T = sf.THREE;
+      const N = 96;
+      const dots = new T.InstancedMesh(
+        new T.SphereGeometry(0.13, 14, 10),
+        new T.MeshStandardMaterial({ color: 0x6ea8ff, emissive: 0x2b6bff, emissiveIntensity: 1.6, roughness: 0.35 }),
+        N,
+      );
+      dots.frustumCulled = false;
+      sf.scene.add(dots);
+
+      const history = [];          // accumulated path — this is the cross-frame state
+      const m = new T.Matrix4(), v = new T.Vector3(), q = new T.Quaternion(), s = new T.Vector3();
+      const head = (t) => new T.Vector3(Math.sin(t * 1.3) * 3.4, Math.sin(t * 0.9) * 1.7 + 0.2, Math.cos(t * 1.1) * 2.4);
+
+      // dt > 0 only on a forward step; on the first frame / a backward seek dt is
+      // 0, so we don't corrupt the buffer (the forward-mode guardrail).
+      sf.onSeek((t, dt) => {
+        if (dt > 0) { history.push(head(t)); if (history.length > N) history.shift(); }
+        const len = history.length;
+        for (let i = 0; i < N; i++) {
+          const h = i < len ? history[len - 1 - i] : null;
+          if (h) { v.copy(h); s.setScalar(Math.max(0.05, 1 - (i / N) * 0.92)); }
+          else { v.set(0, -999, 0); s.setScalar(0.0001); }
+          m.compose(v, q, s);
+          dots.setMatrixAt(i, m);
+        }
+        dots.instanceMatrix.needsUpdate = true;
+      });
+    </script>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

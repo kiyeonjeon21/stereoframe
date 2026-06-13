@@ -204,6 +204,8 @@ Total video duration = max(start + duration). For crossfades, make the previous 
 
 The contract is **seekability**: each frame a pure function of `t` within a render (so capture is coherent and frames are reproducible). That's all that's required. You do NOT need two renders to be byte-identical — use rich custom shaders (sin noise is fine), high poly, heavy materials freely. Only avoid things that break seekability: wall-clock reads, unseeded per-frame `Math.random()`, and previous-frame accumulation (trails/feedback). `validate` checks exactly this.
 
+**Escape valve — `mode="forward"`** (for genuine live sim that can't be analytic): a `<sf-scene mode="forward">` opts out of seek-idempotency so escape-hatch code may accumulate cross-frame state. The seekFn gets a second arg `dt` (seconds since last seek; 0 on the first frame): `sf.onSeek((t, dt) => { if (dt > 0) step(dt); })`. Cost: no random-access seek/scrub — correct only under the monotonic render. Must be the sole, full-timeline scene (validate enforces). See `examples/forward-trails`. To use such a sim in a multi-shot composition, **bake** it into a seekable asset (`stereoframe bake`). Default to staying analytic/seekable; reach for forward only when a sim truly can't be a function of t.
+
 ## Rules (these break the render — they break seekability)
 
 1. **Assets must be local** (`assets/...`) — never CDN models/HDRIs. If the user wants a model they don't have, generate one with `stereoframe gen "<prompt>"` (writes a GLB into assets/), then reference it with `<sf-model>`.

@@ -125,6 +125,7 @@ export function canvasFingerprint(scenes: CompiledScene[]): string {
   let hash = 5381;
   for (const s of scenes) {
     if (s.canvas.style.display === "none") continue;
+    if (s.forward) continue; // forward scenes are not seek-idempotent by design
     const url = s.canvas.toDataURL("image/png");
     for (let i = 0; i < url.length; i++) {
       hash = ((hash << 5) + hash + url.charCodeAt(i)) | 0;

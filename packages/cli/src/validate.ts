@@ -110,12 +110,49 @@ export async function validateProject(projectDir: string): Promise<Finding[]> {
       }
     }
 
+    // Forward-only scenes opt out of seek-idempotency by design (live sim /
+    // accumulation). Detect them, warn that random-access seek is waived, and
+    // require each to be a solo full-timeline scene (forward + multi-shot is
+    // unsupported — bake it instead). The idempotency probe is then skipped.
+    const sceneInfo = (await page.evaluate(
+      "window.__stereoframe.scenes.map(s => ({ forward: !!s.forward, start: s.shot.start, duration: s.shot.duration }))",
+    )) as Array<{ forward: boolean; start: number; duration: number }>;
+    const forwardScenes = sceneInfo.filter((s) => s.forward);
+    if (forwardScenes.length > 0) {
+      findings.push({
+        rule: "forward_only_scene",
+        severity: "warning",
+        message:
+          "forward-only scene present — seek-idempotency is intentionally waived; random-access seek/scrub is unavailable and frames are correct only under the monotonic render loop.",
+        fixHint: "Bake the sim (`stereoframe bake`) for a seekable, multi-shot-safe asset.",
+      });
+      for (const f of forwardScenes) {
+        const soloFull =
+          sceneInfo.length === 1 && f.start <= 0.001 && f.duration >= info.duration - 0.001;
+        if (!soloFull) {
+          findings.push({
+            rule: "forward_multishot_unsupported",
+            severity: "error",
+            message:
+              "a forward-only scene must be the only scene and span the whole timeline (start=0, full duration); forward + multi-shot/windowing isn't supported.",
+            fixHint: "Make it the sole scene, or bake the sim and use the seekable result in multi-shot.",
+          });
+        }
+      }
+    }
+
+    if (forwardScenes.length === sceneInfo.length && forwardScenes.length > 0) {
+      return findings; // all-forward: no meaningful idempotency probe
+    }
+
     // Seek-idempotency probe: seek mid → elsewhere → mid. The frame must be a
     // pure function of t WITHIN a render — that's the seekability contract,
     // and what makes frame-by-frame capture coherent. Same t = same draw
     // calls = same pixels, so rich shaders / high poly / sin-noise all pass;
     // only genuine history-dependence (accumulated state, trails, unseeded
     // randomness) breaks it. Cross-RUN bit-identity is NOT required.
+    // (canvasFingerprint skips forward-scene canvases, so mixed scenes still
+    // probe their pure scenes.)
     const mid = info.duration / 2;
     const first = await page.evaluate(`window.__stereoframe.fingerprint(${mid})`);
     await page.evaluate(`window.__stereoframe.seek(0)`);

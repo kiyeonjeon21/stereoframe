@@ -51,6 +51,13 @@ export interface CompiledScene {
   preRender: (() => void) | null;
   /** Shot window — single default scene: start 0, always visible. */
   shot: ShotSpec;
+  /** `mode="forward"`: this scene opts OUT of seek-idempotency so it may carry
+   *  cross-frame state (live sim/accumulation). Cost: no random-access seek —
+   *  correct only under the monotonic render loop. Must be a solo, full-timeline
+   *  scene (validate enforces). Forward seekFns receive `dt` (seconds since the
+   *  last seek; 0 on the first frame or a non-forward step). */
+  forward: boolean;
+  forwardState: { lastT: number };
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
@@ -59,8 +66,9 @@ export interface CompiledScene {
   objectsById: Map<string, THREE.Object3D>;
   /** Named animation-clip actions per sf-model group (for clip verbs). */
   actionsByObject: Map<THREE.Object3D, Map<string, THREE.AnimationAction>>;
-  /** Per-seek state writers (animation verbs register here). */
-  seekFns: Array<(t: number) => void>;
+  /** Per-seek state writers (animation verbs register here). Receive `(t, dt)`;
+   *  analytic writers ignore `dt`, forward-scene writers may step by it. */
+  seekFns: Array<(t: number, dt: number) => void>;
   /** Writers that must run after seekFns (camera follow tracks moved subjects). */
   lateSeekFns: Array<(t: number) => void>;
   /** DOM-overlay writers that run after camera lookAt — they read the final
@@ -225,6 +233,9 @@ export function compileScene(host: HTMLElement): CompiledScene {
         : "cut",
     transitionDuration: parseNumber(host.getAttribute("transition-duration"), 0.6),
   };
+
+  const forward =
+    (host.getAttribute("mode") ?? "").toLowerCase() === "forward" || host.hasAttribute("forward-only");
 
   // Supersampling AA: render the canvas at samples× and let the capture
   // downsample. Deterministic (unlike driver MSAA), and the single biggest
@@ -486,6 +497,8 @@ export function compileScene(host: HTMLElement): CompiledScene {
     post,
     preRender,
     shot,
+    forward,
+    forwardState: { lastT: -1 },
     renderer,
     scene,
     camera,

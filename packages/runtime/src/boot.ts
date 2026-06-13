@@ -68,7 +68,7 @@ export async function boot(): Promise<void> {
   gate?.open();
 
   if (standalone && new URLSearchParams(location.search).has("sf-preview")) {
-    startPreviewLoop(duration);
+    startPreviewLoop(duration, scenes.some((s) => s.forward));
   }
 }
 
@@ -92,7 +92,9 @@ function runEscapeHatchScripts(scenes: ReturnType<typeof compileScene>[]): void 
     height: first.height,
     objects: first.objectsById,
     scenes,
-    onSeek: (fn: (t: number) => void) => {
+    // `dt` is seconds since the last seek — 0 in a normal scene; in a
+    // `mode="forward"` scene, use it to step accumulating/live state.
+    onSeek: (fn: (t: number, dt: number) => void) => {
       first.seekFns.push(fn);
     },
   };

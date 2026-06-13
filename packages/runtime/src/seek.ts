@@ -77,11 +77,27 @@ export function installHfGate(): { open: () => void } {
   };
 }
 
+/** Seconds elapsed since the last seek of a forward scene; 0 on the first seek
+ *  (lastT < 0) or any non-advance. Forward writers step by this. Pure. */
+export function forwardDelta(lastT: number, t: number): number {
+  return lastT < 0 ? 0 : t - lastT;
+}
+
 export function applySeek(compiled: CompiledScene, t: number): void {
   const time = Math.max(0, Number(t) || 0);
 
+  // Forward-only scenes carry cross-frame state: hand writers the time delta so
+  // they can step a sim by dt. dt = 0 for normal scenes (and the first frame /
+  // a backward seek), so analytic writers — which ignore the second arg — are
+  // unaffected and stay pure functions of t.
+  let dt = 0;
+  if (compiled.forward) {
+    dt = forwardDelta(compiled.forwardState.lastT, time);
+    compiled.forwardState.lastT = time;
+  }
+
   // 1. Animation verbs (analytic writers, document order)
-  for (const fn of compiled.seekFns) fn(time);
+  for (const fn of compiled.seekFns) fn(time, dt);
 
   // 2. Late writers — camera follow must observe subjects already moved.
   for (const fn of compiled.lateSeekFns) fn(time);
@@ -187,7 +203,7 @@ export function installSeekListener(
 
   const first = scenes[0];
   const protocol: StereoframeProtocol = {
-    version: "0.2.0",
+    version: "0.3.0",
     ready: false,
     duration: opts.duration,
     width: first?.width ?? 1920,
@@ -218,10 +234,15 @@ export function installSeekListener(
  * STANDALONE preview mode (`?sf-preview` in the URL): loops playback on the
  * wall clock. Preview only — renders always go through explicit seeks.
  */
-export function startPreviewLoop(duration: number): void {
+export function startPreviewLoop(duration: number, hasForward = false): void {
   const t0 = performance.now();
   const tick = () => {
-    const t = ((performance.now() - t0) / 1000) % Math.max(0.001, duration);
+    const elapsed = (performance.now() - t0) / 1000;
+    // Forward scenes can't be rewound — looping (modulo) would be a backward
+    // seek. Play once and hold on the last frame instead.
+    const t = hasForward
+      ? Math.min(elapsed, Math.max(0.001, duration))
+      : elapsed % Math.max(0.001, duration);
     window.__stereoframe?.seek(t);
     requestAnimationFrame(tick);
   };
