@@ -174,3 +174,88 @@ describe("compileStoryboard", () => {
     expect(lintHtml(out, { fileExists: () => true }).filter((f) => f.severity === "error")).toEqual([]);
   });
 });
+
+describe("rich schema (backdrop / atmosphere / secondaryMotion / flythrough / text tiers)", () => {
+  const richShot = (p: Partial<Shot>): Shot => shot(p);
+
+  test("backdrop emits a tinted fullscreen shader; 'none' and absent emit none", () => {
+    const withBd: Storyboard = { model: "m.glb", shots: [richShot({ backdrop: { coldGlow: "#0a3550", warmGlow: "#2a0a1e" } })] };
+    const out = compileStoryboard(withBd, resolvedFor(withBd));
+    expect(out).toContain("<sf-shader fullscreen");
+    expect(out).toContain('u-cold-glow="#0a3550"');
+    expect(out).toContain('u-warm-glow="#2a0a1e"');
+
+    const none: Storyboard = { model: "m.glb", shots: [richShot({ backdrop: "none" })] };
+    expect(compileStoryboard(none, resolvedFor(none))).not.toContain("<sf-shader");
+
+    const absent: Storyboard = { model: "m.glb", shots: [richShot({})] };
+    expect(compileStoryboard(absent, resolvedFor(absent))).not.toContain("<sf-shader");
+  });
+
+  test("atmosphere emits particles, and is DROPPED (with a warning) on a crossfade-outgoing shot", () => {
+    // shot 1 is followed by a crossfade → it's the outgoing half → drop + warn.
+    const plan: Storyboard = {
+      model: "m.glb",
+      shots: [
+        richShot({ atmosphere: "dust" }),
+        richShot({ atmosphere: "dust", transition: "crossfade", camera: { type: "static", position: "0 1 5" } }),
+      ],
+    };
+    const warnings: string[] = [];
+    const out = compileStoryboard(plan, resolvedFor(plan), { warn: (m) => warnings.push(m) });
+    // shot 2 is the last shot → particles kept; shot 1 → dropped.
+    expect((out.match(/<sf-particles/g) ?? []).length).toBe(1);
+    expect(warnings.some((w) => /atmosphere dropped/.test(w))).toBe(true);
+  });
+
+  test("secondaryMotion layers turntable + sway + float on the model", () => {
+    const plan: Storyboard = { model: "m.glb", shots: [richShot({ secondaryMotion: { spin: 2, sway: 1.5, float: 0.1 } })] };
+    const out = compileStoryboard(plan, resolvedFor(plan));
+    expect(out).toContain('verb="turntable" rpm="2"');
+    expect(out).toContain('verb="sway" amount="1.50"');
+    expect(out).toContain('verb="float" amplitude="0.10"');
+  });
+
+  test("flythrough camera emits camera-path look=none + a locked sf-camera look-at, lint-clean", () => {
+    const plan: Storyboard = {
+      model: "m.glb",
+      shots: [richShot({ camera: { type: "flythrough", points: "2 1 3, 0 1 3, -2 1 2", lookAt: "0 0.5 0" } })],
+    };
+    const out = compileStoryboard(plan, resolvedFor(plan));
+    expect(out).toContain('verb="camera-path" look="none"');
+    expect(out).toContain('look-at="0 0.5 0"');
+    expect(lintHtml(out, { fileExists: () => true }).filter((f) => f.severity === "error")).toEqual([]);
+  });
+
+  test("three text tiers (title/subtitle/spec) emit three staggered clips", () => {
+    const plan: Storyboard = {
+      model: "m.glb",
+      shots: [richShot({ duration: 4, text: { title: "APEX", subtitle: "in motion", spec: "1020 bhp" } })],
+    };
+    const out = compileStoryboard(plan, resolvedFor(plan));
+    expect(out).toContain(">APEX</div>");
+    expect(out).toContain(">in motion</div>");
+    expect(out).toContain(">1020 bhp</div>");
+    expect((out.match(/class="clip"/g) ?? []).length).toBe(3);
+  });
+
+  test("flythrough/dust validation: flythrough needs points; bad atmosphere errors", () => {
+    expect(validateStoryboard({ model: "m.glb", shots: [shot({ camera: { type: "flythrough" } })] }).some((e) => /needs points/.test(e))).toBe(true);
+    // @ts-expect-error intentionally invalid
+    expect(validateStoryboard({ model: "m.glb", shots: [shot({ atmosphere: "fog" })] }).some((e) => /atmosphere/.test(e))).toBe(true);
+  });
+
+  test("a fully-loaded rich plan compiles with zero lint errors", () => {
+    const plan: Storyboard = {
+      model: "m.glb",
+      defaults: { backdrop: { coldGlow: "#0a3550", warmGlow: "#2a0a1e" }, secondaryMotion: { spin: 1.5, sway: 1 }, finish: { samples: 2, ground: "contact-shadow" } },
+      shots: [
+        richShot({ name: "open", duration: 3, atmosphere: "dust", camera: { type: "push-in", position: "3 0.5 3.5", lookAt: "0 0.4 0", toward: "0 0.4 0", distance: 0.5 } }),
+        richShot({ name: "fly", duration: 3, camera: { type: "flythrough", points: "2.8 0.4 2.8, 0 0.5 3.2, -2.6 0.6 1.6", lookAt: "0 0.45 0" } }),
+        richShot({ name: "hero", duration: 4, transition: "crossfade", atmosphere: "dust", camera: { type: "hero", radius: 5, from: 18, to: -14, height: 0.2 }, text: { title: "APEX", subtitle: "in motion", spec: "1020 bhp" } }),
+      ],
+    };
+    const out = compileStoryboard(plan, resolvedFor(plan));
+    expect(lintHtml(out, { fileExists: () => true }).filter((f) => f.severity === "error")).toEqual([]);
+  });
+});

@@ -336,16 +336,23 @@ from one GLB).
 (multi-model). `defaults` is a `ShotDefaults` whose fields every shot inherits.
 
 **`ShotDefaults` / per-shot overrides:** `bg`, `environment="room"`, `fit=2.4`,
-`fitGround=true`, `pose`, `finish` (deep-merged), `lighting` (per-shot wins).
-`pose` is a base-pose rotation `"x y z"` in degrees (→ sf-model `rotation`) — use
-it to re-orient a model however it was generated (text-to-3D often returns a phone
-lying flat; `"0 90 90"` stands it up in portrait).
+`fitGround=true`, `pose`, `backdrop`, `atmosphere`, `secondaryMotion`, `finish`
+(deep-merged), `lighting` (per-shot wins).
+- `pose` — base rotation `"x y z"` degrees (→ sf-model `rotation`); re-orient a model
+  however it generated (text-to-3D often returns a phone flat; `"0 90 90"` stands it up).
+- `backdrop` — `{coldGlow?,warmGlow?}` (hex) → a tinted `<sf-shader fullscreen>` nebula
+  behind the subject (the "not flat black" lever), or `"none"`. Omit ⇒ no backdrop.
+- `atmosphere` — `"dust"|"snow"|"none"` → `<sf-particles>`. **Dropped (with a warning)
+  on a shot that crossfades out** — particles aren't seek-idempotent there. Safe on a
+  cut-followed or final shot.
+- `secondaryMotion` — `{spin?(rpm),sway?(deg),float?(amplitude)}` layered on the model
+  *while the camera moves* (composes). The biggest "alive vs dead" lever.
 
 **`Shot`** adds: `name?` (comment label), `duration` (required, >0),
 `transition?` (`cut` | `crossfade`, default crossfade after shot 1),
 `transitionDuration?=0.4`, `camera` (required), `spin?` (rpm turntable),
 `isolate?:{part,dim?}`, `explode?:{distance?}`, `callout?` (`"auto"` | `"none"` |
-array), `text?:{title?,subtitle?}` (DOM overlay clipped to the shot).
+array), `text?:{title?,subtitle?,spec?}` (up to three staggered DOM tiers clipped to the shot).
 
 **Timeline.** `start_0 = 0`; `start_i = start_{i-1} + duration_{i-1} − overlap_i`
 where `overlap_i` is `transitionDuration_i` for a crossfade else 0. This makes the
@@ -360,6 +367,7 @@ previous shot cover the seam exactly — no gaps, no `crossfade_gap`. Total =
 | `orbit` | `around`, `radius`, `from`, `to`, `height`, `lookAt?`, `ease?` | `verb="orbit"` |
 | `dolly` / `push-in` / `pull-back` | `position`, `lookAt`, `toward`, `distance`, `ease?` | `verb="dolly"` (pull-back = negative distance) |
 | `path` | `points`, `fov`, `ease?` | `verb="camera-path" look="ahead"` (no `look-at` — lint conflict) |
+| `flythrough` | `points`, `lookAt`, `fov`, `ease?` | `verb="camera-path" look="none"` + locked `look-at` (dynamic spline that stays on the subject) |
 | `hero` | low-angle `position`/`lookAt` + slow orbit fields | hero recipe |
 
 Default ease `sine.inOut`; ease must be a known GSAP name.

@@ -50,7 +50,7 @@ export type Lighting =
   | "auto"
   | { key?: LightSpec; fill?: LightSpec; rim?: LightSpec };
 export interface Camera {
-  type: "static" | "orbit" | "dolly" | "push-in" | "pull-back" | "path" | "hero";
+  type: "static" | "orbit" | "dolly" | "push-in" | "pull-back" | "path" | "hero" | "flythrough";
   fov?: number;
   position?: string;
   lookAt?: string;
@@ -80,6 +80,16 @@ export interface ShotDefaults {
    *  model whatever orientation it was generated in (e.g. a phone that came out
    *  lying flat → "90 0 90" to stand it up). */
   pose?: string;
+  /** Animated nebula backdrop (vs flat black) → a tinted `<sf-shader fullscreen>`.
+   *  `"none"` opts out. Omit for the default subtle dark backdrop. */
+  backdrop?: { coldGlow?: string; warmGlow?: string } | "none";
+  /** Drifting atmosphere → `<sf-particles>`. Dropped (with a warning) on a shot
+   *  that is the outgoing half of a crossfade — particles break seek-idempotency
+   *  there. Safe on cut-followed or final shots. */
+  atmosphere?: "dust" | "snow" | "none";
+  /** Secondary motion layered on the model *while* the camera moves (the biggest
+   *  "alive vs dead" lever): turntable rpm + sway degrees + float amplitude. */
+  secondaryMotion?: { spin?: number; sway?: number; float?: number };
   finish?: Finish;
   lighting?: Lighting;
 }
@@ -94,7 +104,7 @@ export interface Shot extends ShotDefaults {
   isolate?: { part: string | number; dim?: number };
   explode?: { distance?: number };
   callout?: "auto" | "none" | CalloutInput[];
-  text?: { title?: string; subtitle?: string };
+  text?: { title?: string; subtitle?: string; spec?: string };
 }
 export interface Storyboard {
   title?: string;
@@ -106,7 +116,7 @@ export interface Storyboard {
   shots: Shot[];
 }
 
-const CAMERA_TYPES = ["static", "orbit", "dolly", "push-in", "pull-back", "path", "hero"];
+const CAMERA_TYPES = ["static", "orbit", "dolly", "push-in", "pull-back", "path", "hero", "flythrough"];
 
 // ── timeline (pure) ─────────────────────────────────────────────────────────
 export interface ShotWindow {
@@ -179,11 +189,19 @@ export function validateStoryboard(plan: Storyboard): string[] {
       if ((cam.type === "dolly" || cam.type === "push-in" || cam.type === "pull-back") && cam.distance == null) {
         errs.push(`${tag}: ${cam.type} camera needs distance`);
       }
-      if (cam.type === "path" && !cam.points) errs.push(`${tag}: path camera needs points`);
+      if ((cam.type === "path" || cam.type === "flythrough") && !cam.points) {
+        errs.push(`${tag}: ${cam.type} camera needs points`);
+      }
       if (cam.type === "static" && !cam.position) errs.push(`${tag}: static camera needs position`);
       if (cam.ease && !eases.has(cam.ease)) errs.push(`${tag}: unknown ease "${cam.ease}"`);
     }
+    if (s.atmosphere && !["dust", "snow", "none"].includes(s.atmosphere)) {
+      errs.push(`${tag}: atmosphere must be "dust", "snow", or "none"`);
+    }
   });
+  if (plan.defaults?.atmosphere && !["dust", "snow", "none"].includes(plan.defaults.atmosphere)) {
+    errs.push(`storyboard.defaults.atmosphere must be "dust", "snow", or "none"`);
+  }
   return errs;
 }
 
@@ -234,6 +252,32 @@ function lightMarkup(lighting: Lighting | undefined, metalRig: boolean): string 
   return lines.join("\n      ");
 }
 
+/** A moody nebula `<sf-shader fullscreen>` — a tinted cyan/magenta fbm gradient
+ *  with vignette. The single biggest "not a flat black void" lever. */
+function backdropMarkup(backdrop: ShotDefaults["backdrop"]): string {
+  if (backdrop === "none") return "";
+  const cold = (backdrop && typeof backdrop === "object" && backdrop.coldGlow) || "#0a3550";
+  const warm = (backdrop && typeof backdrop === "object" && backdrop.warmGlow) || "#2a0a1e";
+  return `<sf-shader fullscreen u-cold-glow="${cold}" u-warm-glow="${warm}">
+        void main(){
+          vec2 uv = vUv; vec2 c = uv - vec2(0.5, 0.46); c.x *= uResolution.x / uResolution.y;
+          float d = length(c); float vig = smoothstep(1.2, 0.1, d);
+          float n = fbm(uv * 2.4 + vec2(uTime * 0.022, uTime * 0.035));
+          float n2 = fbm(uv * 4.0 - vec2(uTime * 0.018, 0.0));
+          vec3 glow = mix(uColdGlow, uWarmGlow, smoothstep(0.12, 0.92, uv.y + n * 0.3));
+          gl_FragColor = vec4(vec3(0.006,0.009,0.015) + glow * (0.11 + 0.17 * n2) * vig, 1.0);
+        }
+      </sf-shader>`;
+}
+
+/** Drifting atmosphere particles. Caller enforces the crossfade-outgoing guard. */
+function atmosphereMarkup(kind: "dust" | "snow", seed: number): string {
+  if (kind === "snow") {
+    return `<sf-particles preset="snow" count="500" seed="${seed}" color="#dceaff" size="0.04" opacity="0.6" area="10 6 10"></sf-particles>`;
+  }
+  return `<sf-particles preset="dust" count="340" seed="${seed}" color="#7ab6ff" size="0.03" opacity="0.45" area="9 5 9"></sf-particles>`;
+}
+
 function cameraMarkup(cam: Camera, d: number): { camera: string; animate: string } {
   const fov = cam.fov ?? 35;
   const ease = cam.ease ?? "sine.inOut";
@@ -249,6 +293,17 @@ function cameraMarkup(cam: Camera, d: number): { camera: string; animate: string
     return {
       camera: `<sf-camera fov="${fov}" position="${first}"></sf-camera>`,
       animate: `<sf-animate target="camera" verb="camera-path" look="ahead" points="${cam.points}" start="0" duration="${dd}" ease="${ease}"></sf-animate>`,
+    };
+  }
+  if (cam.type === "flythrough") {
+    // Dynamic spline that stays locked on the subject: camera-path moves the
+    // position, look="none" leaves aiming to the sf-camera look-at (re-applied
+    // each frame after the path). No lint conflict (conflict is look="ahead" only).
+    const first = (cam.points ?? "0 1 5").split(",")[0]!.trim();
+    const lookAt = cam.lookAt ?? "0 0.9 0";
+    return {
+      camera: `<sf-camera fov="${fov}" position="${first}" look-at="${lookAt}"></sf-camera>`,
+      animate: `<sf-animate target="camera" verb="camera-path" look="none" points="${cam.points}" start="0" duration="${dd}" ease="${ease}"></sf-animate>`,
     };
   }
   if (cam.type === "orbit" || cam.type === "hero") {
@@ -273,7 +328,12 @@ function cameraMarkup(cam: Camera, d: number): { camera: string; animate: string
   };
 }
 
-export function compileStoryboard(plan: Storyboard, resolved: ResolvedShot[]): string {
+export function compileStoryboard(
+  plan: Storyboard,
+  resolved: ResolvedShot[],
+  opts: { warn?: (msg: string) => void } = {},
+): string {
+  const warn = opts.warn ?? (() => {});
   const W = plan.width ?? 1920;
   const H = plan.height ?? 1080;
   const windows = computeTimeline(plan.shots);
@@ -291,9 +351,22 @@ export function compileStoryboard(plan: Storyboard, resolved: ResolvedShot[]): s
     const fit = shot.fit ?? plan.defaults?.fit ?? 2.4;
     const fitGround = shot.fitGround ?? plan.defaults?.fitGround ?? true;
     const pose = shot.pose ?? plan.defaults?.pose;
+    const backdrop = shot.backdrop ?? plan.defaults?.backdrop;
+    const atmosphere = shot.atmosphere ?? plan.defaults?.atmosphere;
+    const secondaryMotion = shot.secondaryMotion ?? plan.defaults?.secondaryMotion;
     const finish = mergeFinish(plan.defaults?.finish, shot.finish);
     const lighting = mergeLighting(plan.defaults?.lighting, shot.lighting);
     const cam = cameraMarkup(shot.camera, shot.duration);
+
+    // Atmosphere is unsafe on the outgoing half of a crossfade (particle time
+    // uniform isn't advanced while fading out → non-idempotent seek). The
+    // outgoing shot is this one when the NEXT shot crossfades in.
+    const nextCrossfades = plan.shots[i + 1]?.transition === "crossfade";
+    const wantAtmosphere = atmosphere && atmosphere !== "none";
+    const emitAtmosphere = wantAtmosphere && !nextCrossfades;
+    if (wantAtmosphere && nextCrossfades) {
+      warn(`shot ${i + 1}${shot.name ? ` "${shot.name}"` : ""}: atmosphere dropped — a shot that crossfades out can't hold seekable particles. Use a cut after it, or make it the last shot.`);
+    }
 
     const anims: string[] = [];
     if (shot.explode) {
@@ -302,8 +375,14 @@ export function compileStoryboard(plan: Storyboard, resolved: ResolvedShot[]): s
         `<sf-animate target="#${id}" verb="explode" distance="${num(shot.explode.distance ?? 0.8)}" start="${num(ex.start)}" duration="${num(ex.dur)}" ease="power2.inOut"></sf-animate>`,
       );
     }
-    if (shot.spin) {
-      anims.push(`<sf-animate target="#${id}" verb="turntable" rpm="${num(shot.spin)}"></sf-animate>`);
+    // Secondary motion (composes with the camera move) — the "alive" layer.
+    const spin = secondaryMotion?.spin ?? shot.spin;
+    if (spin) anims.push(`<sf-animate target="#${id}" verb="turntable" rpm="${num(spin)}"></sf-animate>`);
+    if (secondaryMotion?.sway) {
+      anims.push(`<sf-animate target="#${id}" verb="sway" amount="${num(secondaryMotion.sway)}" period="7"></sf-animate>`);
+    }
+    if (secondaryMotion?.float) {
+      anims.push(`<sf-animate target="#${id}" verb="float" amplitude="${num(secondaryMotion.float)}" period="5"></sf-animate>`);
     }
     if (shot.isolate) {
       anims.push(
@@ -316,19 +395,27 @@ export function compileStoryboard(plan: Storyboard, resolved: ResolvedShot[]): s
     const callouts = (r.callouts ?? []).map((c) => ({ ...c }));
     const calloutBlock = calloutMarkup(callouts).replace(/target="#m"/g, `target="#${id}"`);
 
-    // text overlay (DOM, clipped to this shot's global window)
-    if (shot.text?.title || shot.text?.subtitle) {
-      const t1 = Math.min(0.6, shot.duration * 0.3);
+    // text overlay (DOM, clipped to this shot's window) — up to three staggered
+    // tiers (title / subtitle / spec), the flagship title-card pattern.
+    if (shot.text?.title || shot.text?.subtitle || shot.text?.spec) {
+      const t1 = Math.min(0.7, shot.duration * 0.3);
+      const tiers: Array<{ key: string; text: string; bottom: number; style: string; rise: number; start: number }> = [];
       if (shot.text.title) {
-        anims.push(`<sf-animate target="#sbtitle${i}" verb="fade-in" start="${num(t1)}" duration="0.9" rise="24"></sf-animate>`);
-        domBlocks.push(
-          `<div id="sbtitle${i}" class="clip" data-start="${num(w.start)}" data-duration="${num(shot.duration)}" style="position:absolute;bottom:120px;width:100%;text-align:center;font-size:64px;font-weight:800;letter-spacing:0.04em;color:#f4f1e8;text-shadow:0 4px 30px rgba(0,0,0,.6)">${shot.text.title}</div>`,
-        );
+        tiers.push({ key: `sbtitle${i}`, text: shot.text.title, bottom: 148, rise: 26, start: t1,
+          style: "font-size:80px;font-weight:800;letter-spacing:0.06em;color:#f4f6ff;text-shadow:0 6px 38px rgba(0,0,0,.7)" });
       }
       if (shot.text.subtitle) {
-        anims.push(`<sf-animate target="#sbsub${i}" verb="fade-in" start="${num(t1 + 0.3)}" duration="0.9" rise="16"></sf-animate>`);
+        tiers.push({ key: `sbsub${i}`, text: shot.text.subtitle, bottom: 112, rise: 18, start: t1 + 0.5,
+          style: "font-size:19px;font-weight:500;letter-spacing:0.4em;text-transform:uppercase;color:#8fd0ff" });
+      }
+      if (shot.text.spec) {
+        tiers.push({ key: `sbspec${i}`, text: shot.text.spec, bottom: 74, rise: 12, start: t1 + 1.0,
+          style: "font-size:15px;font-weight:500;letter-spacing:0.3em;text-transform:uppercase;color:#aeb6c2" });
+      }
+      for (const tier of tiers) {
+        anims.push(`<sf-animate target="#${tier.key}" verb="fade-in" start="${num(tier.start)}" duration="0.9" rise="${tier.rise}"></sf-animate>`);
         domBlocks.push(
-          `<div id="sbsub${i}" class="clip" data-start="${num(w.start)}" data-duration="${num(shot.duration)}" style="position:absolute;bottom:92px;width:100%;text-align:center;font-size:18px;font-weight:500;letter-spacing:0.3em;text-transform:uppercase;color:#aeb6c2">${shot.text.subtitle}</div>`,
+          `<div id="${tier.key}" class="clip" data-start="${num(w.start)}" data-duration="${num(shot.duration)}" style="position:absolute;bottom:${tier.bottom}px;width:100%;text-align:center;${tier.style}">${tier.text}</div>`,
         );
       }
     }
@@ -338,13 +425,21 @@ export function compileStoryboard(plan: Storyboard, resolved: ResolvedShot[]): s
         ? ` transition="crossfade" transition-duration="${num(w.transitionDuration)}"`
         : "";
 
+    // backdrop emits only when the field is set (keeps existing plans unchanged;
+    // cinematic "always-on backdrop" is a director-layer default, not the compiler's).
+    const backdropStr = backdrop === undefined ? "" : backdropMarkup(backdrop);
+    const atmosphereStr = emitAtmosphere ? atmosphereMarkup(atmosphere!, i + 1) : "";
+    const head2 = [backdropStr, cam.camera, lightMarkup(lighting, r.metalRig), atmosphereStr]
+      .filter(Boolean)
+      .map((s) => `      ${s}`)
+      .join("\n");
+
     sceneBlocks.push(
       `    <!-- shot ${i + 1}${shot.name ? ` · ${shot.name}` : ""} · ${num(w.start)}–${num(w.end)}s -->
     <sf-scene start="${num(w.start)}" duration="${num(shot.duration)}"${transitionAttr}
               width="${W}" height="${H}" background="${bg}"
               environment="${env}"${finishAttrs(finish, r.metalRig)}>
-      ${cam.camera}
-      ${lightMarkup(lighting, r.metalRig)}
+${head2}
       <sf-model id="${id}" src="assets/${r.modelBasename}" fit="${num(fit)}"${fitGround ? " fit-ground" : ""}${pose ? ` rotation="${pose}"` : ""}></sf-model>
 ${anims.map((a) => `      ${a}`).join("\n")}${calloutBlock ? "\n" + calloutBlock : ""}
     </sf-scene>`,
@@ -422,7 +517,7 @@ export async function buildStoryboard(opts: BuildStoryboardOptions): Promise<{ d
     resolved.push({ modelBasename: base, metalRig, callouts });
   }
 
-  const html = compileStoryboard(plan, resolved);
+  const html = compileStoryboard(plan, resolved, { warn: (m) => console.warn(`note: ${m}`) });
   copyFileSync(resolveRuntimeBundle(), join(dir, "assets", "stereoframe.js"));
   if (!existsSync(join(dir, ".gitignore"))) writeFileSync(join(dir, ".gitignore"), "renders/\n");
   writeFileSync(join(dir, "index.html"), html);

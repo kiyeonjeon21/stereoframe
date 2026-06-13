@@ -241,11 +241,18 @@ for `lighting:"auto"`/`callout:"auto"`, copies GLBs + runtime into `out/assets/`
 
 - **Camera types** → verbs: `static` (no move), `orbit` (`around/radius/from/to/height`),
   `dolly`/`push-in`/`pull-back` (`toward/distance`; pull-back = negative distance),
-  `path` (`points` — emits NO `look-at`), `hero` (low-angle + slow orbit). `ease`
+  `path` (`points` — emits NO `look-at`), `flythrough` (`points`+`lookAt` — dynamic
+  spline that stays locked on the subject), `hero` (low-angle + slow orbit). `ease`
   defaults to `sine.inOut`.
 - **Lighting**: `{preset}` | `"auto"` (metal → tamed rim/fill rig) | 3-point `{key,fill,rim}`.
+- **Cinematic richness (use these — a bare camera move per shot is flat):**
+  - `backdrop:{coldGlow,warmGlow}` → a moody nebula shader behind the subject (vs flat black).
+  - `atmosphere:"dust"|"snow"` → drifting particles. **Not on a shot that crossfades out**
+    (dropped+warned) — put it on cut-followed or final shots.
+  - `secondaryMotion:{spin,sway,float}` → the subject stays *alive* while the camera moves.
+  - `text:{title,subtitle,spec}` → staggered 3-tier title card.
 - **Per-shot extras**: `spin` (rpm), `isolate:{part,dim?}`, `explode:{distance?}`,
-  `callout:"auto"|"none"|[…]`, `text:{title?,subtitle?}`.
+  `callout:"auto"|"none"|[…]`.
 - **`pose`** (`"x y z"` degrees, in `defaults` or per-shot): re-orient the model
   however it was generated. **Check orientation first** — text-to-3D often returns
   flat/odd poses (a phone usually generates lying flat → `pose:"0 90 90"` stands it
