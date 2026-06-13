@@ -22,6 +22,7 @@ import { buildContactShadow } from "./blocks/contactshadow";
 import { buildOcean, type OceanBuild } from "./blocks/ocean";
 import { buildSky } from "./blocks/sky";
 import { buildSwarm } from "./blocks/swarm";
+import { buildShader } from "./blocks/shader";
 import { buildParticles } from "./particles";
 import type { ShotSpec } from "./shots";
 import {
@@ -403,6 +404,14 @@ export function compileScene(host: HTMLElement): CompiledScene {
       scene.add(metaball.mesh);
       if (el.id) objectsById.set(el.id, metaball.mesh);
       seekFns.push(metaball.writer);
+    } else if (tag === "sf-shader") {
+      const fullscreen = el.hasAttribute("fullscreen");
+      const geometry = fullscreen ? new THREE.PlaneGeometry(2, 2) : buildGeometry(el);
+      const { mesh, timeUniform } = buildShader(el, { width, height, geometry, fullscreen });
+      if (!fullscreen) applyTransform(mesh, el);
+      scene.add(mesh);
+      if (el.id) objectsById.set(el.id, mesh);
+      timeUniforms.push(timeUniform);
     }
   }
 

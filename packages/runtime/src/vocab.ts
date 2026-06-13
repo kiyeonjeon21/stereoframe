@@ -18,6 +18,7 @@ export const ELEMENT_NAMES = [
   "sf-ocean",
   "sf-swarm",
   "sf-metaball",
+  "sf-shader",
   "sf-animate",
   "sf-callout",
 ] as const;

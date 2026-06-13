@@ -1,0 +1,53 @@
+<!doctype html>
+<!--
+  type-poster — a bright, graphic, editorial motion poster. Breaks the moody
+  dark-studio product look: a flat cream backdrop, bold black typography, and an
+  iridescent matcap form that overlaps and occludes the type (transparent scene
+  background + DOM placed before the scene so the canvas draws over it). Matcap
+  needs no lighting rig. Deterministic.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #ece6da; }
+      body { font-family: "Helvetica Neue", Arial, sans-serif; }
+      sf-scene { position: absolute; inset: 0; }
+      #type {
+        position: absolute; inset: 0; display: flex; flex-direction: column;
+        justify-content: center; padding-left: 150px;
+        font-size: 280px; font-weight: 800; letter-spacing: -0.04em; line-height: 0.84;
+        color: #14110d;
+      }
+      #foot {
+        position: absolute; left: 156px; bottom: 90px;
+        font-size: 22px; font-weight: 600; letter-spacing: 0.42em; text-transform: uppercase;
+        color: #b0341d;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- type sits BEHIND the canvas; the 3D form occludes it -->
+    <div id="type" class="clip" data-start="0.3">FORM<br>IN<br>MOTION</div>
+
+    <!-- No post-fx here: the EffectComposer flattens the transparent scene to an
+         opaque buffer, which would hide the cream page background + the type
+         behind the canvas. Direct render preserves alpha for the occlusion. -->
+    <sf-scene duration="8" width="1920" height="1080" background="transparent" samples="2">
+      <sf-camera fov="34" position="2.2 0.4 6"></sf-camera>
+      <sf-mesh id="form" geometry="icosahedron" args="2.1 1" material="matcap" matcap="iridescent"
+               position="2.0 0 0"></sf-mesh>
+      <sf-animate target="#form" verb="turntable" rpm="3.5"></sf-animate>
+      <sf-animate target="#form" verb="sway" amount="9" period="6"></sf-animate>
+      <sf-animate target="camera" verb="dolly" toward="2 0 0" distance="0.8"
+                  start="0" duration="8" ease="sine.inOut"></sf-animate>
+    </sf-scene>
+
+    <div id="foot" class="clip" data-start="1.0">stereoframe · matcap + sway</div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

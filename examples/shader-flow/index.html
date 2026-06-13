@@ -1,0 +1,57 @@
+<!doctype html>
+<!--
+  shader-flow — a generative, non-product piece. Proof that stereoframe isn't
+  only a product-shot tool: a domain-warped flow field authored directly with
+  <sf-shader> (fragment GLSL, auto-wired uTime + noise toolkit), graded with the
+  scene finish, with editorial type over it. Fully deterministic / seekable.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #05030d; }
+      body { font-family: "Helvetica Neue", Arial, sans-serif; }
+      sf-scene { position: absolute; inset: 0; }
+      #title {
+        position: absolute; left: 96px; bottom: 92px; color: #f4f0ff;
+        font-size: 132px; font-weight: 800; letter-spacing: -0.03em; line-height: 0.92;
+        text-shadow: 0 8px 60px rgba(0,0,0,0.5);
+      }
+      #sub {
+        position: absolute; left: 102px; bottom: 60px; color: #c7b8ff;
+        font-size: 20px; font-weight: 500; letter-spacing: 0.5em; text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <sf-scene duration="9" width="1920" height="1080"
+              vignette="0.5" contrast="1.06" saturation="1.12" grain="0.03">
+      <sf-camera position="0 0 5"></sf-camera>
+      <sf-shader fullscreen u-warp="0.12">
+        void main() {
+          vec2 p = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0) * 2.4;
+          float t = uTime * uWarp;
+          vec2 q = vec2(fbm(p + t), fbm(p + vec2(5.2, 1.3) - t));
+          vec2 r = vec2(fbm(p + 2.0 * q + vec2(1.7, 9.2) + 0.18 * t),
+                        fbm(p + 2.0 * q + vec2(8.3, 2.8) - 0.14 * t));
+          float f = fbm(p + 3.0 * r);
+          vec3 indigo = vec3(0.04, 0.02, 0.14);
+          vec3 magenta = vec3(0.85, 0.16, 0.55);
+          vec3 cyan = vec3(0.22, 0.78, 0.95);
+          vec3 col = mix(indigo, magenta, smoothstep(0.05, 0.62, f));
+          col = mix(col, cyan, smoothstep(0.45, 1.05, length(r)));
+          col += 0.05 * f;
+          gl_FragColor = vec4(col, 1.0);
+        }
+      </sf-shader>
+    </sf-scene>
+
+    <div id="title" class="clip" data-start="0.6">FLOW<br>STATE</div>
+    <div id="sub" class="clip" data-start="1.0">generative · deterministic</div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

@@ -98,7 +98,7 @@ Non-interactive, plain-text output, exit code 1 on failure — safe to run in ag
 
 ## Vocabulary
 
-Elements: `sf-scene` (duration, width/height, background, environment HDRI, exposure) · `sf-camera` (fov, far, position, look-at, look-at-offset) · `sf-model` (GLB; `clip="Name"` picks the initial animation clip) · `sf-mesh` (box/sphere/plane/cylinder/torus/icosahedron/rounded-box; `material="glass"` for transmission panels; emissive/env-map-intensity knobs) · `sf-light` (preset studio/soft/sunset, or single light — multiple allowed) · `sf-particles` (preset fountain/snow/dust, count, seed, color, area) · `sf-sky` (atmosphere dome) · `sf-ocean` (animated water, needs `stereoframe add ocean`) · `sf-swarm` (paper scraps gathering into typography: text with `|` line breaks, count, seed, palette, stagger) · `sf-animate`.
+Elements: `sf-scene` (duration, width/height, background, environment HDRI, exposure) · `sf-camera` (fov, far, position, look-at, look-at-offset) · `sf-model` (GLB; `clip="Name"` picks the initial animation clip) · `sf-mesh` (box/sphere/plane/cylinder/torus/icosahedron/rounded-box; `material="glass"` for transmission panels; emissive/env-map-intensity knobs) · `sf-light` (preset studio/soft/sunset, or single light — multiple allowed) · `sf-particles` (preset fountain/snow/dust, count, seed, color, area) · `sf-sky` (atmosphere dome) · `sf-ocean` (animated water, needs `stereoframe add ocean`) · `sf-swarm` (paper scraps gathering into typography: text with `|` line breaks, count, seed, palette, stagger) · `sf-shader` (author a fragment shader directly — `fullscreen` for a generative background, or geometry-bound; auto-wires uTime/uResolution/vUv + a noise toolkit) · `sf-animate`.
 
 Verbs (`start`/`duration` in seconds, `ease` = GSAP-compatible names like `power2.inOut`, `back.out`, `sine.inOut`):
 
@@ -208,10 +208,11 @@ The contract is **seekability**: each frame a pure function of `t` within a rend
 
 ## Breaking the "formulaic" look
 
-Generic output = generic primitives + centered orbit + preset materials. To make something that looks designed, not auto-generated:
-- **Custom materials via `sf.THREE`** (escape hatch): write GLSL for looks no preset has — iridescent/oil-slick, marble, gradient-mapped. This is the biggest lever against "it looks like an AI 3D demo". Add a `new sf.THREE.Mesh(...)` with a `ShaderMaterial` to `sf.scene`, drive `uTime` from `sf.onSeek(t)`. Use a sin-free hash for noise and modest poly counts to stay deterministic (see docs/format.md).
-- **Art-directed composition**: off-center the subject (rule of thirds), use big confident negative space, dramatic scale contrast, and let the 3D form overlap/occlude large editorial typography (transparent scene `background`, DOM text BEFORE the sf-scene in document order so the canvas occludes it).
-- **A specific palette**: one bold flat background color + one accent, not "moody dark gradient". Reference real design, not the three.js default aesthetic.
+Determinism is NOT the limit on creativity — it only bans live simulation, unseeded randomness, and cross-frame accumulation. Everything below is seekable. Generic output = generic primitives + centered orbit + preset materials. To make something that looks designed, not auto-generated:
+- **`<sf-shader>` — author GLSL directly (the biggest lever).** Drop a fragment shader as the element's text; you get `uTime`, `uResolution`, `vUv`, any `u-<name>` attribute as `u<Name>`, and a `hash21/hash22/vnoise/fbm` noise toolkit for free. `fullscreen` makes it a generative background canvas (flow fields, plasma, gradients); without it, the shader is bound to a `geometry`. Far less boilerplate than the `sf.THREE` escape hatch. Generative/abstract/organic looks the markup can't otherwise express — see `examples/shader-flow`. (The `sf.THREE` escape hatch is still there for custom geometry/meshes that need JS.)
+- **Go non-product.** stereoframe is not only a product-shot tool: pure generative pieces (`sf-shader`), typographic/editorial motion posters (`examples/type-poster`), abstract/data pieces. Break the "object on dark studio bg, orbiting" default.
+- **Art-directed composition**: off-center the subject (rule of thirds), big confident negative space, dramatic scale contrast; let a 3D form overlap/occlude large editorial typography (transparent scene `background`, DOM text BEFORE the sf-scene so the canvas occludes it — **but no post-fx on that scene; the EffectComposer flattens transparency to opaque black**).
+- **A specific palette**: one bold flat background color + one accent (bright/cream backgrounds, not only "moody dark gradient"). Pair `material="matcap"` (iridescent/chrome/holo) — its dark core pops on light backgrounds. Reference real design, not the three.js default aesthetic.
 
 ## Polish — the "finish" attributes (use these for premium-looking output)
 

@@ -176,6 +176,19 @@ Liquid/goo blobs. Ball centers follow closed-form seeded orbits (`f(seed_i, t)`)
 
 Staging tip: omit the sf-scene `background` (transparent) and place DOM typography *before* the sf-scene in document order — the blobs occlude the letters (`examples/metaball`).
 
+### `<sf-shader>` — author a fragment shader (block)
+
+Drop GLSL as the element's text and get the boilerplate wired up — the lowest-friction way to generative/abstract/organic looks the markup can't express, while staying deterministic (`uTime` is a pure function of `t`). Less verbose than the `sf.THREE` escape hatch.
+
+| attribute | default | description |
+|---|---|---|
+| `fullscreen` | (absent) | present ⇒ a clip-space quad that fills the frame ignoring the camera (a generative background canvas). Absent ⇒ the shader is bound to a `geometry` (+`args`, like sf-mesh) and is camera-projected with `position`/`rotation`/`scale` |
+| `geometry`/`args` | box | (mesh mode) the surface to shade |
+| `transparent` | false | `true` for alpha blending |
+| `u-<name>` | — | a custom uniform exposed in GLSL as `u<Name>` — a number (`float`), `#hex`/color (`vec3`), or `"x y[ z[ w]]"` (`vec2/3/4`). e.g. `u-speed="0.3"` → `uSpeed`, `u-tint="#ff5a36"` → `uTint` |
+
+In scope inside your fragment `main()`: `vUv` (0–1), `uTime` (seconds), `uResolution` (px), your `u-*` uniforms, and a sin-free noise toolkit — `hash21(vec2)`, `hash22(vec2)`, `vnoise(vec2)`, `fbm(vec2)`. Set `gl_FragColor`. With no body, a default flow-field is used. See `examples/shader-flow`. Note: a `fullscreen` shader draws first (renderOrder −1) so 3D geometry composites on top.
+
 ### `<sf-animate>` — semantic verbs
 
 Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, default 0), `duration` (seconds), `ease`.
