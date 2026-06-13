@@ -207,6 +207,13 @@ A flat, jagged, plastic look is almost always a missing-finish problem, not a co
 - `contrast="1.05" saturation="1.1"` — light color grade.
 - **`material="matcap" matcap="iridescent|chrome|pearl|clay|holo"`** — distinctive, designer-grade surfaces with zero lighting setup. The fastest way off the generic-preset look. Dark-core looks (iridescent) pop on LIGHT backgrounds; bright looks pop on dark. Match background contrast to the material.
 
+**Product-film finish** (kills the "floating CG" look — the difference between a spinning GLB and a real product shot):
+- **`ground="contact-shadow"`** on `<sf-scene>` + **`fit-ground`** on `<sf-model>` — a soft top-down shadow grounds the model on `y=0`. The single highest-impact fix for "it looks fake". Tune `ground-size`/`ground-opacity`/`ground-blur`/`ground-darkness`.
+- **`light-sweep="0.1"`** on `<sf-scene>` — rotates the `environment` over the timeline so a specular highlight travels across metal/glass. The signature premium-product sweep. Needs `environment="room"` (or studio/HDRI).
+- **`isolate` verb** (`part="<index>" dim="0.8"`) — fade every other part to black so one component is the hero. Multi-part GLB only; pair with a slow `dolly` toward it.
+
+The `stage` reveal/hero-orbit/turntable presets already apply ground + light-sweep, so a plain `stage product.glb` gives a grounded, swept product film out of the box.
+
 Example moody hero scene: `<sf-scene background="#070709" exposure="0.85" environment="room" samples="2" bloom="0.35" bloom-threshold="0.86" vignette="0.4">`. Metal/glass need `environment` to look right; emissive + `bloom` reads as glow/light.
 
 ## Framing heuristics

@@ -50,6 +50,8 @@ In both modes, load the runtime with an **inline module script**:
 | `chromatic-aberration` | 0 | radial RGB split at the edges (e.g. 0.3–0.5) — lens/film feel |
 | `grain` | 0 | film grain amount (e.g. 0.03–0.06); seeded by `t`, so seekable |
 | `contrast`/`saturation` | 1 / 1 | light color grade (e.g. 1.05 / 1.1) |
+| `ground` | — | `contact-shadow` (or `shadow`) renders a soft top-down depth shadow onto a `y`-plane — grounds the model so it stops looking like floating CG. Pair with model `fit-ground`. Tune with `ground-y` (0), `ground-size` (6), `ground-opacity` (0.75), `ground-blur` (3), `ground-darkness` (1.4) |
+| `light-sweep` | 0 | rotate the environment (reflections) `light-sweep` turns over the whole timeline — a slow specular sweep travels across metal/glass, the signature "premium product film" highlight. Needs `environment` (`room`/`studio`/HDRI). Try 0.1 |
 
 **The "finish" attributes** (`samples`, `environment="room"`, `bloom`, `vignette`) are what separate a tech-demo look from a polished one: supersampling removes jaggies, a procedural environment gives metal/glass something to reflect, bloom makes highlights glow, and a vignette frames the shot. All are deterministic. Note the earlier `environment` row (HDRI) — the same attribute now also accepts `room`/`studio`.
 
@@ -195,6 +197,7 @@ Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, defau
 | `float` | `amplitude` (0.1), `period` (4) | sinusoidal bob on Y; continuous |
 | `sway` | `amount` (6, degrees), `period` (5) | continuous multi-axis secondary motion (gentle wobble) — makes a form feel alive; analytic, seekable |
 | `explode` | `distance` (1.5) | exploded view — separate a model's parts outward from its center over the window. Needs a **multi-component** GLB (separate part meshes); single-mesh or rigged-character models have nothing to separate (no effect) |
+| `isolate` | `part` (index, required), `dim` (0.8) | feature spotlight — fade every *other* part's material toward black over the window so one component reads as the hero. `dim` is how far the rest darken (1 = fully). Needs a multi-component GLB; pair with a slow `dolly`/`orbit` toward the part |
 | `variant` | `color`/`roughness`/`metalness` (target values), `material` (GLB material name filter), duration default 0.8 | material colorway transitions (configurators). Multiple variants on one target chain in start order — each one's from-state is the previous one's result (resolved at compile time, backward-seek safe) |
 
 ### Easing vocabulary (GSAP-compatible names)

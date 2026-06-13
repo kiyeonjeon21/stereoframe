@@ -34,6 +34,7 @@ export const VERB_NAMES = [
   "float",
   "sway",
   "explode",
+  "isolate",
   "variant",
 ] as const;
 

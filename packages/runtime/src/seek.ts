@@ -107,6 +107,7 @@ export function applySeek(compiled: CompiledScene, t: number): void {
     }
   }
 
+  compiled.preRender?.(); // e.g. contact-shadow depth pass (resets render target)
   if (compiled.post) compiled.post.render(time);
   else compiled.renderer.render(compiled.scene, compiled.camera);
 }

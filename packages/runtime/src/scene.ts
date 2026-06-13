@@ -18,6 +18,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { buildPostFX, type PostFX } from "./postfx";
 import { getMatcap } from "./matcaps";
 import { buildMetaball } from "./blocks/metaball";
+import { buildContactShadow } from "./blocks/contactshadow";
 import { buildOcean, type OceanBuild } from "./blocks/ocean";
 import { buildSky } from "./blocks/sky";
 import { buildSwarm } from "./blocks/swarm";
@@ -44,6 +45,8 @@ export interface CompiledScene {
   canvas: HTMLCanvasElement;
   /** Post-processing chain (bloom/vignette); null = render directly. */
   post: PostFX | null;
+  /** Runs before the main render each frame (e.g. contact-shadow depth pass). */
+  preRender: (() => void) | null;
   /** Shot window — single default scene: start 0, always visible. */
   shot: ShotSpec;
   renderer: THREE.WebGLRenderer;
@@ -402,6 +405,32 @@ export function compileScene(host: HTMLElement): CompiledScene {
     for (const ocean of oceans) ocean.setSunDirection(skySunDirection);
   }
 
+  // Contact shadow — grounds the subject. `ground="contact-shadow"` (the
+  // shadow sits at `ground-y`, default 0; pair with sf-model fit-ground).
+  let preRender: (() => void) | null = null;
+  const groundMode = (host.getAttribute("ground") ?? "").toLowerCase();
+  if (groundMode === "contact-shadow" || groundMode === "shadow") {
+    const cs = buildContactShadow(renderer, scene, {
+      y: parseNumber(host.getAttribute("ground-y"), 0),
+      size: parseNumber(host.getAttribute("ground-size"), 6),
+      opacity: parseNumber(host.getAttribute("ground-opacity"), 0.75),
+      blur: parseNumber(host.getAttribute("ground-blur"), 3),
+      darkness: parseNumber(host.getAttribute("ground-darkness"), 1.4),
+    });
+    scene.add(cs.group);
+    preRender = cs.update;
+  }
+
+  // Light sweep — rotate the environment so a specular streak travels across
+  // metal/glass (the signature "premium product" move). `light-sweep` =
+  // revolutions per second (e.g. 0.15). Pure function of t.
+  const sweepSpeed = parseNumber(host.getAttribute("light-sweep"), 0);
+  if (sweepSpeed !== 0) {
+    seekFns.push((t) => {
+      scene.environmentRotation.y = t * sweepSpeed * Math.PI * 2;
+    });
+  }
+
   const ready = Promise.all(pending).then(async () => {
     if (lookAtSelector) {
       const target = objectsById.get(lookAtSelector);
@@ -434,6 +463,7 @@ export function compileScene(host: HTMLElement): CompiledScene {
     height,
     canvas,
     post,
+    preRender,
     shot,
     renderer,
     scene,

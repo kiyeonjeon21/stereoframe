@@ -67,16 +67,17 @@ function reveal(model: string, d: number, bg: string, title?: string): string {
     <sf-scene duration="${d}" width="1920" height="1080" background="${bg}"
               environment="room" exposure="0.92"
               samples="2" bloom="0.22" bloom-threshold="0.86" vignette="0.45"
-              chromatic-aberration="0.14" grain="0.03" contrast="1.05" saturation="1.05">
-      <sf-camera fov="34" position="-3 -0.8 5.2" look-at="0 0.1 0"></sf-camera>
+              chromatic-aberration="0.14" grain="0.03" contrast="1.05" saturation="1.05"
+              ground="contact-shadow" ground-y="0" ground-size="6" light-sweep="0.1">
+      <sf-camera fov="34" position="-3 0.5 5.2" look-at="0 1 0"></sf-camera>
       <sf-light type="hemisphere" color="#2a3450" intensity="0.5"></sf-light>
-      <sf-light type="directional" color="#ffffff" intensity="2.6" position="4 6 5"></sf-light>
-      <sf-light type="directional" color="#9db8ff" intensity="1.5" position="-5 2 -4"></sf-light>
-      <sf-model id="m" src="assets/${model}" fit="2.6"></sf-model>
+      <sf-light type="directional" color="#ffffff" intensity="2.6" position="4 7 5"></sf-light>
+      <sf-light type="directional" color="#9db8ff" intensity="1.5" position="-5 3 -4"></sf-light>
+      <sf-model id="m" src="assets/${model}" fit="2.6" fit-ground></sf-model>
       <sf-animate target="#m" verb="bounce-in" start="0.2" duration="1" ease="back.out"></sf-animate>
       <sf-animate target="#m" verb="turntable" rpm="2.4" start="0.5"></sf-animate>
       <sf-animate target="camera" verb="camera-path" look="none"
-                  points="-3 -0.8 5.2, -1.8 0 4.4, -0.7 0.5 3.9, 0.25 0.7 3.7"
+                  points="-3 0.5 5.2, -1.8 0.9 4.4, -0.7 1.1 3.9, 0.25 1.1 3.7"
                   start="0" duration="${d}" ease="power2.inOut"></sf-animate>
 ${t.anim}    </sf-scene>
 ${t.dom}${tail}`;
@@ -89,13 +90,14 @@ function heroOrbit(model: string, d: number, bg: string, title?: string): string
     <sf-scene duration="${d}" width="1920" height="1080" background="${bg}"
               environment="room" exposure="1.0"
               samples="2" bloom="0.12" bloom-threshold="0.9" vignette="0.32"
-              grain="0.025" contrast="1.03" saturation="1.05">
-      <sf-camera fov="34" position="0 0.6 5" look-at="0 0 0"></sf-camera>
+              grain="0.025" contrast="1.03" saturation="1.05"
+              ground="contact-shadow" ground-y="0" ground-size="6" light-sweep="0.1">
+      <sf-camera fov="34" position="0 1.3 5.2" look-at="0 1 0"></sf-camera>
       <sf-light preset="studio"></sf-light>
-      <sf-model id="m" src="assets/${model}" fit="2.6"></sf-model>
+      <sf-model id="m" src="assets/${model}" fit="2.4" fit-ground></sf-model>
       <sf-animate target="#m" verb="turntable" rpm="1.4"></sf-animate>
-      <sf-animate target="camera" verb="orbit" around="0 0 0" radius="5"
-                  from="-38deg" to="38deg" height="0.6" start="0" duration="${d}"
+      <sf-animate target="camera" verb="orbit" around="0 1 0" radius="5.4"
+                  from="-38deg" to="38deg" height="0.5" start="0" duration="${d}"
                   ease="sine.inOut"></sf-animate>
 ${t.anim}    </sf-scene>
 ${t.dom}${tail}`;
@@ -108,7 +110,7 @@ function turntable(model: string, d: number, bg: string, title?: string): string
     <sf-scene duration="${d}" width="1920" height="1080" background="${bg}"
               environment="room" exposure="1.02"
               samples="2" bloom="0.12" bloom-threshold="0.9" vignette="0.3"
-              grain="0.02" contrast="1.03">
+              grain="0.02" contrast="1.03" light-sweep="0.1">
       <sf-camera fov="33" position="0 1.4 5.4" look-at="0 1 0"></sf-camera>
       <sf-light preset="studio"></sf-light>
       <sf-mesh geometry="cylinder" args="2 2.2 0.12" color="#1c1f26"

@@ -104,6 +104,7 @@ export function compileAnimations(compiled: CompiledScene): void {
       "camera-path": 8,
       "variant": 0.8,
       "explode": 2.5,
+      "isolate": 0.8,
     };
     // Verb timing uses bare start/duration attributes (seconds) — data-start/
     // data-duration are HyperFrames *clip* timing and would trip its linter.
@@ -291,6 +292,80 @@ export function compileAnimations(compiled: CompiledScene): void {
         const p = verbs.easedProgress(t, timing);
         for (const m of movers) {
           m.part.position.copy(m.base).add(tmp.copy(m.dir).multiplyScalar(distance * p));
+        }
+      });
+    } else if (verb === "isolate") {
+      // Feature highlight: dim every part except the chosen one, so the eye
+      // goes to it (the "detail section" beat). Needs a multi-part model.
+      const parts = collectParts(target);
+      if (parts.length <= 1) continue;
+      const targetIdx = Math.max(
+        0,
+        Math.min(parts.length - 1, Math.round(parseNumber(el.getAttribute("part"), 0))),
+      );
+      // `dim=1` fully blacks out the rest. Default 0.85 leaves a faint ghost.
+      const dim = Math.min(1, parseNumber(el.getAttribute("dim"), 0.85));
+      interface DimState {
+        mat: MeshStandardMaterial;
+        color: Color;
+        env: number;
+        emissive: Color | null;
+        emissiveIntensity: number;
+        // MeshPhysicalMaterial extras: sheen (fabric) and specular reflect
+        // independently of base color, so dimming `color` alone leaves a lit
+        // ghost (e.g. ToyCar's sheen-red cloth). Capture them when present.
+        phys: MeshPhysicalMaterial | null;
+        sheen: number;
+        sheenColor: Color | null;
+        specularIntensity: number;
+        specularColor: Color | null;
+        clearcoat: number;
+      }
+      const mats: DimState[] = [];
+      const seen = new Set<Material>();
+      parts.forEach((part, i) => {
+        if (i === targetIdx) return;
+        part.traverse((o) => {
+          const m = (o as Mesh).material;
+          for (const mat of Array.isArray(m) ? m : m ? [m] : []) {
+            if (seen.has(mat) || !(mat instanceof MeshStandardMaterial)) continue;
+            seen.add(mat);
+            const phys = mat instanceof MeshPhysicalMaterial ? mat : null;
+            mats.push({
+              mat,
+              color: mat.color.clone(),
+              env: mat.envMapIntensity,
+              emissive: mat.emissive ? mat.emissive.clone() : null,
+              emissiveIntensity: mat.emissiveIntensity,
+              phys,
+              sheen: phys ? phys.sheen : 0,
+              sheenColor: phys?.sheenColor ? phys.sheenColor.clone() : null,
+              specularIntensity: phys ? phys.specularIntensity : 0,
+              specularColor: phys?.specularColor ? phys.specularColor.clone() : null,
+              clearcoat: phys ? phys.clearcoat : 0,
+            });
+          }
+        });
+      });
+      compiled.seekFns.push((t) => {
+        // Drive every light-contributing channel toward black together —
+        // opacity is deliberately untouched (toggling `transparent` changes
+        // render sorting and breaks seek-idempotency). Pure function of t.
+        const k = Math.max(0, 1 - dim * verbs.easedProgress(t, timing));
+        for (const e of mats) {
+          e.mat.color.copy(e.color).multiplyScalar(k);
+          e.mat.envMapIntensity = e.env * k;
+          if (e.emissive) {
+            e.mat.emissive.copy(e.emissive).multiplyScalar(k);
+            e.mat.emissiveIntensity = e.emissiveIntensity * k;
+          }
+          if (e.phys) {
+            e.phys.sheen = e.sheen * k;
+            if (e.sheenColor) e.phys.sheenColor.copy(e.sheenColor).multiplyScalar(k);
+            e.phys.specularIntensity = e.specularIntensity * k;
+            if (e.specularColor) e.phys.specularColor.copy(e.specularColor).multiplyScalar(k);
+            e.phys.clearcoat = e.clearcoat * k;
+          }
         }
       });
     }
