@@ -37,7 +37,7 @@ Because the markup is declarative, a partial edit is a one-line diff, and becaus
 | particle count/seed, fine shot-length splits | brand colors (if any) |
 | glass/water material parameters | total length and intended use (social/presentation/demo) |
 
-**Asset rule**: for requests that need models or environment maps, provide the GLB/HDRI files or say "abstract with primitives". The agent won't use CDN assets because remote fetches during render break determinism (CC0 sources: Poly Haven HDRIs, Khronos sample GLBs).
+**Asset rule**: for requests that need models or environment maps, you can (a) provide the GLB/HDRI files, (b) say "abstract with primitives", or (c) let the agent **generate** a model from text — `stereoframe gen "<prompt>"` produces a textured GLB via Meshy. The agent won't use CDN assets at render time because remote fetches break determinism, but generation happens up front and the GLB is saved locally (CC0 sources for hand-picked assets: Poly Haven HDRIs, Khronos sample GLBs).
 
 ## What's in range of the current vocabulary
 

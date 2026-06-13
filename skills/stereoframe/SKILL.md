@@ -18,6 +18,7 @@ stereoframe validate           # headless run: errors, lighting, framing, seek i
 stereoframe render --draft     # fast iteration render → renders/*.mp4
 stereoframe render             # quality render (crf 18)
 stereoframe preview            # browser playback at http://127.0.0.1:<port>/?sf-preview
+stereoframe gen "<prompt>"     # text-to-3D: generate a textured GLB into assets/ (Meshy)
 stereoframe add ocean          # install a block's assets + print its markup
 stereoframe blocks             # list available blocks
 stereoframe update             # refresh assets/stereoframe.js after upgrading
@@ -166,7 +167,7 @@ Total video duration = max(start + duration). For crossfades, make the previous 
 
 ## Rules (breaking these breaks the render)
 
-1. **Assets must be local** (`assets/...`) — never CDN models/HDRIs.
+1. **Assets must be local** (`assets/...`) — never CDN models/HDRIs. If the user wants a model they don't have, generate one with `stereoframe gen "<prompt>"` (writes a GLB into assets/), then reference it with `<sf-model>`.
 2. **Everything derives from seek time.** In `<script type="stereoframe">` escape-hatch code (`sf.onSeek((t) => ...)`, runs after assets load), no `Date.now()`, no `performance.now()`, no `Math.random()`, no state accumulated across frames. Randomness comes from `<sf-particles seed>`-style seeded attributes.
 3. No previous-frame-dependent effects (trails, feedback, stepped physics) — frames must be seekable in any order.
 4. Camera motion = verbs on `target="camera"`; one `sf-camera` per scene.

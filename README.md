@@ -24,6 +24,17 @@ npx stereoframe preview     # looping playback in the browser
 </sf-scene>
 ```
 
+## Generate assets from text
+
+Need a model you don't have? `stereoframe gen` turns a prompt into a textured GLB (via [Meshy](https://www.meshy.ai)) and drops it in `assets/`:
+
+```bash
+stereoframe gen "a low-poly treasure chest"   # → assets/a-low-poly-treasure-chest.glb
+# then: <sf-model src="assets/a-low-poly-treasure-chest.glb"></sf-model>
+```
+
+It runs with no setup using Meshy's free test mode (returns a sample model); set `MESHY_API_KEY` (shell env or project `.env`) for real prompt-driven generations.
+
 ## How it works
 
 - **Seek-driven rendering.** The CLI drives the runtime's protocol (`window.__stereoframe.seek(t)`, `t = frame / fps`) in headless Chrome and screenshots each frame into ffmpeg. Every frame is a pure function of `t`: verb writers → `AnimationMixer.setTime(t)` → `camera.lookAt` → `renderer.render`. No wall clock, no `requestAnimationFrame`, no accumulated state.
@@ -37,7 +48,7 @@ npx stereoframe preview     # looping playback in the browser
 
 ```
 packages/runtime/    stereoframe-runtime → dist/stereoframe.js (three.js r184 bundled)
-packages/cli/        stereoframe → `stereoframe` bin (init/lint/validate/render/preview/add/update)
+packages/cli/        stereoframe → `stereoframe` bin (init/gen/lint/validate/render/preview/add/update)
 examples/
   hello-standalone/        CLI-scaffolded starter (no HyperFrames)
   character-run-standalone/ Fox run cycle + follow cam + particles, own pipeline

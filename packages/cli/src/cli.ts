@@ -12,6 +12,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { addBlock, listBlocks } from "./blocks";
+import { genModel } from "./gen";
 import { lintHtml, type Finding } from "./lint";
 import { renderProject } from "./render";
 import { scaffoldProject, updateRuntime } from "./scaffold";
@@ -58,6 +59,12 @@ USAGE
       --draft          fast low-quality render for iteration
   stereoframe preview [dir]            serve with looping wall-clock playback
       --port <n>       fixed port (default: random)
+  stereoframe gen "<prompt>"           generate a 3D model (GLB) from text via Meshy
+      --dir <dir>      project dir (default .)
+      --out <path>     output path (default assets/<slug>.glb)
+      --no-texture     skip the PBR texture pass (faster, untextured mesh)
+      --polycount <n>  target polygon count
+      --key <key>      Meshy API key (else MESHY_API_KEY / .env / test mode)
   stereoframe add <block> [dir]        install a visual block's assets + print usage
   stereoframe blocks                   list available blocks
   stereoframe update [dir]             refresh assets/stereoframe.js from the CLI's bundled runtime
@@ -108,6 +115,19 @@ async function main(): Promise<void> {
       console.log(`preview: ${handle.url}?sf-preview`);
       console.log("press ctrl-c to stop");
       return; // server keeps the process alive
+    }
+    case "gen": {
+      const prompt = positional.join(" ").trim();
+      if (!prompt) throw new Error('usage: stereoframe gen "<prompt>"');
+      await genModel({
+        prompt,
+        projectDir: typeof options.get("dir") === "string" ? (options.get("dir") as string) : ".",
+        out: typeof options.get("out") === "string" ? (options.get("out") as string) : undefined,
+        texture: options.get("no-texture") !== true,
+        polycount: options.has("polycount") ? Number(options.get("polycount")) : undefined,
+        key: typeof options.get("key") === "string" ? (options.get("key") as string) : undefined,
+      });
+      return;
     }
     case "add": {
       const name = positional[0];
