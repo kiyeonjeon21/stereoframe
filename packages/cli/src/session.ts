@@ -33,6 +33,10 @@ export async function openSession(
       // GPU-less environments (CI runners): Chrome 137+ disabled the automatic
       // SwiftShader WebGL fallback; this flag re-enables software rendering.
       "--enable-unsafe-swiftshader",
+      // Ubuntu 24 runners block unprivileged user namespaces (AppArmor), which
+      // crashes Chrome's sandbox. Compositions are local files, so dropping
+      // the sandbox on CI is acceptable.
+      ...(process.env.CI ? ["--no-sandbox", "--disable-setuid-sandbox"] : []),
     ],
   });
 
