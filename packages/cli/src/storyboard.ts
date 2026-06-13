@@ -543,3 +543,59 @@ export function readStoryboard(path: string): { plan: Storyboard; planDir: strin
   }
   return { plan, planDir: dirname(full) };
 }
+
+// ── schema description (single source of truth for the `brief` LLM prompt) ────
+/** A compact, LLM-facing description of the storyboard JSON. Kept next to the
+ *  schema it documents so the two never drift. Consumed by `brief.ts`. */
+export const STORYBOARD_SCHEMA_DOC = `STORYBOARD PLAN — JSON schema (a shot list that compiles to a multi-shot 3D film)
+
+Top level:
+  { title?, model (GLB basename), width?=1920, height?=1080, fps?=30,
+    defaults?: ShotDefaults, shots: Shot[] (required, >=1) }
+
+ShotDefaults (inherited by every shot; any shot may override):
+  bg?            : "#hex" scene background
+  environment?   : "studio" | "room" (procedural reflections; keep "studio")
+  fit?=2.6       : normalize model longest-dim to this size
+  fitGround?=true: rest model on the floor
+  pose?          : "x y z" degrees — re-orient the model (text-to-3D often returns
+                   odd poses; a phone flat -> "0 90 90"). Use the model facts below.
+  backdrop?      : { coldGlow:"#hex", warmGlow:"#hex" } -> a moody nebula shader
+                   behind the subject (NOT flat black). Or "none". SET THIS on most shots.
+  atmosphere?    : "dust" | "snow" | "none" -> drifting particles. CONSTRAINT: only on
+                   a shot whose NEXT shot is a cut, or the LAST shot (it is dropped on a
+                   shot that crossfades out). Good on the cold-open and the hero.
+  secondaryMotion: { spin?(rpm), sway?(deg), float?(amplitude) } -> keeps the subject
+                   ALIVE while the camera moves. SET THIS (e.g. spin 1-2, sway 1) on most shots.
+  finish?        : { exposure?, samples?=2, bloom?, bloomThreshold?, vignette?, contrast?,
+                     saturation?, grain?, chromaticAberration?, lightSweep?, ground?:"contact-shadow" }
+  lighting?      : { preset:"studio"|"soft"|"sunset" } | "auto" (metal-aware rig) |
+                   { key?, fill?, rim? } each { color:"#hex", intensity, position:"x y z" }
+
+Shot (extends ShotDefaults):
+  name?            : short label
+  duration         : seconds (required). Vary across shots (e.g. 2.4 / 3.3 / 3 / 3 / 4).
+  transition?      : "cut" | "crossfade" (default crossfade after shot 1). Use a CUT for
+                     a dramatic "lights-on" reveal.
+  transitionDuration?=0.4
+  camera           : { type, fov?, ease?, ...type fields } (required), where type is:
+                       static     {position, lookAt}
+                       orbit      {around, radius, from, to, height}     (from/to in degrees)
+                       dolly|push-in|pull-back {position, lookAt, toward, distance}
+                       path       {points:"x y z, x y z, ..."}           (looks ahead; no lookAt)
+                       flythrough {points, lookAt}                       (dynamic, stays on subject)
+                       hero       {position, lookAt, around, radius, from, to, height} (low heroic orbit)
+  isolate?         : { part, dim? }   explode?: { distance? }   spin?: rpm
+  callout?         : "auto" | "none"  (auto = inspect-driven spec labels; multi-part models only)
+  text?            : { title?, subtitle?, spec? } -> staggered 3-tier title card (use on the hero)
+
+CINEMATIC DIRECTION (aim for a real film, not a turntable):
+- 6-9 shots, 18-28s total, VARIED beat lengths.
+- A strong arc: cold-open (dark, low exposure, vignette, one rim light) -> hard CUT to a
+  lit reveal -> 1-2 detail/macro beats -> a flythrough -> hero (full light) with a staggered
+  title card. Vary camera TYPE across shots (don't repeat orbit every time).
+- Set backdrop + secondaryMotion on (almost) every shot. Put atmosphere:"dust" on the
+  cold-open (followed by a cut) and the final hero.
+- Colour = lighting + grade: complementary split (e.g. cyan key / magenta rim), per-beat
+  exposure/vignette/saturation, light-sweep 0.1-0.24 for the specular highlight sweep.
+- Determinism: atmosphere never on a crossfade-out shot. Keep everything a function of time.`;

@@ -17,6 +17,7 @@ import { genModel } from "./gen";
 import { inspectModel } from "./inspect";
 import { bakeProject } from "./bake";
 import { buildStoryboard, readStoryboard, validateStoryboard } from "./storyboard";
+import { runBrief } from "./brief";
 import { buildAutoCallouts, explodeTiming, PRESETS, stageModel, type Preset } from "./stage";
 import { lintHtml, type Finding } from "./lint";
 import { renderProject } from "./render";
@@ -75,6 +76,11 @@ USAGE
       --duration <s>   seconds (default 8)
       --title "<text>" optional title overlay
       --bg <color>     background color (preset default otherwise)
+  stereoframe brief "<brief>" | <brief.md>   natural-language directing → a cinematic plan.json (via an LLM)
+      --model <glb>    the model to direct (required)
+      --dir <dir>      output project dir (default: <brief> slug or film)
+      --render         compile + render the result to mp4 (--draft for fast)
+      --llm-model <n>  LLM model (default gpt-4o; or OPENAI_MODEL); needs OPENAI_API_KEY
   stereoframe storyboard <plan.json>   compile a shot plan (JSON) into a multi-shot directed film
       --dir <dir>      output project dir (default: <title> slug or <stem>-film)
       --render         render the compiled film to mp4 (--draft for fast)
@@ -253,6 +259,29 @@ async function main(): Promise<void> {
       } else {
         console.log(`next: cd ${outDir} && stereoframe render`);
       }
+      return;
+    }
+    case "brief": {
+      const brief = positional.join(" ").trim();
+      const model = options.get("model");
+      if (!brief || typeof model !== "string") {
+        throw new Error('usage: stereoframe brief "<brief>" | <brief.md> --model <model.glb> [--dir out] [--render] [--draft] [--llm-model <name>]');
+      }
+      const slug = brief
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 32) || "film";
+      const outDir = typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${slug}-film`;
+      await runBrief({
+        brief,
+        model,
+        outDir,
+        render: options.get("render") === true,
+        draft: options.get("draft") === true,
+        llmModel: typeof options.get("llm-model") === "string" ? (options.get("llm-model") as string) : undefined,
+        key: typeof options.get("key") === "string" ? (options.get("key") as string) : undefined,
+      });
       return;
     }
     case "gen": {
