@@ -71,6 +71,10 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 
 v0 (Tier 3b): standalone CLI pipeline (init/lint/validate/render/preview/add/update, Puppeteer + ffmpeg), **3D-aware verification** (`lint`: markup/asset/time-purity static checks; `validate`: headless probes for lighting, framing, black frames, and seek idempotency — the determinism contract, machine-checked), **multi-shot compositions** (each sf-scene is a shot with cut/crossfade transitions and shot-local time), declarative scenes, GLB/HDRI preloading, eleven animation verbs incl. character clip crossfades, camera follow, `camera-path` spline flythroughs, and `variant` colorway switching, stateless GPU particles, visual blocks (`sf-sky`, `sf-ocean`, `sf-swarm` typography choreography, `sf-metaball` goo), glass/physical materials (transmission, rounded-box, emissive), DOM title overlays, deterministic local renders (frame-hash-identical across runs). HyperFrames embed mode retained. Roadmap: audio mux, alpha output, Docker bit-parity CI.
 
+## Releasing
+
+`stereoframe` (CLI) and `stereoframe-runtime` are versioned lock-step; `bun run release` (patch by default) bumps both, publishes, and tags. See [VERSIONING.md](VERSIONING.md) for the bump policy.
+
 ## License
 
 MIT.
