@@ -11,8 +11,10 @@
  */
 import { readFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { basename } from "node:path";
 import { addBlock, listBlocks } from "./blocks";
 import { genModel } from "./gen";
+import { PRESETS, stageModel, type Preset } from "./stage";
 import { lintHtml, type Finding } from "./lint";
 import { renderProject } from "./render";
 import { scaffoldProject, updateRuntime } from "./scaffold";
@@ -59,6 +61,12 @@ USAGE
       --draft          fast low-quality render for iteration
   stereoframe preview [dir]            serve with looping wall-clock playback
       --port <n>       fixed port (default: random)
+  stereoframe stage <model.glb>        auto-direct a GLB into a cinematic motion graphic
+      --preset <name>  reveal | hero-orbit | turntable (default reveal)
+      --dir <dir>      output project dir (default: <model name>)
+      --duration <s>   seconds (default 8)
+      --title "<text>" optional title overlay
+      --bg <color>     background color (preset default otherwise)
   stereoframe gen "<prompt>"           generate a 3D model (GLB) from text via Meshy
       --dir <dir>      project dir (default .)
       --out <path>     output path (default assets/<slug>.glb)
@@ -115,6 +123,28 @@ async function main(): Promise<void> {
       console.log(`preview: ${handle.url}?sf-preview`);
       console.log("press ctrl-c to stop");
       return; // server keeps the process alive
+    }
+    case "stage": {
+      const model = positional[0];
+      if (!model) throw new Error('usage: stereoframe stage <model.glb> [--preset reveal|hero-orbit|turntable]');
+      const preset = (typeof options.get("preset") === "string" ? options.get("preset") : "reveal") as Preset;
+      if (!PRESETS.includes(preset)) {
+        throw new Error(`unknown preset: ${preset}\n\npresets: ${PRESETS.join(", ")}`);
+      }
+      const stem = basename(model).replace(/\.(glb|gltf)$/i, "");
+      const outDir =
+        typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${stem}-${preset}`;
+      const created = stageModel({
+        model,
+        projectDir: outDir,
+        preset,
+        duration: options.has("duration") ? Number(options.get("duration")) : undefined,
+        background: typeof options.get("bg") === "string" ? (options.get("bg") as string) : undefined,
+        title: typeof options.get("title") === "string" ? (options.get("title") as string) : undefined,
+      });
+      console.log(`staged ${model} (${preset}) → ${created}`);
+      console.log(`next: cd ${outDir} && stereoframe render`);
+      return;
     }
     case "gen": {
       const prompt = positional.join(" ").trim();

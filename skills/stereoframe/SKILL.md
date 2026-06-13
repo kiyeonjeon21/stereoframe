@@ -7,6 +7,19 @@ description: Declarative, deterministic 3D video on three.js. Use when creating 
 
 Stereoframe turns HTML markup into deterministic 3D video. You describe a three.js scene, camera, lights, and motion with custom elements; the runtime renders every frame as a pure function of seek time; the CLI captures frames in headless Chrome and encodes MP4 via ffmpeg. Same input → bit-identical output.
 
+## The fast path: auto-direct any GLB
+
+stereoframe's core job is **directing** a model, not making it. To turn any GLB into a polished cinematic motion graphic with zero hand-tuning:
+
+```bash
+stereoframe stage product.glb --preset reveal --title "Product Name"
+cd product-reveal && stereoframe render
+```
+
+Presets: `reveal` (dramatic dark spiral-in + rim light), `hero-orbit` (clean studio orbit), `turntable` (product on a pedestal). The model is auto-framed (`<sf-model fit="2.6">` normalizes its size/center), so the preset's camera move + lighting rig + timing + film finish frame ANY model correctly — no per-model camera/scale tweaking. Then hand-edit the generated `index.html` to taste.
+
+When a user gives you a model (or you `gen` one) and wants "an Apple-ad-style reveal / a product video", reach for `stage` first.
+
 ## Workflow
 
 ```bash

@@ -313,10 +313,25 @@ export function compileScene(host: HTMLElement): CompiledScene {
       if (el.id) objectsById.set(el.id, group);
       const src = el.getAttribute("src");
       const clipAttr = el.getAttribute("clip");
+      // Auto-framing: normalize any model to a known size + center so a
+      // fixed camera/lighting preset frames it perfectly. `fit` = target
+      // longest-dimension (world units); `fit-ground` rests it on y=0.
+      const fit = parseNumber(el.getAttribute("fit"), 0);
+      const fitGround = el.getAttribute("fit-ground") !== null;
       if (src) {
         pending.push(
           gltfLoader.loadAsync(src).then((gltf) => {
             group.add(gltf.scene);
+            if (fit > 0) {
+              const box = new THREE.Box3().setFromObject(gltf.scene);
+              const size = box.getSize(new THREE.Vector3());
+              const center = box.getCenter(new THREE.Vector3());
+              const maxDim = Math.max(size.x, size.y, size.z) || 1;
+              const s = fit / maxDim;
+              gltf.scene.scale.multiplyScalar(s);
+              gltf.scene.position.sub(center.multiplyScalar(s));
+              if (fitGround) gltf.scene.position.y += (size.y * s) / 2;
+            }
             if (gltf.animations.length > 0) {
               const mixer = new THREE.AnimationMixer(gltf.scene);
               const actions = new Map<string, THREE.AnimationAction>();

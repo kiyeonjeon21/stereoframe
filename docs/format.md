@@ -73,6 +73,8 @@ The canvas is auto-inserted as sf-scene's first child. Control layering with reg
 | `id` | for `#id` references |
 | `position`/`rotation`/`scale` | `x y z` (rotation in degrees); scale accepts a single value |
 | `clip` | initially playing clip name (default: first clip). Other clips wait at weight 0 |
+| `fit` | auto-frame: normalize the model so its longest dimension = this many world units, centered at origin (e.g. `2.6`). Makes a fixed camera/lighting preset frame any model regardless of its original scale/origin |
+| `fit-ground` | (with `fit`) rest the model on `y=0` instead of centering it vertically |
 
 All clips stay in the playing state (only weights change) and are seeked with `mixer.setTime(t)` (timeScale pinned to 1). Switch clips with the `crossfade-clip` verb — weights become a pure function of t, so random-access seeking is safe.
 

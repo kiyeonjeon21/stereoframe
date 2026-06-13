@@ -1,8 +1,15 @@
 # stereoframe
 
-**Declarative, deterministic 3D video on three.js — built for AI agents.**
+**The auto-director for 3D motion graphics — drop in a GLB, get a cinematic reveal.**
 
 ![stereoframe showcase — six example renders](docs/media/showcase.png)
+
+```bash
+npx stereoframe stage product.glb --preset reveal --title "Product"
+cd product-reveal && npx stereoframe render   # → an Apple-ad-style reveal, zero hand-tuning
+```
+
+Asset generation (Meshy/Tripo/Rodin) is a solved, crowded space. The underserved, higher-value layer is **directing** a model — camera, lighting, timing, easing, staging — which is where motion designers actually spend their time. stereoframe auto-frames any model and applies a director preset (reveal / hero-orbit / turntable), all deterministic and agent-drivable. It's also a full declarative 3D-video framework underneath (below).
 
 Describe a three.js scene, camera, lighting, and motion in plain HTML custom elements; render it frame-perfectly to MP4 with the bundled CLI. The thesis (borrowed from [HyperFrames](https://github.com/heygen-com/hyperframes), which proved it for 2D): LLMs write HTML fluently, so HTML is the right authoring surface for AI-generated video — stereoframe applies it to 3D.
 
@@ -49,7 +56,7 @@ It runs with no setup using Meshy's free test mode (returns a sample model); set
 
 ```
 packages/runtime/    stereoframe-runtime → dist/stereoframe.js (three.js r184 bundled)
-packages/cli/        stereoframe → `stereoframe` bin (init/gen/lint/validate/render/preview/add/update)
+packages/cli/        stereoframe → `stereoframe` bin (stage/init/gen/lint/validate/render/preview/add/update)
 examples/
   hello-standalone/        CLI-scaffolded starter (no HyperFrames)
   character-run-standalone/ Fox run cycle + follow cam + particles, own pipeline
