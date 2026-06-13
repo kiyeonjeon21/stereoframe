@@ -91,7 +91,29 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 
 ## Status
 
-v0 (Tier 3b+): standalone CLI pipeline (init/gen/lint/validate/render/preview/add/update, Puppeteer + ffmpeg), **text-to-3D asset generation** (`stereoframe gen` → textured GLB via Meshy), **3D-aware verification** (`lint`: markup/asset/time-purity static checks; `validate`: headless probes for lighting, framing, black frames, and seek idempotency — the determinism contract, machine-checked), **multi-shot compositions** (each sf-scene is a shot with cut/crossfade transitions and shot-local time), declarative scenes, GLB/HDRI preloading, fourteen animation verbs incl. character clip crossfades, camera follow, `camera-path` spline flythroughs, `explode`/`isolate`/`sway`, and `variant` colorway switching, stateless GPU particles, visual blocks (`sf-sky`, `sf-ocean`, `sf-swarm` typography choreography, `sf-metaball` goo), glass/physical materials (transmission, rounded-box, emissive), **GLB auto-director** (`stage` command: auto-framing + reveal/hero-orbit/turntable/exploded-view/spec/teardown presets), **segment + tag pipeline** (`inspect` reads a GLB's parts — name, material character, position, size — so parts can be targeted by name), **tracked spec callouts** (`sf-callout`: leader-line labels that follow a 3D part as the camera moves; auto-placed by `spec`/`teardown`), **product-film finish** (contact-shadow grounding, environment light-sweep, feature-isolate spotlight), **compressed-GLB support** (Draco/KTX2/Meshopt, so real downloaded/generated models just load), **post-processing finish** (supersampling AA, procedural `environment="room"` reflections, bloom, vignette, grain, chromatic aberration — all deterministic), DOM title overlays, deterministic local renders (frame-hash-identical across runs). **custom shaders** via `sf.THREE` in the escape hatch, **matcap materials** (pearl/chrome/iridescent/clay/holo — designer-grade surfaces, no lighting), cinematic finish (**film grain, chromatic aberration, color grade** + bloom/vignette), and a **`sway`** secondary-motion verb. Determinism is scoped to seekability (structure), leaving visuals free. HyperFrames embed mode retained. Roadmap: depth of field + motion blur, audio mux, alpha output, Docker bit-parity CI.
+**v0 (Tier 3b+).** Determinism is scoped to seekability: every frame is a pure function of `t`, frame-hash-identical across runs — which leaves the visuals free.
+
+**Direct any GLB**
+- `stage` auto-director — auto-framing + presets: reveal, hero-orbit, turntable, exploded-view, **spec** (annotated product film), **teardown** (per-part exploded breakdown).
+- `inspect` segment + tag pipeline — reads a GLB's parts (name, material character, position, size) so they can be targeted by name.
+- `sf-callout` tracked spec labels — leader lines that follow a 3D part as the camera moves; auto-placed by `spec`/`teardown`.
+- Product-film finish — contact-shadow grounding, environment light-sweep, feature-isolate spotlight.
+- Compressed-GLB support (Draco / KTX2 / Meshopt) — real downloaded/generated models just load.
+
+**Authoring (declarative 3D-video framework)**
+- Plain-HTML scenes; GLB/HDRI preload gate; multi-shot compositions (each `sf-scene` is a shot — cut/crossfade, shot-local time).
+- Fourteen analytic verbs — turntable, orbit, dolly, move, follow, camera-path, crossfade-clip, bounce-in, fade-in, float, sway, explode, isolate, variant — with GSAP-compatible easing.
+- Materials — glass/physical (transmission, rounded-box, emissive) and matcaps (pearl/chrome/iridescent/clay/holo).
+- Stateless GPU particles (fountain/snow/dust); visual blocks (`sf-sky`, `sf-ocean`, `sf-swarm` typography, `sf-metaball`).
+- Post-processing — supersampling AA, `environment="room"` reflections, bloom, vignette, film grain, chromatic aberration, color grade (all deterministic).
+- Custom shaders via the `sf.THREE` escape hatch; DOM title overlays.
+
+**Pipeline & verification**
+- CLI — init / gen / inspect / lint / validate / render / preview / add / update (Puppeteer + ffmpeg).
+- Text-to-3D — `stereoframe gen` → textured GLB via Meshy.
+- `lint` — markup / asset / time-purity static checks. `validate` — headless probes for lighting, framing, black frames, and seek idempotency (the determinism contract, machine-checked).
+
+HyperFrames embed mode retained. **Roadmap:** depth of field + motion blur, audio mux, alpha output, Docker bit-parity CI.
 
 ## Releasing
 
