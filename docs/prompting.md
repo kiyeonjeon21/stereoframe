@@ -14,13 +14,20 @@ When making a video with stereoframe, describe your **directorial intent**, not 
 
 ## Examples by altitude
 
+**Lowest effort — hand the agent a GLB:** for "make my model look good", the agent reaches for `stage` (auto-frame + director preset) — you don't describe a scene at all.
+
+> "Make an Apple-ad-style reveal of this helmet GLB." → `stage helmet.glb --preset reveal`
+> "Annotate the parts of this lamp as a spec sheet." → `inspect` then `stage --preset spec`
+
 **High altitude — enough most of the time:**
 
 > "A 10-second product video with my helmet GLB. Dark studio, slow rotation while the camera arcs slightly, 'Titan Mk-II' title at the bottom."
 
-**Shot-level — trailers:**
+**Shot-level — trailers:** a shot list is the strongest form. When you give beats with their own camera/lighting/grade, the agent can write a **storyboard plan** (JSON) and compile the whole multi-shot film in one command (`stereoframe storyboard plan.json`), with crossfade timing computed for you.
 
 > "A 15-second trailer: ① the words 'LAUNCH WEEK' assemble from paper scraps → ② 'March 24' over a glass panel → ③ fly over the ocean to an ending logo. Crossfade between shots."
+
+> "A cinematic spot of this GLB: cold-open in near-black → ignition orbit → push-in macro → low-angle hero with our wordmark. Teal-rim/warm-fill, moody grade." → a storyboard plan (see `examples/storyboard-camera`).
 
 **Iterative refinement — the core loop after the first render:**
 
@@ -41,7 +48,7 @@ Because the markup is declarative, a partial edit is a one-line diff, and becaus
 
 ## What's in range of the current vocabulary
 
-**Works in one pass** — turntable/orbit/dolly/spline-flythrough cameras, character clip transitions (idle→run) with a follow camera, paper-swarm typography, glass panels (transmission), ocean/sky (golden hour), particles (fountain/snow/dust), metaball goo, material colorway switching (variant), multi-shot cuts/crossfades, DOM titles/captions.
+**Works in one pass** — auto-directing a GLB (`stage`: reveal/hero-orbit/turntable/exploded-view/spec/teardown), compiling a shot list into a multi-shot film (`storyboard`), turntable/orbit/dolly/spline-flythrough cameras, character clip transitions (idle→run) with a follow camera, paper-swarm typography, glass panels (transmission), ocean/sky (golden hour), particles (fountain/snow/dust), metaball goo, material colorway switching (variant), multi-shot cuts/crossfades, DOM titles/captions.
 
 **Not yet** — the agent will try the escape hatch or tell you the limit: physics simulation (collapse/collision), photorealistic humans, audio, depth of field, motion blur, wipe/shader transitions, 3D text meshes (captions are DOM overlays).
 
@@ -55,6 +62,8 @@ Starting from a proven example (`examples/`) and stating only the difference giv
 
 | reference example | style |
 |---|---|
+| `storyboard-camera` | directed multi-shot spot from a JSON shot list (the `storyboard` compiler) |
+| `product-teardown` | annotated product film (inspect + isolate + tracked callouts) |
 | `product-turntable` | product video (HDRI studio + turntable + orbit) |
 | `character-run-standalone` | character shot (clip transition + follow cam + particles) |
 | `ocean-flythrough` | nature flythrough (sky/ocean + camera path) |

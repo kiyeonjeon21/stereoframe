@@ -66,9 +66,10 @@ Camera types (`static`/`orbit`/`dolly`/`push-in`/`pull-back`/`path`/`hero`), 3-p
 
 ## How it works
 
+- **Directing compiles to markup.** `stage`, `storyboard`, `spec`/`teardown`, and `inspect` are *authors*, not a separate runtime: they emit the same deterministic `<sf-*>` HTML you could hand-write. `inspect` segments a GLB into named/tagged parts; `stage` auto-frames + finishes one; `storyboard` turns a JSON shot list into a multi-shot film with the timeline computed. The output is always editable markup — nothing is locked in a black box.
 - **Seek-driven rendering.** The CLI drives the runtime's protocol (`window.__stereoframe.seek(t)`, `t = frame / fps`) in headless Chrome and screenshots each frame into ffmpeg. Every frame is a pure function of `t`: verb writers → `AnimationMixer.setTime(t)` → `camera.lookAt` → `renderer.render`. No wall clock, no `requestAnimationFrame`, no accumulated state.
 - **Preload gate.** `__stereoframe.ready` only flips true after every GLB/HDRI is loaded and shaders are compiled — the renderer waits for it, so first frames are never half-loaded.
-- **Semantic verbs.** `turntable`, `orbit`, `dolly`, `move`, `follow`, `camera-path`, `crossfade-clip`, `bounce-in`, `fade-in`, `float`, `sway`, `explode`, `isolate`, `variant` with GSAP-compatible easing names compile to pure analytic writers — idempotent, random-access seekable, unit-tested without a GPU.
+- **Semantic verbs.** `turntable`, `orbit`, `dolly`, `move`, `follow`, `camera-path`, `path`, `morph`, `deform`, `crossfade-clip`, `bounce-in`, `fade-in`, `float`, `sway`, `explode`, `isolate`, `variant` with GSAP-compatible easing names compile to pure analytic writers — idempotent, random-access seekable, unit-tested without a GPU.
 - **Stateless particles.** `<sf-particles>` (fountain/snow/dust) computes every particle position in-shader as a closed-form function of seeded attributes and `t` — no simulation steps, bit-identical for a given seed.
 
 - **Custom shaders via the escape hatch.** `<script type="stereoframe">` receives `sf` with the full `sf.THREE` namespace — write custom geometry/materials/GLSL (iridescent, marble, vertex-displaced morphs) that the markup can't express, add them to `sf.scene`, and drive uniforms from `sf.onSeek(t)`. Still deterministic and post-processed.
