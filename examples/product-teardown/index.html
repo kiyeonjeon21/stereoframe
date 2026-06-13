@@ -1,0 +1,120 @@
+<!doctype html>
+<!--
+  product-teardown — a hand-directed 5-shot product film built on `stage`.
+  Hero → exploded teardown → per-part material spotlights (isolate + callouts).
+
+  Model: "Anisotropy Barn Lamp" by Eric Chadwick (© 2023 Wayfair, LLC),
+  CC BY 4.0 — https://github.com/KhronosGroup/glTF-Sample-Assets. Unmodified.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0e1014; }
+      body { font-family: "Helvetica Neue", Arial, sans-serif; }
+      sf-scene { position: absolute; inset: 0; }
+      #title {
+        position: absolute; bottom: 130px; width: 100%; text-align: center;
+        font-size: 70px; font-weight: 700; letter-spacing: 0.2em; color: #f4f1e8;
+        text-shadow: 0 4px 30px rgba(0,0,0,0.6);
+      }
+      #tag {
+        position: absolute; bottom: 100px; width: 100%; text-align: center;
+        font-size: 19px; font-weight: 500; letter-spacing: 0.34em; color: #b1aca0;
+        text-transform: uppercase;
+      }
+      #endline {
+        position: absolute; bottom: 120px; width: 100%; text-align: center;
+        font-size: 40px; font-weight: 600; letter-spacing: 0.26em; color: #f4f1e8;
+        text-shadow: 0 4px 30px rgba(0,0,0,0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ░░ SHOT 1 · hero (assembled) · 0–3.2 ░░ -->
+    <sf-scene start="0" duration="3.2" width="1920" height="1080" background="#0e1014"
+              environment="room" exposure="1.0" samples="2" bloom="0.14" bloom-threshold="0.88"
+              vignette="0.34" contrast="1.04" saturation="1.05"
+              ground="contact-shadow" ground-size="6" light-sweep="0.12">
+      <sf-camera fov="34" position="2.5 1.2 4.9" look-at="0 0.95 0"></sf-camera>
+      <sf-light preset="studio"></sf-light>
+      <sf-model id="m1" src="assets/lamp.glb" fit="2.3" fit-ground></sf-model>
+      <sf-animate target="camera" verb="orbit" around="0 0.95 0" radius="5.4"
+                  from="26deg" to="2deg" height="0.5" start="0" duration="3.2" ease="sine.inOut"></sf-animate>
+      <sf-animate target="#title" verb="fade-in" start="0.7" duration="1.0" rise="28"></sf-animate>
+      <sf-animate target="#tag" verb="fade-in" start="1.0" duration="1.0" rise="22"></sf-animate>
+    </sf-scene>
+
+    <!-- ░░ SHOT 2 · teardown (explode + overview callouts) · 2.8–6.2 ░░ -->
+    <sf-scene start="2.8" duration="3.4" transition="crossfade" transition-duration="0.4"
+              width="1920" height="1080" background="#0e1014"
+              environment="room" exposure="1.0" samples="2" bloom="0.14" bloom-threshold="0.88"
+              vignette="0.34" contrast="1.04" saturation="1.05"
+              ground="contact-shadow" ground-size="6" light-sweep="0.1">
+      <sf-camera fov="40" position="0 1.0 5.9" look-at="0 0.95 0"></sf-camera>
+      <sf-light preset="studio"></sf-light>
+      <sf-model id="m2" src="assets/lamp.glb" fit="2.3" fit-ground></sf-model>
+      <sf-animate target="#m2" verb="explode" distance="0.72" start="0.25" duration="1.6" ease="power2.inOut"></sf-animate>
+      <sf-animate target="camera" verb="orbit" around="0 0.95 0" radius="5.9"
+                  from="-15deg" to="15deg" height="0.5" start="0" duration="3.4" ease="sine.inOut"></sf-animate>
+      <sf-callout target="#m2" part="Lamp_Metal" value="Aluminum" text="Body" anchor="right" lead-y="-82" start="1.8" duration="0.5"></sf-callout>
+      <sf-callout target="#m2" part="Lamp_Glass" value="Glass" text="Diffuser" anchor="left" lead-y="-82" start="2.1" duration="0.5"></sf-callout>
+      <sf-callout target="#m2" part="Lamp_Filament" value="Filament" text="Source" anchor="right" lead-y="-150" start="2.4" duration="0.5"></sf-callout>
+    </sf-scene>
+
+    <!-- ░░ SHOT 3 · METAL spotlight · 5.8–8.2 ░░ -->
+    <sf-scene start="5.8" duration="2.4" transition="crossfade" transition-duration="0.4"
+              width="1920" height="1080" background="#0e1014"
+              environment="room" exposure="1.0" samples="2" bloom="0.14" bloom-threshold="0.88"
+              vignette="0.4" contrast="1.05" saturation="1.05"
+              ground="contact-shadow" ground-size="6" light-sweep="0.16">
+      <sf-camera fov="32" position="2.0 1.1 4.6" look-at="0 0.95 0"></sf-camera>
+      <sf-light preset="studio"></sf-light>
+      <sf-model id="m3" src="assets/lamp.glb" fit="2.3" fit-ground></sf-model>
+      <sf-animate target="#m3" verb="isolate" part="Lamp_Metal" dim="0.94" start="0.2" duration="0.7" ease="power2.out"></sf-animate>
+      <sf-animate target="camera" verb="orbit" around="0 0.95 0" radius="5.1"
+                  from="20deg" to="-4deg" height="0.45" start="0" duration="2.4" ease="sine.inOut"></sf-animate>
+      <sf-callout target="#m3" part="Lamp_Metal" value="Machined aluminum" text="CNC billet body" anchor="right" lead-y="-96" start="0.9" duration="0.6"></sf-callout>
+    </sf-scene>
+
+    <!-- ░░ SHOT 4 · GLASS spotlight · 7.8–10.2 ░░ -->
+    <sf-scene start="7.8" duration="2.4" transition="crossfade" transition-duration="0.4"
+              width="1920" height="1080" background="#0e1014"
+              environment="room" exposure="1.05" samples="2" bloom="0.16" bloom-threshold="0.86"
+              vignette="0.4" contrast="1.05" saturation="1.06"
+              ground="contact-shadow" ground-size="6" light-sweep="0.16">
+      <sf-camera fov="32" position="-1.9 1.0 4.7" look-at="0 0.9 0"></sf-camera>
+      <sf-light preset="studio"></sf-light>
+      <sf-model id="m4" src="assets/lamp.glb" fit="2.3" fit-ground></sf-model>
+      <sf-animate target="#m4" verb="isolate" part="Lamp_Glass" dim="0.92" start="0.2" duration="0.7" ease="power2.out"></sf-animate>
+      <sf-animate target="camera" verb="orbit" around="0 0.9 0" radius="5.1"
+                  from="-22deg" to="2deg" height="0.4" start="0" duration="2.4" ease="sine.inOut"></sf-animate>
+      <sf-callout target="#m4" part="Lamp_Glass" value="Hand-blown glass" text="Optical diffuser" anchor="left" lead-y="-96" start="0.9" duration="0.6"></sf-callout>
+    </sf-scene>
+
+    <!-- ░░ SHOT 5 · FILAMENT spotlight · 9.8–12.6 ░░ -->
+    <sf-scene start="9.8" duration="2.8" transition="crossfade" transition-duration="0.4"
+              width="1920" height="1080" background="#0e1014"
+              environment="room" exposure="1.0" samples="2" bloom="0.34" bloom-threshold="0.7"
+              vignette="0.44" contrast="1.06" saturation="1.05"
+              ground="contact-shadow" ground-size="6" light-sweep="0.12">
+      <sf-camera fov="30" position="0.6 0.95 4.3" look-at="0 0.95 0"></sf-camera>
+      <sf-light preset="studio"></sf-light>
+      <sf-model id="m5" src="assets/lamp.glb" fit="2.3" fit-ground></sf-model>
+      <sf-animate target="#m5" verb="isolate" part="Lamp_Filament" dim="0.96" start="0.2" duration="0.8" ease="power2.out"></sf-animate>
+      <sf-animate target="camera" verb="dolly" toward="0 0.95 0" distance="0.7"
+                  start="0" duration="2.8" ease="sine.inOut"></sf-animate>
+      <sf-callout target="#m5" part="Lamp_Filament" value="Edison filament" text="2700K warm glow" anchor="right" lead-y="-104" start="0.9" duration="0.6"></sf-callout>
+      <sf-animate target="#endline" verb="fade-in" start="1.6" duration="1.0" rise="20"></sf-animate>
+    </sf-scene>
+
+    <div id="title" class="clip" data-start="0" data-duration="3.2">LUMEN</div>
+    <div id="tag" class="clip" data-start="0" data-duration="3.2">Hand-built lighting</div>
+    <div id="endline" class="clip" data-start="9.8" data-duration="2.8">LUMEN</div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

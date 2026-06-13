@@ -62,6 +62,7 @@ examples/
   character-run-standalone/ Fox run cycle + follow cam + particles, own pipeline
   ocean-flythrough/        sf-sky + sf-ocean + camera-path golden-hour flight
   glass-hero/              transmission glass panels ("Designed in glass")
+  product-teardown/        hand-directed 5-shot film: hero → teardown → per-part spotlights (inspect + isolate + callouts)
   paper-swarm/             sf-swarm typography choreography
   multi-shot/              16s three-shot trailer (swarm → glass → ocean, crossfades)
   variant-demo/            colorway switching with the variant verb
@@ -98,4 +99,4 @@ v0 (Tier 3b+): standalone CLI pipeline (init/gen/lint/validate/render/preview/ad
 
 MIT.
 
-Example assets: [Water Bottle](https://github.com/KhronosGroup/glTF-Sample-Models/tree/main/2.0/WaterBottle) (CC0), [Fox](https://github.com/KhronosGroup/glTF-Sample-Models/tree/main/2.0/Fox) by PixelMannen (model, CC0) & @tomkranis (rigging/animation, CC BY 4.0), HDRIs from [Poly Haven](https://polyhaven.com) (CC0), water normal map from [three.js](https://github.com/mrdoob/three.js) (MIT).
+Example assets: [Water Bottle](https://github.com/KhronosGroup/glTF-Sample-Models/tree/main/2.0/WaterBottle) (CC0), [Fox](https://github.com/KhronosGroup/glTF-Sample-Models/tree/main/2.0/Fox) by PixelMannen (model, CC0) & @tomkranis (rigging/animation, CC BY 4.0), [Anisotropy Barn Lamp](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/AnisotropyBarnLamp) by Eric Chadwick (© 2023 Wayfair, LLC, CC BY 4.0), HDRIs from [Poly Haven](https://polyhaven.com) (CC0), water normal map from [three.js](https://github.com/mrdoob/three.js) (MIT).
