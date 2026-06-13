@@ -46,9 +46,27 @@ Each generation also writes a provenance sidecar — `assets/<name>.gen.json` re
 
 It runs with no setup using Meshy's free test mode (returns a sample model); set `MESHY_API_KEY` (shell env or project `.env`) for real prompt-driven generations.
 
-## Direct a multi-shot film from a JSON shot list
+## Direct a film — in natural language, or a JSON shot list
 
-Generating a model is the commodity; **directing** it is the moat. A **storyboard plan** — a small JSON shot list (camera move, lighting, grade, duration, crossfade per beat) — compiles into a multi-shot film, with the timeline computed so crossfades never gap. This is the agent-native flagship: from a brief, an LLM writes the JSON; one command renders the spot.
+Generating a model is the commodity; **directing** it is the moat — and direction is
+natural-language too, the symmetric twin of the Meshy *gen* prompt:
+
+```bash
+# layer 1 — asset:     a prompt → a model
+stereoframe gen "a candy-red mid-engine hypercar"            # → assets/…glb (+ .gen.json)
+# layer 2 — direction: a brief → a cinematic film
+stereoframe brief "a dark neon showroom reveal, hard-cut ignition, flythrough, \
+  hero on 'APEX', ~24s, cyan/magenta, drifting dust" --model car.glb --render
+```
+
+`brief` sends your paragraph to an LLM that writes a rich, model-aware
+`plan.json` (it inspects the GLB), validates + repairs it, then compiles and renders
+— saving the brief as `brief.md` (provenance). Needs `OPENAI_API_KEY`.
+
+Under the hood it's a **storyboard plan** — a JSON shot list (camera / lighting /
+grade / backdrop / atmosphere / secondary-motion / crossfade per beat) that compiles
+into a multi-shot film with the timeline computed so crossfades never gap. Write it
+yourself (or have any LLM write it) and compile directly:
 
 ```bash
 stereoframe storyboard plan.json --render   # → a directed multi-shot film, timeline computed for you
@@ -81,7 +99,7 @@ Camera types (`static`/`orbit`/`dolly`/`push-in`/`pull-back`/`path`/`hero`), 3-p
 
 ```
 packages/runtime/    stereoframe-runtime → dist/stereoframe.js (three.js r184 bundled)
-packages/cli/        stereoframe → `stereoframe` bin (stage/storyboard/inspect/init/gen/lint/validate/render/bake/preview/add/update)
+packages/cli/        stereoframe → `stereoframe` bin (stage/brief/storyboard/inspect/init/gen/lint/validate/render/bake/preview/add/update)
 examples/
   hello-standalone/        CLI-scaffolded starter (no HyperFrames)
   character-run-standalone/ Fox run cycle + follow cam + particles, own pipeline
@@ -122,7 +140,8 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 **v0 (Tier 3b+).** Determinism is scoped to seekability: every frame is a pure function of `t`, frame-hash-identical across runs — which leaves the visuals free.
 
 **Direct any GLB**
-- `storyboard` compiler — a JSON shot list (camera / lighting / grade / crossfade per beat) → a multi-shot film, timeline computed so crossfades never gap. The agent-native path from a brief to a directed spot.
+- `brief` — natural-language directing: a paragraph → a model-aware, cinematic `plan.json` via an LLM (the directing twin of the `gen` prompt), validated + repaired, then compiled + rendered.
+- `storyboard` compiler — a JSON shot list (camera / lighting / grade / backdrop / atmosphere / secondary-motion / crossfade per beat) → a multi-shot film, timeline computed so crossfades never gap.
 - `stage` auto-director — auto-framing + presets: reveal, hero-orbit, turntable, exploded-view, **spec** (annotated product film), **teardown** (per-part exploded breakdown).
 - `inspect` segment + tag pipeline — reads a GLB's parts (name, material character, position, size) so they can be targeted by name.
 - `sf-callout` tracked spec labels — leader lines that follow a 3D part as the camera moves; auto-placed by `spec`/`teardown`.

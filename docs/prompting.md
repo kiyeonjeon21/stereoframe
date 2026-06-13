@@ -29,6 +29,19 @@ When making a video with stereoframe, describe your **directorial intent**, not 
 
 > "A cinematic spot of this GLB: cold-open in near-black → ignition orbit → push-in macro → low-angle hero with our wordmark. Teal-rim/warm-fill, moody grade." → a storyboard plan (see `examples/storyboard-camera`).
 
+**One paragraph → a whole film (the `brief`):** direction is natural-language too —
+the symmetric twin of the Meshy *gen* prompt. `stereoframe brief "<paragraph>" --model
+<glb> --render` sends your brief to an LLM that writes a rich, cinematic `plan.json`
+(model-aware: it inspects the GLB), then compiles + renders it. The brief is saved
+next to the result as `brief.md` (provenance, like `gen`'s `.gen.json`). A good brief
+names: the **product/mood**, the **arc** (cold-open → reveal → detail → hero), the
+**palette**, the **length**, and the **copy** (exact wording).
+
+> `stereoframe brief "A dark, high-drama neon showroom film of this hypercar. Cold open in near-black, hard cut as the lights slam on, sweep + push-in + a flythrough, end on a low hero with 'APEX' / 'engineered in motion' / '0–100 in 2.4s · 1020 bhp'. Cyan/magenta, ~24s, drifting dust." --model car.glb --render`
+
+(When you're working *with an agent* like Claude, you don't need the command — just
+describe the film and the agent writes the rich plan directly.)
+
 **Iterative refinement — the core loop after the first render:**
 
 > "Make shot 2 half a second longer" · "Camera lower" · "Delay the title by a second and use fade instead of bounce" · "Make the particles amber"

@@ -14,8 +14,9 @@ Pick the lightest path that fits the request, then refine:
 1. **Have a GLB, want a polished video fast?** → `stage <model>.glb --preset <name>` auto-frames + finishes any model (presets below). Then hand-edit the generated `index.html` to taste. **This is the default for "make a product video / Apple-ad reveal."**
 2. **Want the parts labelled (spec sheet / teardown)?** → `inspect` the GLB first to learn its parts, then `stage --preset spec` (annotated, still model) or `--preset teardown` (exploded, per-part labels). Multi-part GLBs only.
 3. **No model yet?** → `stereoframe gen "<prompt>"` writes a textured GLB into `assets/` (real prompt-driven generation when `MESHY_API_KEY` is set — otherwise a sample model) plus a `<name>.gen.json` provenance sidecar (the exact prompt + Meshy task ids, kept next to the GLB). For the whole thing in one command, `gen "<prompt>" --stage <preset> --render` → prompt → model → directed film → mp4.
-4. **Want a cinematic multi-shot film (a directed spot, not one move)?** → write a **storyboard plan** (JSON shot list) and `stereoframe storyboard plan.json [--render]`. This is the agent-native flagship: turn a brief into a beat-by-beat JSON (cold-open → reveal → macro → hero, with per-shot camera / lighting / grade / crossfades) and the compiler emits the whole multi-shot `index.html` with the timeline computed correctly. See "Storyboard compiler" below and `examples/storyboard-camera/plan.json`.
-5. **Custom scene / full control?** → hand-author `sf-scene` markup (canonical composition below).
+4. **Want a cinematic multi-shot film (a directed spot, not one move)?** → write a **storyboard plan** (JSON shot list) and `stereoframe storyboard plan.json [--render]`. This is the agent-native flagship: turn a brief into a beat-by-beat JSON (cold-open → reveal → macro → flythrough → hero, with per-shot camera / lighting / grade / crossfades / backdrop / atmosphere / secondaryMotion) and the compiler emits the whole multi-shot `index.html` with the timeline computed correctly. See "Storyboard compiler" + "Direct from a brief" below and `examples/storyboard-camera/plan.json`.
+5. **Just a sentence of direction (no JSON)?** → `stereoframe brief "<brief>" --model <glb> --render` calls an LLM to write the rich plan.json for you (needs `OPENAI_API_KEY`). **When *you* (the agent) are asked for a film in this session, you don't need that command — author the plan.json yourself** using the cinematic defaults in "Direct from a brief" below.
+6. **Custom scene / full control?** → hand-author `sf-scene` markup (canonical composition below).
 
 Whatever the path, **always `lint` → `validate` before `render`.**
 
@@ -262,8 +263,30 @@ for `lighting:"auto"`/`callout:"auto"`, copies GLBs + runtime into `out/assets/`
   `transition`. `defaults` (incl. `finish`/`lighting`) are inherited; per-shot wins.
 
 Dark cold-opens may emit `subject_bg_low_contrast` **warnings** (advisory, fine for
-moody beats). For accents the schema can't express (emissive backdrops, extra point
-lights), hand-edit the emitted HTML. Full schema in `docs/format.md`.
+moody beats). For accents the schema can't express (extra point lights, custom
+backdrop meshes), hand-edit the emitted HTML. Full schema in `docs/format.md`.
+
+## Direct from a brief — cinematic defaults (DON'T ship thin plans)
+
+When a user describes a film in words ("a dark neon supercar reveal", "a clean
+keynote phone spot"), **you author the `plan.json` directly** (the `brief` CLI is
+only for non-agent users). A bare 4-beat, one-move-per-shot, flat-black plan is the
+thing to avoid. Default to the flagship arc:
+
+- **6–9 shots, ~18–28s, VARIED beat lengths** (e.g. 3.2 / 3.3 / 3 / 3 / 4).
+- **Arc:** cold-open (dark, low exposure, deep vignette, one rim light) → **hard CUT**
+  to a lit reveal → 1–2 detail/macro beats → a **flythrough** → **hero** (full light)
+  with a staggered `text:{title,subtitle,spec}` title card. **Vary the camera type**
+  across shots — don't orbit every beat.
+- **Set `backdrop` + `secondaryMotion` on (almost) every shot** — these are what make
+  it not look auto-generated. `atmosphere:"dust"` on the cold-open (cut-followed) and
+  the hero only (never on a crossfade-out shot — it's dropped).
+- **Colour = lighting + grade:** complementary split (cyan key / magenta rim, or
+  teal/amber), per-beat `exposure`/`vignette`/`saturation`, `lightSweep` 0.1–0.24.
+- Use the model facts: stand up a genuinely-flat device with `pose`; metal → `lighting:"auto"`.
+
+Reference plans: `killer-demos/supercar/flagship/index.html` (the hand-authored
+ceiling) and `examples/storyboard-camera/plan.json`. Match that density, not a stub.
 
 ## Determinism = structure only (high creative freedom otherwise)
 
