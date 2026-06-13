@@ -1,0 +1,19 @@
+---
+description: stereoframe repo — conventions and authoring guide
+alwaysApply: true
+---
+
+This is the **stereoframe** monorepo (bun workspaces): `packages/runtime`
+(`stereoframe-runtime`) and `packages/cli` (`stereoframe`) — declarative `<sf-*>`
+HTML rendered to deterministic 3D video on three.js.
+
+Read **AGENTS.md** for the full guide. Core rules:
+
+- **Determinism = seekability.** Every frame is a pure function of `t`: no wall-clock, no unseeded per-frame `Math.random()`, no cross-frame accumulation. `stereoframe validate` enforces seek idempotency.
+- **feat-then-release (two commits).** Commit the change as its own `feat:`/`fix:` commit first, then `bun run release` (it makes the version-bump commit). Releases are lock-step and publish with `npm publish`.
+- **Verify before done.** `bun test` for code; `stereoframe lint` then `stereoframe validate` for compositions (both exit 1 on error).
+- **Secrets in `.env`** (gitignored): `NPM_TOKEN`, `MESHY_API_KEY`. Never commit them. `refs/` is gitignored too.
+
+To author compositions (the `<sf-*>` vocabulary, `stage` presets, finish
+attributes, recipes), read `.claude/skills/stereoframe/SKILL.md` and
+`docs/format.md` before writing markup.

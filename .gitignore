@@ -11,3 +11,6 @@ refs/
 
 # build artifact copies in example projects (regenerate: stereoframe update)
 examples/*/assets/stereoframe.js
+
+# Claude Code local (per-machine) settings
+.claude/settings.local.json
