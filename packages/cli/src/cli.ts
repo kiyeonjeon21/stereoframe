@@ -18,6 +18,7 @@ import { inspectModel } from "./inspect";
 import { bakeProject } from "./bake";
 import { buildStoryboard, readStoryboard, validateStoryboard } from "./storyboard";
 import { runBrief } from "./brief";
+import { segmentModel } from "./segment";
 import { buildAutoCallouts, explodeTiming, PRESETS, stageModel, type Preset } from "./stage";
 import { lintHtml, type Finding } from "./lint";
 import { renderProject } from "./render";
@@ -89,6 +90,9 @@ USAGE
       --vertical       force 1080x1920 (social) · --square forces 1080x1080
   stereoframe inspect <model.glb>      segment + tag a GLB: list its parts (name, material, where, size)
       --json           print the manifest as JSON instead of a table
+  stereoframe segment <model.glb>      report a mesh's separable connected components
+      --min-faces <n>  ignore components smaller than n triangles (default 50)
+                       (AI text/image-to-3D output is one welded mesh → not separable)
   stereoframe gen "<prompt>"           generate a 3D model (GLB) via Meshy
       --image <png>    image-to-3D from one local image (instead of text)
       --images a,b,c   multi-image-to-3D from 1-4 views (front/side/back…)
@@ -272,6 +276,23 @@ async function main(): Promise<void> {
         console.log(out);
       } else {
         console.log(`next: cd ${outDir} && stereoframe render`);
+      }
+      return;
+    }
+    case "segment": {
+      const m = positional[0];
+      if (!m) throw new Error("usage: stereoframe segment <model.glb> [--min-faces N] [--dry-run]");
+      const minFaces = options.has("min-faces") ? Number(options.get("min-faces")) : undefined;
+      const report = await segmentModel({ model: m, minFaces, dryRun: true });
+      console.log(`mesh: ${report.meshTris} tris, ${report.weldedVerts} welded verts`);
+      console.log(`connected components (>= min-faces): ${report.components.length}  (dropped ${report.dropped} specks)`);
+      report.components.slice(0, 20).forEach((c, i) => {
+        const sz = c.size.map((n) => n.toFixed(2)).join("×");
+        const ctr = c.center.map((n) => n.toFixed(2)).join(" ");
+        console.log(`  #${i}  ${String(c.tris).padStart(7)} tris   size ${sz}   center ${ctr}`);
+      });
+      if (report.components.length <= 1) {
+        console.log("\n→ single welded component: this mesh can't be auto-split (use a multi-part source GLB for per-part features).");
       }
       return;
     }

@@ -116,7 +116,7 @@ Camera types (`static`/`orbit`/`dolly`/`push-in`/`pull-back`/`path`/`hero`), 3-p
 
 ```
 packages/runtime/    stereoframe-runtime → dist/stereoframe.js (three.js r184 bundled)
-packages/cli/        stereoframe → `stereoframe` bin (stage/brief/storyboard/inspect/init/gen/lint/validate/render/bake/preview/add/update)
+packages/cli/        stereoframe → `stereoframe` bin (stage/brief/storyboard/inspect/segment/init/gen/lint/validate/render/bake/preview/add/update)
 examples/
   hello-standalone/        CLI-scaffolded starter (no HyperFrames)
   character-run-standalone/ Fox run cycle + follow cam + particles, own pipeline

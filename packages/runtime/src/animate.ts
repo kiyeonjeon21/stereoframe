@@ -182,9 +182,20 @@ export function compileAnimations(compiled: CompiledScene): void {
       continue;
     }
 
+    // Per-part motion: `<sf-animate target="#m" part="wheel" verb="turntable">`
+    // animates one named/indexed child of the model (e.g. spin just the wheels)
+    // instead of the whole group. Only the object-motion verbs honor `part`;
+    // isolate/explode/callout do their own part handling on the whole target.
+    let motionTarget = target;
+    const partAttr = el.getAttribute("part");
+    if (partAttr !== null && (verb === "turntable" || verb === "sway" || verb === "float" || verb === "move")) {
+      const parts = collectParts(target);
+      motionTarget = parts[resolvePartIndex(parts, partAttr, 0)] ?? target;
+    }
+
     if (verb === "turntable") {
       compiled.seekFns.push(
-        verbs.turntable(target, timing, {
+        verbs.turntable(motionTarget, timing, {
           rpm: parseNumber(el.getAttribute("rpm"), 6),
           axis: (el.getAttribute("axis") ?? "y") as "x" | "y" | "z",
         }),
@@ -220,7 +231,7 @@ export function compileAnimations(compiled: CompiledScene): void {
       const fromAttr = el.getAttribute("from");
       const from = fromAttr ? parseVec3(fromAttr, [0, 0, 0]) : null;
       compiled.seekFns.push(
-        verbs.move(target, timing, {
+        verbs.move(motionTarget, timing, {
           from: from ? { x: from[0], y: from[1], z: from[2] } : undefined,
           to: { x: to[0], y: to[1], z: to[2] },
         }),
@@ -292,14 +303,14 @@ export function compileAnimations(compiled: CompiledScene): void {
       compiled.seekFns.push(verbs.fadeIn(makeOpacitySetter(target), timing));
     } else if (verb === "float") {
       compiled.seekFns.push(
-        verbs.float(target, timing, {
+        verbs.float(motionTarget, timing, {
           amplitude: parseNumber(el.getAttribute("amplitude"), 0.1),
           period: parseNumber(el.getAttribute("period"), 4),
         }),
       );
     } else if (verb === "sway") {
       compiled.seekFns.push(
-        verbs.sway(target, timing, {
+        verbs.sway(motionTarget, timing, {
           amount: (parseNumber(el.getAttribute("amount"), 6) * Math.PI) / 180,
           period: parseNumber(el.getAttribute("period"), 5),
         }),

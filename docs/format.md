@@ -244,6 +244,14 @@ Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, defau
 | `isolate` | `part` (index or name, required), `dim` (0.8) | feature spotlight — fade every *other* part's material toward black over the window so one component reads as the hero. `dim` is how far the rest darken (1 = fully). Needs a multi-component GLB; pair with a slow `dolly`/`orbit` toward the part. `part` accepts a name (`part="Glass"`) — run `stereoframe inspect <model>` to learn the names |
 | `variant` | `color`/`roughness`/`metalness` (target values), `material` (GLB material name filter), duration default 0.8 | material colorway transitions (configurators). Multiple variants on one target chain in start order — each one's from-state is the previous one's result (resolved at compile time, backward-seek safe) |
 
+**Per-part motion.** `turntable`, `sway`, `float`, `move` also accept a `part` (index or
+name, like `isolate`) to animate **one component** of a multi-part model instead of the
+whole thing — e.g. `<sf-animate target="#car" part="wheel" verb="turntable" axis="x">` spins
+just a wheel. Needs a **multi-component** GLB. **Note:** AI text/image-to-3D output (Meshy
+etc.) is a single welded mesh — `stereoframe segment <glb>` reports whether a model has
+separable components; if it's one welded mesh, per-part features need a genuinely multi-part
+source GLB (DCC/kitbash/CAD).
+
 ### Easing vocabulary (GSAP-compatible names)
 
 `linear` `none`, `power1–4.in/.out/.inOut`, `sine.*`, `expo.*`, `circ.*`, `back.*`, `elastic.out`, `bounce.out`. Default is `power1.out` (`back.out` for bounce-in).
