@@ -5,7 +5,7 @@
  * free; `lintHtml` is pure (filesystem access injected) so every rule is
  * unit-testable against fixture strings.
  */
-import { ASSET_ATTRS, EASE_NAMES, ELEMENT_NAMES, VERB_NAMES } from "@stereoframe/runtime/vocab";
+import { ASSET_ATTRS, EASE_NAMES, ELEMENT_NAMES, VERB_NAMES } from "stereoframe-runtime/vocab";
 
 export interface Finding {
   rule: string;

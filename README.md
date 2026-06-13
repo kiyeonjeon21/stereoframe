@@ -7,9 +7,10 @@
 Describe a three.js scene, camera, lighting, and motion in plain HTML custom elements; render it frame-perfectly to MP4 with the bundled CLI. The thesis (borrowed from [HyperFrames](https://github.com/heygen-com/hyperframes), which proved it for 2D): LLMs write HTML fluently, so HTML is the right authoring surface for AI-generated video — stereoframe applies it to 3D.
 
 ```bash
-stereoframe init my-video   # scaffold
-stereoframe render          # → renders/render_<ts>.mp4, bit-identical across runs
-stereoframe preview         # looping playback in the browser
+npx stereoframe init my-video && cd my-video
+npx stereoframe lint && npx stereoframe validate   # agent-grade verification
+npx stereoframe render      # → renders/render_<ts>.mp4, bit-identical across runs
+npx stereoframe preview     # looping playback in the browser
 ```
 
 ```html
@@ -35,8 +36,8 @@ stereoframe preview         # looping playback in the browser
 ## Repository layout
 
 ```
-packages/runtime/    @stereoframe/runtime → dist/stereoframe.js (three.js r184 bundled)
-packages/cli/        @stereoframe/cli → `stereoframe` bin (init/render/preview/update)
+packages/runtime/    stereoframe-runtime → dist/stereoframe.js (three.js r184 bundled)
+packages/cli/        stereoframe → `stereoframe` bin (init/lint/validate/render/preview/add/update)
 examples/
   hello-standalone/        CLI-scaffolded starter (no HyperFrames)
   character-run-standalone/ Fox run cycle + follow cam + particles, own pipeline

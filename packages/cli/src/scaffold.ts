@@ -47,7 +47,7 @@ const TEMPLATE = `<!doctype html>
 export function resolveRuntimeBundle(): string {
   const require = createRequire(import.meta.url);
   // package main points at dist/stereoframe.js
-  return require.resolve("@stereoframe/runtime");
+  return require.resolve("stereoframe-runtime");
 }
 
 export function scaffoldProject(name: string, cwd = process.cwd()): string {

@@ -1,21 +1,28 @@
 {
-  "name": "@stereoframe/cli",
+  "name": "stereoframe",
   "version": "0.1.0",
-  "description": "stereoframe CLI — scaffold, preview, and deterministically render declarative three.js videos.",
+  "description": "Declarative, deterministic 3D video on three.js — scaffold, lint, validate, and render compositions built for AI agents.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kiyeonjeon21/stereoframe",
+    "directory": "packages/cli"
+  },
   "type": "module",
   "bin": {
     "stereoframe": "./dist/cli.js"
   },
+  "files": ["dist", "assets"],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "bun build src/cli.ts --outfile dist/cli.js --format esm --target node --external puppeteer --banner '#!/usr/bin/env node' && chmod +x dist/cli.js",
+    "prepublishOnly": "bun run build",
+    "build": "bun build src/cli.ts --outfile dist/cli.js --format esm --target node --external puppeteer --external stereoframe-runtime/vocab --banner '#!/usr/bin/env node' && chmod +x dist/cli.js",
     "test": "bun test"
   },
   "dependencies": {
-    "@stereoframe/runtime": "workspace:*",
+    "stereoframe-runtime": "workspace:*",
     "puppeteer": "^24.0.0"
   },
   "devDependencies": {

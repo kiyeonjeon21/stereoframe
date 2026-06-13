@@ -1,15 +1,22 @@
 {
-  "name": "@stereoframe/runtime",
+  "name": "stereoframe-runtime",
   "version": "0.1.0",
-  "description": "Declarative, deterministic 3D scenes for HyperFrames compositions — three.js driven by hf-seek.",
+  "description": "Declarative, deterministic 3D scene runtime for stereoframe — three.js driven by seek time.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kiyeonjeon21/stereoframe",
+    "directory": "packages/runtime"
+  },
   "type": "module",
   "main": "dist/stereoframe.js",
+  "files": ["dist"],
   "exports": {
     ".": "./dist/stereoframe.js",
     "./vocab": "./dist/vocab.js"
   },
   "scripts": {
+    "prepublishOnly": "bun run build",
     "build": "bun build src/index.ts --outfile dist/stereoframe.js --format esm --minify --target browser && bun build src/vocab.ts --outfile dist/vocab.js --format esm --target node && bunx tsc src/vocab.ts --declaration --emitDeclarationOnly --outDir dist --module esnext --moduleResolution bundler --target es2022 --skipLibCheck",
     "build:dev": "bun build src/index.ts --outfile dist/stereoframe.js --format esm --target browser",
     "test": "bun test"
