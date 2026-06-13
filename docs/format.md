@@ -216,6 +216,7 @@ A thin leader line from a feature to a floating typographic label — the signat
 | `value` | — | the big headline line (e.g. `48MP`, `Titanium`) — optional |
 | `text` | — | the small uppercase caption under the value |
 | `anchor` | right | `left` or `right` — which side the label sits on |
+| `lead-x`/`lead-y` | 150 / -92 | px offset from the anchor point to the label (negative `lead-y` = up). Fan `lead-y` across several callouts so labels that cluster don't overlap |
 | `start`/`duration` | 0 / 0.7 | the leader draws on and the label settles in over this window; stays after |
 | `ease` | power2.out | draw-on easing |
 

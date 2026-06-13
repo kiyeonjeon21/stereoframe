@@ -15,7 +15,7 @@ import { basename } from "node:path";
 import { addBlock, listBlocks } from "./blocks";
 import { genModel } from "./gen";
 import { inspectModel } from "./inspect";
-import { PRESETS, stageModel, type Preset } from "./stage";
+import { buildAutoCallouts, PRESETS, stageModel, type Preset } from "./stage";
 import { lintHtml, type Finding } from "./lint";
 import { renderProject } from "./render";
 import { scaffoldProject, updateRuntime } from "./scaffold";
@@ -63,7 +63,8 @@ USAGE
   stereoframe preview [dir]            serve with looping wall-clock playback
       --port <n>       fixed port (default: random)
   stereoframe stage <model.glb>        auto-direct a GLB into a cinematic motion graphic
-      --preset <name>  reveal | hero-orbit | turntable | exploded-view (default reveal)
+      --preset <name>  reveal | hero-orbit | turntable | exploded-view | spec (default reveal)
+                       spec = auto-annotated product film (inspects the GLB, places named callouts)
       --dir <dir>      output project dir (default: <model name>)
       --duration <s>   seconds (default 8)
       --title "<text>" optional title overlay
@@ -143,13 +144,32 @@ async function main(): Promise<void> {
       const stem = basename(model).replace(/\.(glb|gltf)$/i, "");
       const outDir =
         typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${stem}-${preset}`;
+      const duration = options.has("duration") ? Number(options.get("duration")) : undefined;
+
+      // The `spec` preset auto-annotates: inspect the GLB, then place named
+      // callouts on its top parts.
+      let callouts;
+      if (preset === "spec") {
+        console.log(`inspecting ${model} for spec callouts…`);
+        const manifest = await inspectModel({ model, silent: true, write: false });
+        callouts = buildAutoCallouts(manifest, duration && duration > 0 ? duration : 8);
+        if (callouts.length === 0) {
+          console.warn(
+            `note: ${model} has <2 separable mesh parts — spec film will render without callouts.`,
+          );
+        } else {
+          console.log(`  callouts: ${callouts.map((c) => c.value).join(", ")}`);
+        }
+      }
+
       const created = stageModel({
         model,
         projectDir: outDir,
         preset,
-        duration: options.has("duration") ? Number(options.get("duration")) : undefined,
+        duration,
         background: typeof options.get("bg") === "string" ? (options.get("bg") as string) : undefined,
         title: typeof options.get("title") === "string" ? (options.get("title") as string) : undefined,
+        callouts,
       });
       console.log(`staged ${model} (${preset}) → ${created}`);
       console.log(`next: cd ${outDir} && stereoframe render`);

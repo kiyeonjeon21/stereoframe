@@ -1,0 +1,85 @@
+import { describe, expect, test } from "bun:test";
+import { buildAutoCallouts } from "../src/stage";
+import type { ModelManifest, PartManifest } from "../src/inspect";
+
+function part(p: Partial<PartManifest>): PartManifest {
+  return {
+    index: 0,
+    name: "Part",
+    kind: "mesh",
+    skinned: false,
+    triangles: 100,
+    character: "matte",
+    color: null,
+    spatial: ["core"],
+    sizeRank: 0,
+    bounds: { center: [0, 0, 0], size: [1, 1, 1], min: [0, 0, 0], max: [1, 1, 1] },
+    material: null,
+    ...p,
+  };
+}
+
+function manifest(parts: PartManifest[]): ModelManifest {
+  return {
+    model: "m.glb",
+    generatedBy: "test",
+    partCount: parts.length,
+    meshParts: parts.filter((p) => p.kind === "mesh").length,
+    isSingleMesh: parts.filter((p) => p.kind === "mesh").length <= 1,
+    hasRig: false,
+    recommendedFit: 2.6,
+    bounds: { center: [0, 0, 0], size: [2, 2, 2], min: [-1, -1, -1], max: [1, 1, 1] },
+    parts,
+  };
+}
+
+describe("buildAutoCallouts", () => {
+  test("single-mesh model yields no callouts", () => {
+    expect(buildAutoCallouts(manifest([part({ name: "Body" })]), 8)).toEqual([]);
+  });
+
+  test("picks the most-detailed mesh parts, by name, up to max", () => {
+    const m = manifest([
+      part({ index: 0, name: "Body", triangles: 5000 }),
+      part({ index: 1, name: "Trim", triangles: 200 }),
+      part({ index: 2, name: "Glass", triangles: 3000, character: "glass" }),
+      part({ index: 3, name: "Screw", triangles: 50 }),
+    ]);
+    const out = buildAutoCallouts(m, 8);
+    expect(out.length).toBe(3);
+    expect(out.map((c) => c.part)).toEqual(["Body", "Glass", "Trim"]);
+    expect(out[1]!.text).toBe("Optical glass"); // glass → material caption
+    expect(out[2]!.text).toBe("Composite"); // matte → material caption
+  });
+
+  test("empty (mesh-less) parts are ignored", () => {
+    const m = manifest([
+      part({ index: 0, name: "Body", triangles: 5000 }),
+      part({ index: 1, name: "Camera", kind: "empty", triangles: 0, bounds: null }),
+      part({ index: 2, name: "Glass", triangles: 1000 }),
+    ]);
+    const out = buildAutoCallouts(m, 8);
+    expect(out.map((c) => c.part)).toEqual(["Body", "Glass"]);
+  });
+
+  test("spatial tags drive the anchor side; leads fan upward", () => {
+    const m = manifest([
+      part({ index: 0, name: "Left", triangles: 3000, spatial: ["left"] }),
+      part({ index: 1, name: "Right", triangles: 2000, spatial: ["right"] }),
+    ]);
+    const out = buildAutoCallouts(m, 8);
+    expect(out[0]!.anchor).toBe("left");
+    expect(out[1]!.anchor).toBe("right");
+    expect(out[1]!.leadY).toBeLessThan(out[0]!.leadY); // fanned higher
+  });
+
+  test("callouts stagger within the clip", () => {
+    const m = manifest([
+      part({ index: 0, name: "A", triangles: 3000 }),
+      part({ index: 1, name: "B", triangles: 2000 }),
+    ]);
+    const out = buildAutoCallouts(m, 8);
+    expect(out[0]!.start).toBeLessThan(out[1]!.start);
+    expect(out[1]!.start + out[1]!.duration).toBeLessThan(8);
+  });
+});

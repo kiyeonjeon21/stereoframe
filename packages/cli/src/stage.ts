@@ -10,10 +10,22 @@
  */
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import type { Character, ModelManifest } from "./inspect";
 import { resolveRuntimeBundle } from "./scaffold";
 
-export const PRESETS = ["reveal", "hero-orbit", "turntable", "exploded-view"] as const;
+export const PRESETS = ["reveal", "hero-orbit", "turntable", "exploded-view", "spec"] as const;
 export type Preset = (typeof PRESETS)[number];
+
+/** An auto-generated spec callout (from the segment manifest). */
+export interface CalloutSpec {
+  part: string;
+  value: string;
+  text: string;
+  anchor: "left" | "right";
+  leadY: number;
+  start: number;
+  duration: number;
+}
 
 export interface StageOptions {
   model: string;
@@ -22,6 +34,8 @@ export interface StageOptions {
   duration?: number;
   background?: string;
   title?: string;
+  /** spec preset: auto-callouts derived from `stereoframe inspect`. */
+  callouts?: CalloutSpec[];
 }
 
 function head(bg: string): string {
@@ -144,11 +158,108 @@ ${t.anim}    </sf-scene>
 ${t.dom}${tail}`;
 }
 
+/** CamelCase/underscore/hyphen part name → human title ("ToyCar" → "Toy Car"). */
+function humanizeName(name: string): string {
+  const words = name
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!words) return "Part";
+  return words.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** A short, honest caption from the tagged material character. */
+const CHARACTER_CAPTION: Record<Character, string> = {
+  glass: "Optical glass",
+  metal: "Metal body",
+  fabric: "Soft-touch",
+  emissive: "Illuminated",
+  matte: "Composite",
+  "—": "Component",
+};
+
+/**
+ * Derive auto-callouts from a segment manifest: annotate the most detailed mesh
+ * parts (by triangle count), label them by name + material caption, side by
+ * spatial position, and stagger the draw-ons through the back half of the clip.
+ * Returns [] for single-mesh models (nothing to point at).
+ */
+export function buildAutoCallouts(manifest: ModelManifest, duration: number, max = 3): CalloutSpec[] {
+  const parts = manifest.parts
+    .filter((p) => p.kind === "mesh" && p.bounds)
+    .sort((a, b) => b.triangles - a.triangles)
+    .slice(0, max);
+  if (parts.length < 2) return [];
+
+  const base = Math.max(1, duration * 0.32);
+  const step = Math.min(0.9, (duration - base - 0.8) / Math.max(1, parts.length - 1));
+  let alt = 0;
+  return parts.map((p, i) => {
+    const side: "left" | "right" = p.spatial.includes("left")
+      ? "left"
+      : p.spatial.includes("right")
+        ? "right"
+        : alt++ % 2 === 0
+          ? "right"
+          : "left";
+    return {
+      part: p.name || String(p.index),
+      value: humanizeName(p.name || `Part ${p.index}`),
+      text: CHARACTER_CAPTION[p.character],
+      anchor: side,
+      // Fan the labels up the screen so parts that cluster (e.g. a canopy on
+      // a body) and land on the same side don't stack on top of each other.
+      leadY: -82 - i * 66,
+      start: Math.round((base + i * step) * 100) / 100,
+      duration: 0.7,
+    };
+  });
+}
+
+function calloutMarkup(callouts: CalloutSpec[] | undefined): string {
+  if (!callouts || callouts.length === 0) return "";
+  return (
+    callouts
+      .map(
+        (c) =>
+          `      <sf-callout target="#m" part="${c.part}" value="${c.value}" text="${c.text}"` +
+          ` anchor="${c.anchor}" lead-y="${c.leadY}" start="${c.start}" duration="${c.duration}"></sf-callout>`,
+      )
+      .join("\n") + "\n"
+  );
+}
+
+/**
+ * `spec` — the annotated product film. The model rests grounded and still
+ * (so tracked labels stay readable) while the camera makes a slow arc; the
+ * top parts get named spec callouts that draw on in sequence. Auto-populated
+ * by `stage` from the segment manifest.
+ */
+function spec(model: string, d: number, bg: string, title?: string, callouts?: CalloutSpec[]): string {
+  const t1 = Math.max(1.2, d * 0.4);
+  const t = titleBlock(title, t1);
+  return `${head(bg)}
+    <sf-scene duration="${d}" width="1920" height="1080" background="${bg}"
+              environment="room" exposure="1.0"
+              samples="2" bloom="0.1" bloom-threshold="0.9" vignette="0.34"
+              contrast="1.04" saturation="1.05"
+              ground="contact-shadow" ground-y="0" ground-size="6" light-sweep="0.08">
+      <sf-camera fov="34" position="2.2 1.2 4.9" look-at="0 0.9 0"></sf-camera>
+      <sf-light preset="studio"></sf-light>
+      <sf-model id="m" src="assets/${model}" fit="2.3" fit-ground></sf-model>
+      <sf-animate target="camera" verb="orbit" around="0 0.9 0" radius="5.4"
+                  from="20deg" to="-6deg" height="0.5" start="0" duration="${d}" ease="sine.inOut"></sf-animate>
+${calloutMarkup(callouts)}${t.anim}    </sf-scene>
+${t.dom}${tail}`;
+}
+
 const TEMPLATES: Record<Preset, (m: string, d: number, bg: string, t?: string) => string> = {
   "reveal": reveal,
   "hero-orbit": heroOrbit,
   "turntable": turntable,
   "exploded-view": explodedView,
+  "spec": spec,
 };
 
 const DEFAULT_BG: Record<Preset, string> = {
@@ -156,6 +267,7 @@ const DEFAULT_BG: Record<Preset, string> = {
   "hero-orbit": "#16181c",
   "turntable": "#15171b",
   "exploded-view": "#14161a",
+  "spec": "#101216",
 };
 
 export function stageModel(opts: StageOptions): string {
@@ -174,7 +286,10 @@ export function stageModel(opts: StageOptions): string {
 
   const d = opts.duration && opts.duration > 0 ? opts.duration : 8;
   const bg = opts.background ?? DEFAULT_BG[opts.preset];
-  const html = TEMPLATES[opts.preset](modelFile, d, bg, opts.title);
+  const html =
+    opts.preset === "spec"
+      ? spec(modelFile, d, bg, opts.title, opts.callouts)
+      : TEMPLATES[opts.preset](modelFile, d, bg, opts.title);
   writeFileSync(join(dir, "index.html"), html);
 
   return dir;

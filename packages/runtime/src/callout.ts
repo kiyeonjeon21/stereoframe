@@ -20,7 +20,7 @@
 import { Box3, Vector3 } from "three";
 import { collectParts, resolvePartIndex } from "./animate";
 import { getEase, type EaseFn } from "./ease";
-import { parseSeconds, parseVec3 } from "./parse";
+import { parseNumber, parseSeconds, parseVec3 } from "./parse";
 import type { CompiledScene } from "./scene";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -50,6 +50,8 @@ interface Callout {
   line: SVGLineElement;
   label: HTMLDivElement;
   side: number; // -1 = label to the left, +1 = to the right
+  leadX: number; // horizontal lead-out from the anchor to the label (px)
+  leadY: number; // vertical lead-out (negative = up)
   start: number;
   dur: number;
   ease: EaseFn;
@@ -127,6 +129,8 @@ export function compileCallouts(compiled: CompiledScene): void {
       line,
       label,
       side,
+      leadX: parseNumber(el.getAttribute("lead-x"), 150),
+      leadY: parseNumber(el.getAttribute("lead-y"), -92),
       start: parseSeconds(el.getAttribute("start"), 0),
       dur: Math.max(0.001, parseSeconds(el.getAttribute("duration"), 0.7)),
       ease: getEase(el.getAttribute("ease"), "power2.out"),
@@ -136,9 +140,6 @@ export function compileCallouts(compiled: CompiledScene): void {
 
   const _w = new Vector3();
   const _c = new Vector3();
-  // Lead-out vector from the anchor to the label (px), before the side flip.
-  const LEAD_X = 150;
-  const LEAD_Y = -92;
 
   compiled.overlayFns.push((time) => {
     // Read the canvas rect each seek — robust to layout/font settling after
@@ -158,9 +159,9 @@ export function compileCallouts(compiled: CompiledScene): void {
 
       const sx = frame.left + (_w.x * 0.5 + 0.5) * frame.width;
       const sy = frame.top + (-_w.y * 0.5 + 0.5) * frame.height;
-      const dx = c.side * LEAD_X;
+      const dx = c.side * c.leadX;
       const lx = sx + dx;
-      const ly = sy + LEAD_Y;
+      const ly = sy + c.leadY;
 
       const draw = c.ease(Math.min(1, Math.max(0, (time - c.start) / c.dur)));
       const pre = time < c.start ? 0 : 1;
@@ -170,7 +171,7 @@ export function compileCallouts(compiled: CompiledScene): void {
       c.line.setAttribute("x1", String(sx));
       c.line.setAttribute("y1", String(sy));
       c.line.setAttribute("x2", String(sx + dx * draw));
-      c.line.setAttribute("y2", String(sy + LEAD_Y * draw));
+      c.line.setAttribute("y2", String(sy + c.leadY * draw));
       c.line.style.opacity = String(vis * Math.min(1, draw * 4));
       c.dot.setAttribute("cx", String(sx));
       c.dot.setAttribute("cy", String(sy));

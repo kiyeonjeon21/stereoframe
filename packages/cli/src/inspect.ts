@@ -177,7 +177,14 @@ function spatialTags(center: number[], model: ModelManifest["bounds"]): string[]
 }
 
 /** Inspect a model and return its manifest (also writes <model>.segments.json). */
-export async function inspectModel(opts: { model: string; json?: boolean }): Promise<ModelManifest> {
+export async function inspectModel(opts: {
+  model: string;
+  json?: boolean;
+  /** false = don't write <model>.segments.json (used by `stage --preset spec`). */
+  write?: boolean;
+  /** true = return the manifest without printing (used internally). */
+  silent?: boolean;
+}): Promise<ModelManifest> {
   const modelPath = resolve(opts.model);
   if (!/\.(glb|gltf)$/i.test(modelPath)) throw new Error("inspect expects a .glb or .gltf model");
   const modelFile = basename(modelPath);
@@ -245,12 +252,11 @@ export async function inspectModel(opts: { model: string; json?: boolean }): Pro
   };
 
   const outPath = modelPath.replace(/\.(glb|gltf)$/i, ".segments.json");
-  writeFileSync(outPath, JSON.stringify(manifest, null, 2) + "\n");
+  if (opts.write !== false) writeFileSync(outPath, JSON.stringify(manifest, null, 2) + "\n");
 
-  if (opts.json) {
-    console.log(JSON.stringify(manifest, null, 2));
-  } else {
-    printReport(manifest, longest, outPath);
+  if (!opts.silent) {
+    if (opts.json) console.log(JSON.stringify(manifest, null, 2));
+    else printReport(manifest, longest, outPath);
   }
   return manifest;
 }
