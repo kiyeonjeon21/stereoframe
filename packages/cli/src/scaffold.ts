@@ -64,10 +64,11 @@ export function scaffoldProject(name: string, cwd = process.cwd()): string {
 
 /** `stereoframe update` — refresh the runtime bundle in an existing project. */
 export function updateRuntime(projectDir: string): string {
-  const target = join(resolve(projectDir), "assets", "stereoframe.js");
-  if (!existsSync(dirname(target))) {
-    throw new Error(`no assets/ directory found in ${projectDir}`);
+  if (!existsSync(join(resolve(projectDir), "index.html"))) {
+    throw new Error(`no index.html in ${projectDir} — not a stereoframe project`);
   }
+  const target = join(resolve(projectDir), "assets", "stereoframe.js");
+  mkdirSync(dirname(target), { recursive: true });
   copyFileSync(resolveRuntimeBundle(), target);
   return target;
 }
