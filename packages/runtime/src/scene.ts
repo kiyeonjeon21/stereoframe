@@ -214,6 +214,8 @@ function tuneMaterial(mat: THREE.Material, specularAA: boolean): void {
 function buildMesh(el: Element, specularAA: boolean): THREE.Mesh {
   const mesh = new THREE.Mesh(buildGeometry(el), buildMeshMaterial(el));
   tuneMaterial(mesh.material as THREE.Material, specularAA);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true; // a floor/backdrop plane receives the model's cast shadow
   applyTransform(mesh, el);
   return mesh;
 }
@@ -259,6 +261,33 @@ function buildLights(el: Element, scene: THREE.Scene): void {
   scene.add(light);
 }
 
+/** Enable PCF-soft shadow maps from the scene's brightest directional light. Only
+ *  one caster (multiple overlapping shadow maps look muddy + cost more). The ortho
+ *  frustum frames the normalized subject (models are `fit` to ~2.6 around origin).
+ *  Deterministic: the shadow depth is a pure function of geometry at time `t`. */
+function setupShadows(scene: THREE.Scene, renderer: THREE.WebGLRenderer): void {
+  let key: THREE.DirectionalLight | null = null;
+  scene.traverse((o) => {
+    if (o instanceof THREE.DirectionalLight && (!key || o.intensity > key.intensity)) key = o;
+  });
+  if (!key) return;
+  const light = key as THREE.DirectionalLight;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  light.castShadow = true;
+  light.shadow.mapSize.set(2048, 2048);
+  const cam = light.shadow.camera;
+  cam.left = -6;
+  cam.right = 6;
+  cam.top = 6;
+  cam.bottom = -6;
+  cam.near = 0.1;
+  cam.far = 60;
+  cam.updateProjectionMatrix();
+  light.shadow.bias = -0.0004;
+  light.shadow.normalBias = 0.02;
+}
+
 /** Shot duration in seconds: own `duration` attr, else inherited, else 5. */
 export function sceneDuration(host: HTMLElement): number {
   const own = parseNumber(host.getAttribute("duration"), 0);
@@ -292,6 +321,8 @@ export function compileScene(host: HTMLElement): CompiledScene {
   const bufH = height * samples;
   // Geometric specular AA on lit materials (on by default; `specular-aa="none"` opts out).
   const specularAA = (host.getAttribute("specular-aa") ?? "") !== "none";
+  // Real soft shadow maps from the key light (on by default; `shadows="none"` opts out).
+  const shadows = (host.getAttribute("shadows") ?? "") !== "none";
 
   const canvas = document.createElement("canvas");
   canvas.width = bufW;
@@ -418,6 +449,8 @@ export function compileScene(host: HTMLElement): CompiledScene {
             gltf.scene.traverse((node) => {
               const mesh = node as THREE.Mesh;
               if (!mesh.isMesh || !mesh.material) return;
+              mesh.castShadow = true;
+              mesh.receiveShadow = true;
               const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
               for (const mat of mats) tuneMaterial(mat, specularAA);
             });
@@ -510,6 +543,10 @@ export function compileScene(host: HTMLElement): CompiledScene {
   if (skySunDirection) {
     for (const ocean of oceans) ocean.setSunDirection(skySunDirection);
   }
+
+  // Real soft cast shadows from the brightest directional — a grounded directional
+  // shadow (vs the top-down contact-shadow blob). Pure per t → seek-safe.
+  if (shadows) setupShadows(scene, renderer);
 
   // Contact shadow — grounds the subject. `ground="contact-shadow"` (the
   // shadow sits at `ground-y`, default 0; pair with sf-model fit-ground).
