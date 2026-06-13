@@ -31,10 +31,10 @@
     <!-- type sits BEHIND the canvas; the 3D form occludes it -->
     <div id="type" class="clip" data-start="0.3">FORM<br>IN<br>MOTION</div>
 
-    <!-- No post-fx here: the EffectComposer flattens the transparent scene to an
-         opaque buffer, which would hide the cream page background + the type
-         behind the canvas. Direct render preserves alpha for the occlusion. -->
-    <sf-scene duration="8" width="1920" height="1080" background="transparent" samples="2">
+    <!-- Post-fx is alpha-aware (as of v0.2.24), so a transparent scene keeps the
+         cream page background + the type behind the canvas while still grading. -->
+    <sf-scene duration="8" width="1920" height="1080" background="transparent"
+              samples="2" grain="0.02" contrast="1.05" saturation="1.06">
       <sf-camera fov="34" position="2.2 0.4 6"></sf-camera>
       <sf-mesh id="form" geometry="icosahedron" args="2.1 1" material="matcap" matcap="iridescent"
                position="2.0 0 0"></sf-mesh>

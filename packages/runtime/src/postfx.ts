@@ -8,7 +8,7 @@
  * Antialiasing is supersampling (scene.ts renders the canvas at Nx and the
  * capture downsamples) — handled outside this chain.
  */
-import { Vector2 } from "three";
+import { HalfFloatType, RGBAFormat, Vector2, WebGLRenderTarget } from "three";
 import type { Camera, Scene, WebGLRenderer } from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -43,7 +43,7 @@ const VignetteGradeShader = {
       vec2 uv = (vUv - 0.5) * 1.1;
       float vig = clamp(1.0 - dot(uv, uv), 0.0, 1.0);
       c *= mix(1.0, vig, vignette);
-      gl_FragColor = vec4(c, 1.0);
+      gl_FragColor = vec4(c, texture2D(tDiffuse, vUv).a);
     }
   `,
 };
@@ -89,9 +89,9 @@ const GrainShader = {
       return fract((p3.x + p3.y) * p3.z);
     }
     void main() {
-      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      vec4 src = texture2D(tDiffuse, vUv);
       float g = hash(vUv * vec2(1920.0, 1080.0) + uTime * 73.0) - 0.5;
-      gl_FragColor = vec4(c + g * amount, 1.0);
+      gl_FragColor = vec4(src.rgb + g * amount, src.a);
     }
   `,
 };
@@ -130,9 +130,18 @@ export function buildPostFX(
     return null;
   }
 
-  const composer = new EffectComposer(renderer);
+  // Alpha-capable render target + clearAlpha 0 so a transparent scene stays
+  // transparent through the chain (DOM-occlusion compositions can use post-fx).
+  // Default EffectComposer targets + RenderPass clear opaque black otherwise.
+  const target = new WebGLRenderTarget(opts.width, opts.height, {
+    type: HalfFloatType,
+    format: RGBAFormat,
+  });
+  const composer = new EffectComposer(renderer, target);
   composer.setSize(opts.width, opts.height);
-  composer.addPass(new RenderPass(scene, camera));
+  const renderPass = new RenderPass(scene, camera);
+  renderPass.clearAlpha = 0;
+  composer.addPass(renderPass);
 
   if (wantBloom) {
     composer.addPass(

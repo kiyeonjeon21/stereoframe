@@ -24,7 +24,11 @@ export interface SceneDiagnostics {
   frustumCoverage: number | null;
   /** Mean luminance 0..1 of the rendered canvas (visible scenes only). */
   meanLuminance: number | null;
+  /** sRGB luminance 0..1 of a solid-color scene background (null if transparent/env). */
+  backgroundLuminance: number | null;
 }
+
+const toSRGB = (c: number): number => (c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
 
 const _box = new Box3();
 const _frustum = new Frustum();
@@ -54,6 +58,13 @@ function meanLuminance(source: HTMLCanvasElement): number {
 
 function isFiniteVec(v: { x: number; y: number; z: number }): boolean {
   return Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
+}
+
+/** sRGB luminance of a solid-color scene background; null if transparent or an env map. */
+function bgLuminance(s: CompiledScene): number | null {
+  const bg = s.scene.background as { isColor?: boolean; r: number; g: number; b: number } | null;
+  if (!bg || !bg.isColor) return null; // transparent (null) or a Texture env background
+  return 0.2126 * toSRGB(bg.r) + 0.7152 * toSRGB(bg.g) + 0.0722 * toSRGB(bg.b);
 }
 
 export function collectDiagnostics(scenes: CompiledScene[], t: number): SceneDiagnostics[] {
@@ -107,6 +118,7 @@ export function collectDiagnostics(scenes: CompiledScene[], t: number): SceneDia
       hasNaN,
       frustumCoverage: geomObjects > 0 ? inFrustum / geomObjects : null,
       meanLuminance: state.visible ? meanLuminance(s.canvas) : null,
+      backgroundLuminance: bgLuminance(s),
     };
   });
 }

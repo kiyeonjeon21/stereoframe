@@ -34,6 +34,12 @@ describe("lint", () => {
     expect(rules(`<sf-scene></sf-scene>${RUNTIME}`)).toContain("missing_duration");
   });
 
+  test("ignores sf-* tags inside HTML comments (no false positives)", () => {
+    // A doc comment mentioning <sf-scene> must not register as a real element.
+    const html = `<!-- place DOM before <sf-scene> so the canvas occludes it -->\n${OK}`;
+    expect(rules(html)).toEqual([]);
+  });
+
   test("asset_not_found and remote_asset", () => {
     const html = `
       <sf-scene duration="5">

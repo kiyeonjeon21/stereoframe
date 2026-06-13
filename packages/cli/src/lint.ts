@@ -56,7 +56,10 @@ const IMPURE_PATTERNS: Array<{ pattern: RegExp; what: string }> = [
 
 export function lintHtml(html: string, opts: LintOptions): Finding[] {
   const findings: Finding[] = [];
-  const tags = sfTags(html);
+  // Scan markup with HTML comments removed, so `<sf-scene>` etc. mentioned inside
+  // <!-- ... --> (doc comments) don't register as real elements (false positives).
+  const markup = html.replace(/<!--[\s\S]*?-->/g, "");
+  const tags = sfTags(markup);
   const scenes = tags.filter((t) => t.name === "sf-scene");
   const embed = /data-composition-id\s*=/.test(html);
 

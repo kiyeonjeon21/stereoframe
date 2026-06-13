@@ -23,6 +23,7 @@ interface SceneDiagnosticsWire {
   hasNaN: boolean;
   frustumCoverage: number | null;
   meanLuminance: number | null;
+  backgroundLuminance: number | null;
 }
 
 export async function validateProject(projectDir: string): Promise<Finding[]> {
@@ -105,6 +106,21 @@ export async function validateProject(projectDir: string): Promise<Finding[]> {
             severity: "warning",
             message: `${where}: rendered frame is nearly black (mean luminance ${(d.meanLuminance * 255).toFixed(1)}/255).`,
             fixHint: "Likely unlit content, an offscreen subject, or an asset that failed to apply.",
+          });
+        }
+        if (
+          d.meanLuminance !== null &&
+          d.backgroundLuminance !== null &&
+          d.meshCount > 0 &&
+          d.meanLuminance > 0.008 && // not the black-frame case
+          Math.abs(d.meanLuminance - d.backgroundLuminance) < 0.06
+        ) {
+          findings.push({
+            rule: "subject_bg_low_contrast",
+            severity: "warning",
+            message: `${where}: subject blends into the background (mean ${(d.meanLuminance * 255).toFixed(0)}/255 vs background ${(d.backgroundLuminance * 255).toFixed(0)}/255) — it may be hard to see.`,
+            fixHint:
+              "Separate the subject from the background: a rim/back light, more exposure/fill, or a lighter (or darker) background.",
           });
         }
       }
