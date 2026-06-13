@@ -85,6 +85,13 @@ describe("validateStoryboard", () => {
     expect(errs.some((e) => /transitionDuration/.test(e))).toBe(true);
   });
 
+  test("malformed pose is an error (shot and defaults); valid/absent pose is fine", () => {
+    expect(validateStoryboard({ model: "m.glb", shots: [shot({ pose: "90 0" })] }).some((e) => /pose/.test(e))).toBe(true);
+    expect(validateStoryboard({ model: "m.glb", shots: [shot({ pose: "a b c" })] }).some((e) => /pose/.test(e))).toBe(true);
+    expect(validateStoryboard({ model: "m.glb", defaults: { pose: "1 2" }, shots: [shot({})] }).some((e) => /pose/.test(e))).toBe(true);
+    expect(validateStoryboard({ model: "m.glb", defaults: { pose: "90 0 90" }, shots: [shot({ pose: "0 45 0" })] })).toEqual([]);
+  });
+
   test("bad camera type and unknown ease are errors", () => {
     const errs = validateStoryboard({
       model: "m.glb",
@@ -149,5 +156,21 @@ describe("compileStoryboard", () => {
     const resolved = resolvedFor(plan).map((r, i) => (i === 1 ? { ...r, metalRig: true } : r));
     const out = compileStoryboard(plan, resolved);
     expect(out).toContain('color="#2a3040"'); // METAL_RIG hemisphere
+  });
+
+  test("no pose → no rotation attr on sf-model", () => {
+    expect(html).not.toContain("rotation=");
+  });
+
+  test("defaults.pose is inherited; a per-shot pose overrides it", () => {
+    const posed: Storyboard = {
+      model: "m.glb",
+      defaults: { pose: "90 0 90" },
+      shots: [shot({}), shot({ pose: "0 45 0", camera: { type: "static", position: "0 1 5" } })],
+    };
+    const out = compileStoryboard(posed, resolvedFor(posed));
+    expect(out).toContain('rotation="90 0 90"'); // shot 1 inherits defaults
+    expect(out).toContain('rotation="0 45 0"'); // shot 2 overrides
+    expect(lintHtml(out, { fileExists: () => true }).filter((f) => f.severity === "error")).toEqual([]);
   });
 });

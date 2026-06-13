@@ -246,6 +246,10 @@ for `lighting:"auto"`/`callout:"auto"`, copies GLBs + runtime into `out/assets/`
 - **Lighting**: `{preset}` | `"auto"` (metal → tamed rim/fill rig) | 3-point `{key,fill,rim}`.
 - **Per-shot extras**: `spin` (rpm), `isolate:{part,dim?}`, `explode:{distance?}`,
   `callout:"auto"|"none"|[…]`, `text:{title?,subtitle?}`.
+- **`pose`** (`"x y z"` degrees, in `defaults` or per-shot): re-orient the model
+  however it was generated. **Check orientation first** — text-to-3D often returns
+  flat/odd poses (a phone usually generates lying flat → `pose:"0 90 90"` stands it
+  up in portrait). Inspect a render; if the model is on its side/back, add a pose.
 - **Timeline** is computed: `start_i = start_{i-1} + duration_{i-1} − overlap` (overlap =
   `transitionDuration` for crossfades). You only give each shot's `duration` +
   `transition`. `defaults` (incl. `finish`/`lighting`) are inherited; per-shot wins.

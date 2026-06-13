@@ -90,9 +90,15 @@ function compositionSize(host: HTMLElement): { width: number; height: number } {
   return { width, height };
 }
 
-function applyTransform(obj: THREE.Object3D, el: Element): void {
+function applyTransform(
+  obj: THREE.Object3D,
+  el: Element,
+  opts: { rotation?: boolean } = {},
+): void {
   obj.position.set(...parseVec3(el.getAttribute("position"), [0, 0, 0]));
-  obj.rotation.set(...parseRotationRad(el.getAttribute("rotation")));
+  // sf-model puts the base pose on the inner gltf.scene instead (so `fit`
+  // measures + recenters the *posed* bounds), passing rotation:false here.
+  if (opts.rotation !== false) obj.rotation.set(...parseRotationRad(el.getAttribute("rotation")));
   obj.scale.set(...parseScale(el.getAttribute("scale")));
 }
 
@@ -344,7 +350,9 @@ export function compileScene(host: HTMLElement): CompiledScene {
       if (el.id) objectsById.set(el.id, mesh);
     } else if (tag === "sf-model") {
       const group = new THREE.Group();
-      applyTransform(group, el);
+      // Position/scale on the group (the handle verbs animate); the base pose
+      // rotation goes on the inner gltf.scene below, before `fit` measures it.
+      applyTransform(group, el, { rotation: false });
       scene.add(group);
       if (el.id) objectsById.set(el.id, group);
       const src = el.getAttribute("src");
@@ -358,6 +366,10 @@ export function compileScene(host: HTMLElement): CompiledScene {
         pending.push(
           gltfLoader.loadAsync(src).then((gltf) => {
             group.add(gltf.scene);
+            // Base pose on the model itself, applied BEFORE `fit` so the box is
+            // measured on the posed geometry and recenters in the group's
+            // (rotation-free) frame — keeps fit/fit-ground correct under any pose.
+            gltf.scene.rotation.set(...parseRotationRad(el.getAttribute("rotation")));
             if (fit > 0) {
               const box = new THREE.Box3().setFromObject(gltf.scene);
               const size = box.getSize(new THREE.Vector3());

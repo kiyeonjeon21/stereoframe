@@ -336,7 +336,10 @@ from one GLB).
 (multi-model). `defaults` is a `ShotDefaults` whose fields every shot inherits.
 
 **`ShotDefaults` / per-shot overrides:** `bg`, `environment="room"`, `fit=2.4`,
-`fitGround=true`, `finish` (deep-merged), `lighting` (per-shot wins).
+`fitGround=true`, `pose`, `finish` (deep-merged), `lighting` (per-shot wins).
+`pose` is a base-pose rotation `"x y z"` in degrees (→ sf-model `rotation`) — use
+it to re-orient a model however it was generated (text-to-3D often returns a phone
+lying flat; `"0 90 90"` stands it up in portrait).
 
 **`Shot`** adds: `name?` (comment label), `duration` (required, >0),
 `transition?` (`cut` | `crossfade`, default crossfade after shot 1),

@@ -76,6 +76,10 @@ export interface ShotDefaults {
   environment?: string;
   fit?: number;
   fitGround?: boolean;
+  /** Base-pose rotation "x y z" in degrees → sf-model `rotation`. Re-orient a
+   *  model whatever orientation it was generated in (e.g. a phone that came out
+   *  lying flat → "90 0 90" to stand it up). */
+  pose?: string;
   finish?: Finish;
   lighting?: Lighting;
 }
@@ -141,11 +145,20 @@ export function validateStoryboard(plan: Storyboard): string[] {
       errs.push(`storyboard.${dim} must be a positive number`);
     }
   }
+  const badPose = (p: string | undefined): boolean => {
+    if (p === undefined) return false;
+    const n = p.trim().split(/\s+/).map(Number);
+    return n.length !== 3 || n.some((x) => !Number.isFinite(x));
+  };
+  if (badPose(plan.defaults?.pose)) {
+    errs.push(`storyboard.defaults.pose must be "x y z" (3 numbers, degrees)`);
+  }
   const eases = new Set<string>(EASE_NAMES);
   plan.shots.forEach((s, i) => {
     const tag = `shot ${i + 1}${s.name ? ` "${s.name}"` : ""}`;
     if (!(typeof s.duration === "number" && s.duration > 0)) errs.push(`${tag}: duration must be > 0`);
     if (!s.model && !plan.model) errs.push(`${tag}: no model (set storyboard.model or shot.model)`);
+    if (badPose(s.pose)) errs.push(`${tag}: pose must be "x y z" (3 numbers, degrees)`);
     if (s.transition && s.transition !== "cut" && s.transition !== "crossfade") {
       errs.push(`${tag}: transition must be "cut" or "crossfade"`);
     }
@@ -277,6 +290,7 @@ export function compileStoryboard(plan: Storyboard, resolved: ResolvedShot[]): s
     const env = shot.environment ?? plan.defaults?.environment ?? "room";
     const fit = shot.fit ?? plan.defaults?.fit ?? 2.4;
     const fitGround = shot.fitGround ?? plan.defaults?.fitGround ?? true;
+    const pose = shot.pose ?? plan.defaults?.pose;
     const finish = mergeFinish(plan.defaults?.finish, shot.finish);
     const lighting = mergeLighting(plan.defaults?.lighting, shot.lighting);
     const cam = cameraMarkup(shot.camera, shot.duration);
@@ -331,7 +345,7 @@ export function compileStoryboard(plan: Storyboard, resolved: ResolvedShot[]): s
               environment="${env}"${finishAttrs(finish, r.metalRig)}>
       ${cam.camera}
       ${lightMarkup(lighting, r.metalRig)}
-      <sf-model id="${id}" src="assets/${r.modelBasename}" fit="${num(fit)}"${fitGround ? " fit-ground" : ""}></sf-model>
+      <sf-model id="${id}" src="assets/${r.modelBasename}" fit="${num(fit)}"${fitGround ? " fit-ground" : ""}${pose ? ` rotation="${pose}"` : ""}></sf-model>
 ${anims.map((a) => `      ${a}`).join("\n")}${calloutBlock ? "\n" + calloutBlock : ""}
     </sf-scene>`,
     );
