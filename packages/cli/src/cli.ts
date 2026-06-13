@@ -16,6 +16,7 @@ import { addBlock, listBlocks } from "./blocks";
 import { genModel } from "./gen";
 import { inspectModel } from "./inspect";
 import { bakeProject } from "./bake";
+import { buildStoryboard, readStoryboard, validateStoryboard } from "./storyboard";
 import { buildAutoCallouts, explodeTiming, PRESETS, stageModel, type Preset } from "./stage";
 import { lintHtml, type Finding } from "./lint";
 import { renderProject } from "./render";
@@ -74,6 +75,9 @@ USAGE
       --duration <s>   seconds (default 8)
       --title "<text>" optional title overlay
       --bg <color>     background color (preset default otherwise)
+  stereoframe storyboard <plan.json>   compile a shot plan (JSON) into a multi-shot directed film
+      --dir <dir>      output project dir (default: <title> slug or <stem>-film)
+      --render         render the compiled film to mp4 (--draft for fast)
   stereoframe inspect <model.glb>      segment + tag a GLB: list its parts (name, material, where, size)
       --json           print the manifest as JSON instead of a table
   stereoframe gen "<prompt>"           generate a 3D model (GLB) from text via Meshy
@@ -224,6 +228,31 @@ async function main(): Promise<void> {
         title: typeof options.get("title") === "string" ? (options.get("title") as string) : undefined,
       });
       console.log(`next: cd ${outDir} && stereoframe render`);
+      return;
+    }
+    case "storyboard": {
+      const planPath = positional[0];
+      if (!planPath) {
+        throw new Error("usage: stereoframe storyboard <plan.json> [--dir out] [--render]");
+      }
+      const { plan, planDir } = readStoryboard(planPath);
+      const errs = validateStoryboard(plan);
+      if (errs.length) throw new Error(`storyboard plan has errors:\n  - ${errs.join("\n  - ")}`);
+      const slug =
+        (plan.title ?? basename(planPath).replace(/\.json$/i, ""))
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+          .slice(0, 40) || "film";
+      const outDir = typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${slug}-film`;
+      const { dir: built, duration } = await buildStoryboard({ plan, planDir, outDir });
+      console.log(`compiled ${plan.shots.length} shot(s), ${duration.toFixed(1)}s → ${built}`);
+      if (options.get("render") === true) {
+        const out = await renderProject({ projectDir: built, draft: options.get("draft") === true });
+        console.log(out);
+      } else {
+        console.log(`next: cd ${outDir} && stereoframe render`);
+      }
       return;
     }
     case "gen": {

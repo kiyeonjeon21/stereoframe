@@ -44,6 +44,26 @@ stereoframe gen "a low-poly treasure chest"   # → assets/a-low-poly-treasure-c
 
 It runs with no setup using Meshy's free test mode (returns a sample model); set `MESHY_API_KEY` (shell env or project `.env`) for real prompt-driven generations.
 
+## Direct a multi-shot film from a JSON shot list
+
+Generating a model is the commodity; **directing** it is the moat. A **storyboard plan** — a small JSON shot list (camera move, lighting, grade, duration, crossfade per beat) — compiles into a multi-shot film, with the timeline computed so crossfades never gap. This is the agent-native flagship: from a brief, an LLM writes the JSON; one command renders the spot.
+
+```bash
+stereoframe storyboard plan.json --render   # → a directed multi-shot film, timeline computed for you
+```
+
+```jsonc
+// cold-open → ignition → hero, each with its own camera/lighting/grade
+{ "title": "stereoframe cinematic", "model": "lamp.glb",
+  "shots": [
+    { "name": "cold open", "duration": 2.4, "camera": { "type": "push-in", "position": "3.6 0.5 3.5", "lookAt": "0 0.9 0", "distance": 0.45 } },
+    { "name": "ignition",  "duration": 2.9, "transition": "crossfade", "camera": { "type": "orbit", "radius": 5, "from": 50, "to": 6, "height": 0.5 } },
+    { "name": "hero",      "duration": 3.0, "transition": "crossfade", "camera": { "type": "hero", "from": 8, "to": -12 }, "text": { "title": "stereoframe", "subtitle": "directed, not generated" } }
+  ] }
+```
+
+Camera types (`static`/`orbit`/`dolly`/`push-in`/`pull-back`/`path`/`hero`), 3-point or `"auto"` lighting, per-shot grade/`spin`/`isolate`/`explode`/`callout`/`text` — full schema in [docs/format.md](docs/format.md). See `examples/storyboard-camera/plan.json` (recreates a 4-beat cinematic from one GLB).
+
 ## How it works
 
 - **Seek-driven rendering.** The CLI drives the runtime's protocol (`window.__stereoframe.seek(t)`, `t = frame / fps`) in headless Chrome and screenshots each frame into ffmpeg. Every frame is a pure function of `t`: verb writers → `AnimationMixer.setTime(t)` → `camera.lookAt` → `renderer.render`. No wall clock, no `requestAnimationFrame`, no accumulated state.
@@ -58,7 +78,7 @@ It runs with no setup using Meshy's free test mode (returns a sample model); set
 
 ```
 packages/runtime/    stereoframe-runtime → dist/stereoframe.js (three.js r184 bundled)
-packages/cli/        stereoframe → `stereoframe` bin (stage/inspect/init/gen/lint/validate/render/bake/preview/add/update)
+packages/cli/        stereoframe → `stereoframe` bin (stage/storyboard/inspect/init/gen/lint/validate/render/bake/preview/add/update)
 examples/
   hello-standalone/        CLI-scaffolded starter (no HyperFrames)
   character-run-standalone/ Fox run cycle + follow cam + particles, own pipeline
@@ -68,6 +88,7 @@ examples/
   type-poster/             editorial motion poster: bold type occluded by an iridescent matcap form
   forward-trails/          mode="forward" — an accumulating motion trail (live state)
   baked-flock/             a baked forward boids sim replayed seekably via <sf-baked>
+  storyboard-camera/       JSON shot list → 4-beat cinematic (the `storyboard` compiler)
   product-teardown/        hand-directed 5-shot film: hero → teardown → per-part spotlights (inspect + isolate + callouts)
   paper-swarm/             sf-swarm typography choreography
   multi-shot/              16s three-shot trailer (swarm → glass → ocean, crossfades)
@@ -98,6 +119,7 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 **v0 (Tier 3b+).** Determinism is scoped to seekability: every frame is a pure function of `t`, frame-hash-identical across runs — which leaves the visuals free.
 
 **Direct any GLB**
+- `storyboard` compiler — a JSON shot list (camera / lighting / grade / crossfade per beat) → a multi-shot film, timeline computed so crossfades never gap. The agent-native path from a brief to a directed spot.
 - `stage` auto-director — auto-framing + presets: reveal, hero-orbit, turntable, exploded-view, **spec** (annotated product film), **teardown** (per-part exploded breakdown).
 - `inspect` segment + tag pipeline — reads a GLB's parts (name, material character, position, size) so they can be targeted by name.
 - `sf-callout` tracked spec labels — leader lines that follow a 3D part as the camera moves; auto-placed by `spec`/`teardown`.

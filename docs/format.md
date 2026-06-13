@@ -312,6 +312,68 @@ Determinism governs **structure** — what's where, when, and how it moves — s
 
 The renderer keeps `antialias: false` (driver MSAA is non-deterministic) and supersamples instead (`samples`), and pins `pixelRatio 1`.
 
+## Storyboard plans (`stereoframe storyboard`)
+
+Authoring multi-shot films by hand is fiddly: every shot needs the right
+`start`/`duration`, crossfade overlaps must cover the seam, and each camera move
+is a `<sf-camera>` + `<sf-animate>` pair. A **storyboard plan** is a small JSON
+file describing the *beats* — a director's shot list — that compiles into exactly
+that multi-shot HTML. This is the agent-native path: from a brief, an agent writes
+the JSON; `stereoframe storyboard plan.json` produces a directed film.
+
+```bash
+stereoframe storyboard plan.json [--dir out] [--render] [--draft]
+```
+
+The compiler computes the timeline (so crossfades never gap or off-by-one),
+inspects each model once for `lighting:"auto"`/`callout:"auto"`, copies all GLBs +
+the runtime into `out/assets/`, and writes `out/index.html`. See
+`examples/storyboard-camera/plan.json` (recreates the v4 cinematic 4-beat spot
+from one GLB).
+
+**Top level:** `{ title?, model?, width?=1920, height?=1080, fps?, defaults?, shots[] }`.
+`model` is the default GLB (path relative to the plan); a shot may override it
+(multi-model). `defaults` is a `ShotDefaults` whose fields every shot inherits.
+
+**`ShotDefaults` / per-shot overrides:** `bg`, `environment="room"`, `fit=2.4`,
+`fitGround=true`, `finish` (deep-merged), `lighting` (per-shot wins).
+
+**`Shot`** adds: `name?` (comment label), `duration` (required, >0),
+`transition?` (`cut` | `crossfade`, default crossfade after shot 1),
+`transitionDuration?=0.4`, `camera` (required), `spin?` (rpm turntable),
+`isolate?:{part,dim?}`, `explode?:{distance?}`, `callout?` (`"auto"` | `"none"` |
+array), `text?:{title?,subtitle?}` (DOM overlay clipped to the shot).
+
+**Timeline.** `start_0 = 0`; `start_i = start_{i-1} + duration_{i-1} − overlap_i`
+where `overlap_i` is `transitionDuration_i` for a crossfade else 0. This makes the
+previous shot cover the seam exactly — no gaps, no `crossfade_gap`. Total =
+`max(end_i)`. A `transitionDuration` longer than either adjacent shot is rejected.
+
+**Camera → verbs.** Each `camera` becomes one `<sf-camera>` + ≤1 `<sf-animate>`:
+
+| `camera.type` | fields | maps to |
+|---|---|---|
+| `static` | `position`, `lookAt`, `fov` | no animate |
+| `orbit` | `around`, `radius`, `from`, `to`, `height`, `lookAt?`, `ease?` | `verb="orbit"` |
+| `dolly` / `push-in` / `pull-back` | `position`, `lookAt`, `toward`, `distance`, `ease?` | `verb="dolly"` (pull-back = negative distance) |
+| `path` | `points`, `fov`, `ease?` | `verb="camera-path" look="ahead"` (no `look-at` — lint conflict) |
+| `hero` | low-angle `position`/`lookAt` + slow orbit fields | hero recipe |
+
+Default ease `sine.inOut`; ease must be a known GSAP name.
+
+**Lighting.** `{preset:"studio"|"soft"|"sunset"}`, or `"auto"` (inspect the model —
+dominantly-metal models get a tamed-exposure rim/fill rig, else studio), or a
+3-point cap `{key?,fill?,rim?:{color?,intensity?,position?,type?}}`.
+
+**Finish** (all optional → sf-scene grade attrs): `exposure`, `samples`, `bloom`,
+`bloomThreshold`, `vignette`, `contrast`, `saturation`, `grain`,
+`chromaticAberration`, `lightSweep`, `ground`.
+
+Very dark opening beats can trip `subject_bg_low_contrast` *warnings* in
+`validate` — those are advisory (a deliberately moody cold-open is fine);
+`lint`/`validate` errors are not. For accents the schema doesn't cover (emissive
+backdrops, extra point lights, particles), hand-edit the emitted HTML.
+
 ## Architecture notes
 
 - Seek path: seek(t) → verb writers → `mixer.setTime(t)` → time uniforms → `camera.lookAt` → `renderer.render`. One synchronous function (`seek.ts`).

@@ -10,7 +10,7 @@
  */
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import type { Character, ModelManifest } from "./inspect";
+import type { Character, ModelManifest, PartManifest } from "./inspect";
 import { resolveRuntimeBundle } from "./scaffold";
 
 export const PRESETS = ["reveal", "hero-orbit", "turntable", "exploded-view", "spec", "teardown"] as const;
@@ -43,20 +43,20 @@ export interface StageOptions {
 
 /** A cool rim + warm fill + dim hemisphere — separates a metal subject and
  *  keeps highlights from blowing out (the killer-demos dark-metal recipe). */
-const METAL_RIG = `<sf-light type="hemisphere" color="#2a3040" intensity="0.4"></sf-light>
+export const METAL_RIG = `<sf-light type="hemisphere" color="#2a3040" intensity="0.4"></sf-light>
       <sf-light type="directional" color="#bcd4ff" intensity="2.0" position="-5 3.5 -4"></sf-light>
       <sf-light type="directional" color="#ffd0a0" intensity="1.4" position="5 2 3"></sf-light>`;
 
 /** For a metallic model: drop exposure ~0.12 (floor 0.6) and replace the studio
  *  light preset with the metal rig. Applied to the generated HTML — markers
  *  (`exposure="…"`, `<sf-light preset="studio">`) are stable in our templates. */
-function applyMetalRig(html: string): string {
+export function applyMetalRig(html: string): string {
   return html
     .replace(/exposure="([\d.]+)"/, (_m, v) => `exposure="${Math.max(0.6, Number(v) - 0.12).toFixed(2)}"`)
     .replace(/<sf-light preset="studio"><\/sf-light>/g, METAL_RIG);
 }
 
-function head(bg: string): string {
+export function head(bg: string): string {
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -76,7 +76,7 @@ function head(bg: string): string {
   <body>`;
 }
 
-const tail = `
+export const tail = `
     <script type="module">
       import "./assets/stereoframe.js";
     </script>
@@ -84,7 +84,7 @@ const tail = `
 </html>
 `;
 
-function titleBlock(title: string | undefined, t1: number): { anim: string; dom: string } {
+export function titleBlock(title: string | undefined, t1: number): { anim: string; dom: string } {
   if (!title) return { anim: "", dom: "" };
   return {
     anim: `      <sf-animate target="#title" verb="fade-in" start="${t1}" duration="1.2" rise="34"></sf-animate>\n`,
@@ -300,7 +300,7 @@ export function buildAutoCallouts(
   });
 }
 
-function calloutMarkup(callouts: CalloutSpec[] | undefined): string {
+export function calloutMarkup(callouts: CalloutSpec[] | undefined): string {
   if (!callouts || callouts.length === 0) return "";
   return (
     callouts
@@ -371,7 +371,7 @@ const TEMPLATES: Record<Preset, (m: string, d: number, bg: string, t?: string) =
   "teardown": teardown,
 };
 
-const DEFAULT_BG: Record<Preset, string> = {
+export const DEFAULT_BG: Record<Preset, string> = {
   "reveal": "#0a0a0e",
   "hero-orbit": "#16181c",
   "turntable": "#15171b",

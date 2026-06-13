@@ -14,7 +14,8 @@ Pick the lightest path that fits the request, then refine:
 1. **Have a GLB, want a polished video fast?** → `stage <model>.glb --preset <name>` auto-frames + finishes any model (presets below). Then hand-edit the generated `index.html` to taste. **This is the default for "make a product video / Apple-ad reveal."**
 2. **Want the parts labelled (spec sheet / teardown)?** → `inspect` the GLB first to learn its parts, then `stage --preset spec` (annotated, still model) or `--preset teardown` (exploded, per-part labels). Multi-part GLBs only.
 3. **No model yet?** → `stereoframe gen "<prompt>"` writes a textured GLB into `assets/` (real prompt-driven generation when `MESHY_API_KEY` is set — otherwise a sample model). For the whole thing in one command, `gen "<prompt>" --stage <preset> --render` → prompt → model → directed film → mp4.
-4. **Custom scene / full control?** → hand-author `sf-scene` markup (canonical composition below).
+4. **Want a cinematic multi-shot film (a directed spot, not one move)?** → write a **storyboard plan** (JSON shot list) and `stereoframe storyboard plan.json [--render]`. This is the agent-native flagship: turn a brief into a beat-by-beat JSON (cold-open → reveal → macro → hero, with per-shot camera / lighting / grade / crossfades) and the compiler emits the whole multi-shot `index.html` with the timeline computed correctly. See "Storyboard compiler" below and `examples/storyboard-camera/plan.json`.
+5. **Custom scene / full control?** → hand-author `sf-scene` markup (canonical composition below).
 
 Whatever the path, **always `lint` → `validate` before `render`.**
 
@@ -202,6 +203,56 @@ Multiple sf-scenes = shots. Verbs inside a shot use SHOT-LOCAL seconds (shot sta
 ```
 
 Total video duration = max(start + duration). For crossfades, make the previous shot's window cover `next.start + transition-duration`.
+
+## Storyboard compiler (`stereoframe storyboard plan.json`)
+
+The hand-authored multi-shot recipe above is fiddly to get right (timeline math,
+crossfade coverage, camera verb pairs). For a directed *spot* — multiple beats with
+their own camera/lighting/grade — write a **storyboard plan** (JSON) and compile it:
+
+```bash
+stereoframe storyboard plan.json --dir out --render   # --draft for fast
+```
+
+This is the **agent-native flagship**: from a natural-language brief, *you* write the
+JSON shot list, and the compiler produces the multi-shot `index.html` with the
+timeline computed so crossfades never gap or off-by-one. It inspects each model once
+for `lighting:"auto"`/`callout:"auto"`, copies GLBs + runtime into `out/assets/`.
+
+```json
+{
+  "title": "stereoframe cinematic",
+  "model": "../product-teardown/assets/lamp.glb",
+  "defaults": { "environment": "room", "finish": { "samples": 2, "bloom": 0.1, "ground": "contact-shadow" } },
+  "shots": [
+    { "name": "cold open", "duration": 2.4, "bg": "#030405",
+      "camera": { "type": "push-in", "position": "3.6 0.5 3.5", "lookAt": "0 0.9 0", "toward": "0 0.9 0", "distance": 0.45 },
+      "finish": { "exposure": 0.5, "vignette": 0.62 },
+      "lighting": { "key": { "color": "#34b6ff", "intensity": 2.6, "position": "-5 2.2 -3" } } },
+    { "name": "ignition", "duration": 2.9, "transition": "crossfade",
+      "camera": { "type": "orbit", "around": "0 0.85 0", "radius": 5, "from": 50, "to": 6, "height": 0.5 },
+      "lighting": { "key": { "color": "#ffce93", "intensity": 2.6, "position": "4 3 4" }, "rim": { "color": "#56c6ff", "intensity": 2.8, "position": "-5 3 -4" } } },
+    { "name": "hero", "duration": 3, "transition": "crossfade",
+      "camera": { "type": "hero", "position": "0.5 0.25 5", "lookAt": "0 1.05 0", "radius": 5, "from": 8, "to": -12, "height": 0.35 },
+      "text": { "title": "stereoframe", "subtitle": "directed, not generated" } }
+  ]
+}
+```
+
+- **Camera types** → verbs: `static` (no move), `orbit` (`around/radius/from/to/height`),
+  `dolly`/`push-in`/`pull-back` (`toward/distance`; pull-back = negative distance),
+  `path` (`points` — emits NO `look-at`), `hero` (low-angle + slow orbit). `ease`
+  defaults to `sine.inOut`.
+- **Lighting**: `{preset}` | `"auto"` (metal → tamed rim/fill rig) | 3-point `{key,fill,rim}`.
+- **Per-shot extras**: `spin` (rpm), `isolate:{part,dim?}`, `explode:{distance?}`,
+  `callout:"auto"|"none"|[…]`, `text:{title?,subtitle?}`.
+- **Timeline** is computed: `start_i = start_{i-1} + duration_{i-1} − overlap` (overlap =
+  `transitionDuration` for crossfades). You only give each shot's `duration` +
+  `transition`. `defaults` (incl. `finish`/`lighting`) are inherited; per-shot wins.
+
+Dark cold-opens may emit `subject_bg_low_contrast` **warnings** (advisory, fine for
+moody beats). For accents the schema can't express (emissive backdrops, extra point
+lights), hand-edit the emitted HTML. Full schema in `docs/format.md`.
 
 ## Determinism = structure only (high creative freedom otherwise)
 

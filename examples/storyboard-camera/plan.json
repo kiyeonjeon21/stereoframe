@@ -1,0 +1,72 @@
+{
+  "title": "stereoframe cinematic",
+  "model": "../product-teardown/assets/lamp.glb",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "defaults": {
+    "bg": "#070a0e",
+    "environment": "room",
+    "fit": 2.4,
+    "fitGround": true,
+    "finish": {
+      "samples": 2,
+      "bloom": 0.1,
+      "bloomThreshold": 0.9,
+      "contrast": 1.1,
+      "saturation": 1.22,
+      "ground": "contact-shadow"
+    }
+  },
+  "shots": [
+    {
+      "name": "cold open",
+      "duration": 2.4,
+      "bg": "#030405",
+      "camera": { "type": "push-in", "fov": 35, "position": "3.6 0.5 3.5", "lookAt": "0 0.9 0", "toward": "0 0.9 0", "distance": 0.45, "ease": "power1.inOut" },
+      "finish": { "exposure": 0.5, "bloom": 0.04, "bloomThreshold": 0.96, "vignette": 0.62, "contrast": 1.12, "saturation": 1.12 },
+      "lighting": { "key": { "color": "#34b6ff", "intensity": 2.6, "position": "-5 2.2 -3" } }
+    },
+    {
+      "name": "ignition",
+      "duration": 2.9,
+      "transition": "crossfade",
+      "transitionDuration": 0.4,
+      "bg": "#0a0f16",
+      "camera": { "type": "orbit", "fov": 32, "around": "0 0.85 0", "radius": 5.0, "from": 50, "to": 6, "height": 0.5, "ease": "power3.out" },
+      "finish": { "exposure": 0.95, "vignette": 0.4, "contrast": 1.08, "saturation": 1.24, "lightSweep": 0.16 },
+      "lighting": {
+        "key": { "color": "#ffce93", "intensity": 2.6, "position": "4 3 4" },
+        "rim": { "color": "#56c6ff", "intensity": 2.8, "position": "-5 3 -4" },
+        "fill": { "color": "#ffffff", "intensity": 0.6, "position": "5 1.5 3" }
+      }
+    },
+    {
+      "name": "lens macro",
+      "duration": 2.4,
+      "transition": "crossfade",
+      "transitionDuration": 0.4,
+      "bg": "#070a0e",
+      "camera": { "type": "push-in", "fov": 28, "position": "1.1 0.85 4.0", "lookAt": "0 0.78 0", "toward": "0 0.78 0", "distance": 1.05, "ease": "power2.inOut" },
+      "finish": { "exposure": 0.86, "bloom": 0.11, "bloomThreshold": 0.88, "vignette": 0.54, "contrast": 1.12, "saturation": 1.22, "lightSweep": 0.08 },
+      "lighting": {
+        "key": { "color": "#ffc890", "intensity": 3.2, "position": "3 2 4" },
+        "rim": { "color": "#56c6ff", "intensity": 1.8, "position": "-4 2.5 -3" }
+      }
+    },
+    {
+      "name": "hero (low angle)",
+      "duration": 3.0,
+      "transition": "crossfade",
+      "transitionDuration": 0.4,
+      "bg": "#05121b",
+      "camera": { "type": "hero", "fov": 34, "position": "0.5 0.25 5.0", "lookAt": "0 1.05 0", "around": "0 0.9 0", "radius": 5.0, "from": 8, "to": -12, "height": 0.35, "ease": "sine.inOut" },
+      "finish": { "exposure": 0.94, "vignette": 0.4, "contrast": 1.09, "saturation": 1.28, "lightSweep": 0.05 },
+      "lighting": {
+        "key": { "color": "#ffb066", "intensity": 1.9, "position": "5 2 3" },
+        "rim": { "color": "#48b6ff", "intensity": 2.4, "position": "-5 3 -3" }
+      },
+      "text": { "title": "stereoframe", "subtitle": "directed, not generated" }
+    }
+  ]
+}
