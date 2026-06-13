@@ -128,6 +128,7 @@ export function compileAnimations(compiled: CompiledScene): void {
     const DEFAULT_DURATIONS: Record<string, number> = {
       "orbit": 4,
       "dolly": 1.5,
+      "zoom": 2,
       "bounce-in": 0.6,
       "fade-in": 0.6,
       "move": 2,
@@ -240,6 +241,22 @@ export function compileAnimations(compiled: CompiledScene): void {
           toward: resolvePoint(compiled, el.getAttribute("toward")),
           distance: parseNumber(el.getAttribute("distance"), 1),
         }),
+      );
+    } else if (verb === "zoom") {
+      // Lens FOV ramp (degrees). Camera-only; pair with `dolly` for a dolly-zoom.
+      if (target !== compiled.camera) continue;
+      const cam = compiled.camera;
+      const from = parseAngleDeg(el.getAttribute("from"), cam.fov);
+      const to = parseAngleDeg(el.getAttribute("to"), cam.fov);
+      compiled.seekFns.push(
+        verbs.zoom(
+          (deg) => {
+            cam.fov = deg;
+            cam.updateProjectionMatrix();
+          },
+          timing,
+          { from, to },
+        ),
       );
     } else if (verb === "move") {
       const toAttr = el.getAttribute("to");

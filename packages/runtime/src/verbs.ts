@@ -186,6 +186,21 @@ export function fadeIn(
   };
 }
 
+/**
+ * Camera FOV ramp (degrees) over the window — a lens zoom. The caller supplies the
+ * setter (FOV + updateProjectionMatrix is renderer-side). Pair with `dolly` in the
+ * opposite direction for a dolly-zoom ("vertigo"). Eased + clamped like `move`.
+ */
+export function zoom(
+  setFov: (deg: number) => void,
+  timing: VerbTiming,
+  opts: { from: number; to: number },
+): Writer {
+  return (t) => {
+    setFov(opts.from + (opts.to - opts.from) * progress(t, timing));
+  };
+}
+
 /** Linear-in-space translation from→to over the window (eased in time). */
 export function move(
   target: TransformLike,

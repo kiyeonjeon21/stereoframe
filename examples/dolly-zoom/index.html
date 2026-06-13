@@ -1,0 +1,55 @@
+<!doctype html>
+<!--
+  dolly-zoom — the "vertigo" move, now expressible in markup. The camera dollies
+  IN toward the hero while the `zoom` verb WIDENS the lens by the same amount, so
+  the hero holds its screen size while the background depth stretches. Both verbs
+  are pure functions of seek t → deterministic. Shows the new `zoom` (FOV) verb.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #07090f; }
+      sf-scene { position: absolute; inset: 0; }
+    </style>
+  </head>
+  <body>
+    <sf-scene duration="6" width="1920" height="1080"
+              background="#07090f" environment="studio" exposure="1.0" samples="2"
+              vignette="0.5" contrast="1.08" saturation="1.16" bloom="0.08" bloom-threshold="0.9"
+              ground="contact-shadow" ground-y="-0.9" ground-size="40">
+      <sf-camera fov="28" position="0 0.6 6.2" look-at="0 0.4 0"></sf-camera>
+      <sf-light preset="studio"></sf-light>
+
+      <!-- hero, dead center -->
+      <sf-mesh id="hero" geometry="icosahedron" args="0.9 2" material="standard"
+               color="#ff6a3d" metalness="0.1" roughness="0.35" position="0 0.4 0"></sf-mesh>
+      <sf-animate target="#hero" verb="turntable" axis="y" rpm="8"></sf-animate>
+
+      <!-- depth cues: columns receding into the distance so the vertigo warp reads -->
+      <sf-mesh geometry="cylinder" args="0.22 0.22 3" material="standard"
+               color="#3a4a66" roughness="0.6" position="-2.4 0 -1"></sf-mesh>
+      <sf-mesh geometry="cylinder" args="0.22 0.22 3" material="standard"
+               color="#3a4a66" roughness="0.6" position="2.4 0 -1"></sf-mesh>
+      <sf-mesh geometry="cylinder" args="0.2 0.2 3" material="standard"
+               color="#33425c" roughness="0.6" position="-3.6 0 -5"></sf-mesh>
+      <sf-mesh geometry="cylinder" args="0.2 0.2 3" material="standard"
+               color="#33425c" roughness="0.6" position="3.6 0 -5"></sf-mesh>
+      <sf-mesh geometry="cylinder" args="0.18 0.18 3" material="standard"
+               color="#2c3950" roughness="0.6" position="-5.0 0 -10"></sf-mesh>
+      <sf-mesh geometry="cylinder" args="0.18 0.18 3" material="standard"
+               color="#2c3950" roughness="0.6" position="5.0 0 -10"></sf-mesh>
+
+      <!-- the dolly-zoom: push in WHILE widening the lens (opposite directions) -->
+      <sf-animate target="camera" verb="dolly" toward="0 0.4 0" distance="3.4"
+                  start="0.4" duration="4.2" ease="sine.inOut"></sf-animate>
+      <sf-animate target="camera" verb="zoom" from="28" to="64"
+                  start="0.4" duration="4.2" ease="sine.inOut"></sf-animate>
+    </sf-scene>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

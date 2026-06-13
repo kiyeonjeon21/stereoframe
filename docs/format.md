@@ -240,6 +240,7 @@ Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, defau
 | `turntable` | `rpm` (6), `axis` (y) | continuous spin; no duration needed |
 | `orbit` | `around` (`#id`\|`x y z`, default origin), `radius` (initial distance), `from`/`to` (deg, default initial→+360°), `height` (initial relative height), duration default 4 | arc around a center; on a camera, combine with look-at |
 | `dolly` | `toward` (`#id`\|`x y z`), `distance` (1), duration default 1.5 | move toward the target (negative = pull back) |
+| `zoom` | `from`/`to` (FOV in degrees, default = camera's current fov), duration default 2 | animate the camera lens FOV (camera-only). Narrowing = zoom in, widening = zoom out. Pair with `dolly` in the *opposite* direction for a **dolly-zoom** ("vertigo"): `dolly toward distance="3"` + `zoom from="28" to="64"` over the same window keeps the subject's screen size while the background depth stretches. See `examples/dolly-zoom` |
 | `move` | `to` (`x y z`, required), `from` (default initial position), duration default 2 | straight-line travel |
 | `follow` | `subject` (`#id`), `offset` (`x y z`, default initial relative offset) | rigidly track a moving subject; continuous; runs in the late pass so it always applies after the subject's own movement verbs |
 | `crossfade-clip` | `from`/`to` (clip names, required), duration default 0.5 | GLB clip weight crossfade (e.g. Survey→Run) |

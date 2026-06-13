@@ -11,6 +11,7 @@ import {
   orbit,
   staggeredProgress,
   turntable,
+  zoom,
 } from "../src/verbs";
 import type { TransformLike } from "../src/verbs";
 
@@ -194,6 +195,31 @@ describe("fade-in", () => {
     expect(values[0]).toBeCloseTo(0);
     expect(values[1]).toBeCloseTo(0.5);
     expect(values[2]).toBeCloseTo(1);
+  });
+});
+
+describe("zoom (camera fov)", () => {
+  test("lerps fov from→to across the window, eased + clamped past the end", () => {
+    let fov = 0;
+    const writer = zoom((d) => { fov = d; }, makeTiming({ duration: 2, ease: "linear" }), { from: 50, to: 20 });
+    writer(0);
+    expect(fov).toBeCloseTo(50);
+    writer(1);
+    expect(fov).toBeCloseTo(35); // halfway
+    writer(2);
+    expect(fov).toBeCloseTo(20);
+    writer(5); // past the window — clamped, not extrapolated
+    expect(fov).toBeCloseTo(20);
+  });
+
+  test("idempotent: seeking the same t twice gives the same fov", () => {
+    let fov = 0;
+    const writer = zoom((d) => { fov = d; }, makeTiming({ start: 1, duration: 3, ease: "power2.inOut" }), { from: 34, to: 52 });
+    writer(2.4);
+    const first = fov;
+    writer(0.2);
+    writer(2.4);
+    expect(fov).toBe(first);
   });
 });
 

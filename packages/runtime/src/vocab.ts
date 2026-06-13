@@ -31,6 +31,7 @@ export const VERB_NAMES = [
   "turntable",
   "orbit",
   "dolly",
+  "zoom",
   "move",
   "follow",
   "crossfade-clip",

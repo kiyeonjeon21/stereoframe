@@ -111,6 +111,7 @@ Verbs (`start`/`duration` in seconds, `ease` = GSAP-compatible names like `power
 | `turntable` | rpm, axis | product spins (continuous) |
 | `orbit` | around, radius, from/to (deg), height | camera arcs around a subject |
 | `dolly` | toward, distance | push-in / pull-back |
+| `zoom` | from/to (FOV deg) | lens zoom (camera-only); `dolly` + `zoom` opposite directions = dolly-zoom / vertigo |
 | `move` | to (required), from | straight-line travel |
 | `follow` | subject, offset | camera tracking a moving subject (continuous) |
 | `crossfade-clip` | from/to (clip names) | character clip transitions (idle → run) |
@@ -284,7 +285,9 @@ thing to avoid. Default to the flagship arc:
 - **Arc:** cold-open (dark, low exposure, deep vignette, one rim light) → **hard CUT**
   to a lit reveal → 1–2 detail/macro beats → a **flythrough** → **hero** (full light)
   with a staggered `text:{title,subtitle,spec}` title card. **Vary the camera type**
-  across shots — don't orbit every beat.
+  across shots — don't orbit every beat. Reach for `zoom` (lens FOV) for punch: a quick
+  `zoom` narrow on a macro/detail beat, or `dolly` + `zoom` opposite-direction together
+  for a **dolly-zoom** on a reveal/hero. Hand-author these as `<sf-animate target="camera">`.
 - **Set `backdrop` + `floor` + `secondaryMotion` on (almost) every shot** — these are what
   make it not look auto-generated. A `backdrop` without a `floor` makes the subject *float*
   on the gradient — always pair them (`floor:"road"` for vehicles, `"studio"` otherwise).
