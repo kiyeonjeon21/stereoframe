@@ -1,6 +1,6 @@
 {
   "name": "stereoframe",
-  "version": "0.1.3",
+  "version": "0.2.2",
   "description": "Declarative, deterministic 3D video on three.js — scaffold, lint, validate, and render compositions built for AI agents.",
   "license": "MIT",
   "repository": {
@@ -12,7 +12,10 @@
   "bin": {
     "stereoframe": "./dist/cli.js"
   },
-  "files": ["dist", "assets"],
+  "files": [
+    "dist",
+    "assets"
+  ],
   "engines": {
     "node": ">=20"
   },

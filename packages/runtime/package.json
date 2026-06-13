@@ -1,6 +1,6 @@
 {
   "name": "stereoframe-runtime",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Declarative, deterministic 3D scene runtime for stereoframe — three.js driven by seek time.",
   "license": "MIT",
   "repository": {
@@ -10,7 +10,9 @@
   },
   "type": "module",
   "main": "dist/stereoframe.js",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": "./dist/stereoframe.js",
     "./vocab": "./dist/vocab.js"
