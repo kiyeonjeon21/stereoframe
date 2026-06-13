@@ -172,8 +172,48 @@ function buildMeshMaterial(el: Element): THREE.Material {
   });
 }
 
-function buildMesh(el: Element): THREE.Mesh {
+/**
+ * Geometric specular anti-aliasing (filament/Toksvig). On a moving glossy/metal
+ * surface, sharp specular highlights flicker as they cross pixels (sub-pixel
+ * aliasing supersampling can't fully fix). This widens the specular lobe per
+ * pixel by the amount the shading normal varies on screen (`dFdx`/`dFdy`), so
+ * high-curvature/high-frequency areas read smoother instead of sparkling. It is
+ * a pure function of geometry + camera at time `t` → stays seek-idempotent.
+ * Also applies a small roughness floor (mirror-sharp metal is the worst sparkler).
+ */
+const SPEC_AA_INJECT = `#include <normal_fragment_maps>
+  {
+    vec3 sfNx = dFdx( normal );
+    vec3 sfNy = dFdy( normal );
+    float sfVar = 0.5 * ( dot( sfNx, sfNx ) + dot( sfNy, sfNy ) );
+    roughnessFactor = min( 1.0, sqrt( roughnessFactor * roughnessFactor + min( sfVar, 0.25 ) ) );
+  }`;
+
+function tuneMaterial(mat: THREE.Material, specularAA: boolean): void {
+  if (!(mat instanceof THREE.MeshStandardMaterial)) return; // Standard + Physical
+  const transmission = (mat as THREE.MeshPhysicalMaterial).transmission ?? 0;
+  if (transmission > 0) return; // don't frost glass / transmissive materials
+  mat.roughness = Math.max(mat.roughness, 0.06);
+  if (!specularAA) return;
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = function (shader, renderer) {
+    if (prev) prev.call(this, shader, renderer);
+    if (
+      shader.fragmentShader.includes("#include <normal_fragment_maps>") &&
+      !shader.fragmentShader.includes("sfVar")
+    ) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <normal_fragment_maps>",
+        SPEC_AA_INJECT,
+      );
+    }
+  };
+  mat.needsUpdate = true;
+}
+
+function buildMesh(el: Element, specularAA: boolean): THREE.Mesh {
   const mesh = new THREE.Mesh(buildGeometry(el), buildMeshMaterial(el));
+  tuneMaterial(mesh.material as THREE.Material, specularAA);
   applyTransform(mesh, el);
   return mesh;
 }
@@ -250,6 +290,8 @@ export function compileScene(host: HTMLElement): CompiledScene {
   const samples = Math.max(1, Math.min(4, Math.round(parseNumber(host.getAttribute("samples"), 2))));
   const bufW = width * samples;
   const bufH = height * samples;
+  // Geometric specular AA on lit materials (on by default; `specular-aa="none"` opts out).
+  const specularAA = (host.getAttribute("specular-aa") ?? "") !== "none";
 
   const canvas = document.createElement("canvas");
   canvas.width = bufW;
@@ -316,9 +358,14 @@ export function compileScene(host: HTMLElement): CompiledScene {
   // between "plastic" and "chrome"). `room`/`studio` build a procedural
   // studio environment with NO asset; anything else is treated as an HDR path.
   const envSrc = host.getAttribute("environment");
+  // Pre-blur the procedural environment. The synthetic RoomEnvironment is a box of
+  // hard-edged emissive panels; at near-zero sigma those edges reflect as sharp bands
+  // that *sparkle* on metal as the surface/light-sweep rotates. A moderate blur softens
+  // the reflection (less banding/flicker) while keeping a sense of environment.
+  const envBlur = parseNumber(host.getAttribute("env-blur"), 0.2);
   if (envSrc === "room" || envSrc === "studio") {
     const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), envBlur).texture;
     pmrem.dispose();
   } else if (envSrc) {
     const pmrem = new THREE.PMREMGenerator(renderer);
@@ -345,7 +392,7 @@ export function compileScene(host: HTMLElement): CompiledScene {
       if (la && la.startsWith("#")) lookAtSelector = la.slice(1);
       else if (la) lookAt = { point: parseVec3(la, [0, 0, 0]) };
     } else if (tag === "sf-mesh") {
-      const mesh = buildMesh(el);
+      const mesh = buildMesh(el, specularAA);
       scene.add(mesh);
       if (el.id) objectsById.set(el.id, mesh);
     } else if (tag === "sf-model") {
@@ -366,6 +413,14 @@ export function compileScene(host: HTMLElement): CompiledScene {
         pending.push(
           gltfLoader.loadAsync(src).then((gltf) => {
             group.add(gltf.scene);
+            // Calm imported materials: roughness floor + geometric specular AA, so
+            // glossy/metal GLBs stop sparkling as they move (see tuneMaterial).
+            gltf.scene.traverse((node) => {
+              const mesh = node as THREE.Mesh;
+              if (!mesh.isMesh || !mesh.material) return;
+              const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+              for (const mat of mats) tuneMaterial(mat, specularAA);
+            });
             // Base pose on the model itself, applied BEFORE `fit` so the box is
             // measured on the posed geometry and recenters in the group's
             // (rotation-free) frame — keeps fit/fit-ground correct under any pose.

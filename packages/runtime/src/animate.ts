@@ -462,7 +462,10 @@ export function compileAnimations(compiled: CompiledScene): void {
         for (const mat of mats) {
           if (!(mat instanceof MeshStandardMaterial) || seenMats.has(mat)) continue;
           seenMats.add(mat);
-          mat.onBeforeCompile = (shader) => {
+          // Chain (don't overwrite) any existing hook — e.g. tuneMaterial's specular AA.
+          const prev = mat.onBeforeCompile;
+          mat.onBeforeCompile = function (shader, renderer) {
+            if (prev) prev.call(this, shader, renderer);
             shader.uniforms.uDeformTime = uTime;
             shader.uniforms.uDeformAmt = { value: amount };
             shader.uniforms.uDeformFreq = { value: frequency };
