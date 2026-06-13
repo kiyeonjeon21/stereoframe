@@ -259,3 +259,23 @@ describe("rich schema (backdrop / atmosphere / secondaryMotion / flythrough / te
     expect(lintHtml(out, { fileExists: () => true }).filter((f) => f.severity === "error")).toEqual([]);
   });
 });
+
+describe("floor", () => {
+  test('floor "road" emits a flat dark ground plane; "none"/absent emit none', () => {
+    const road: Storyboard = { model: "m.glb", shots: [shot({ floor: "road" })] };
+    const out = compileStoryboard(road, resolvedFor(road));
+    expect(out).toContain('<sf-mesh geometry="plane"');
+    expect(out).toContain('rotation="-90 0 0"');
+    expect(lintHtml(out, { fileExists: () => true }).filter((f) => f.severity === "error")).toEqual([]);
+
+    const none: Storyboard = { model: "m.glb", shots: [shot({ floor: "none" })] };
+    expect(compileStoryboard(none, resolvedFor(none))).not.toContain('geometry="plane"');
+    const absent: Storyboard = { model: "m.glb", shots: [shot({})] };
+    expect(compileStoryboard(absent, resolvedFor(absent))).not.toContain('geometry="plane"');
+  });
+
+  test("bad floor string is a validation error", () => {
+    // @ts-expect-error intentionally invalid
+    expect(validateStoryboard({ model: "m.glb", shots: [shot({ floor: "grass" })] }).some((e) => /floor/.test(e))).toBe(true);
+  });
+});

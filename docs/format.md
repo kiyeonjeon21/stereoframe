@@ -347,6 +347,10 @@ from one GLB).
   cut-followed or final shot.
 - `secondaryMotion` — `{spin?(rpm),sway?(deg),float?(amplitude)}` layered on the model
   *while the camera moves* (composes). The biggest "alive vs dead" lever.
+- `floor` — `"road"` (dark damp asphalt) | `"studio"` (glossy infinity-cove) | `"none"` |
+  `{color,metalness,roughness,size}`. A real ground plane so the subject doesn't float on
+  the backdrop (the plane also occludes the backdrop below the subject). Set it whenever you
+  set a `backdrop`; pair with `finish.ground:"contact-shadow"`.
 
 **`Shot`** adds: `name?` (comment label), `duration` (required, >0),
 `transition?` (`cut` | `crossfade`, default crossfade after shot 1),

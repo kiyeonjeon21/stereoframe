@@ -90,6 +90,11 @@ export interface ShotDefaults {
   /** Secondary motion layered on the model *while* the camera moves (the biggest
    *  "alive vs dead" lever): turntable rpm + sway degrees + float amplitude. */
   secondaryMotion?: { spin?: number; sway?: number; float?: number };
+  /** A real ground plane under the subject (so it doesn't float on the backdrop).
+   *  `"road"` = dark semi-reflective asphalt, `"studio"` = glossy infinity-cove,
+   *  `"none"` = no plane, or a custom `{color,metalness,roughness,size}`. Pairs
+   *  with `finish.ground:"contact-shadow"`. */
+  floor?: "road" | "studio" | "none" | { color?: string; metalness?: number; roughness?: number; size?: number };
   finish?: Finish;
   lighting?: Lighting;
 }
@@ -198,6 +203,9 @@ export function validateStoryboard(plan: Storyboard): string[] {
     if (s.atmosphere && !["dust", "snow", "none"].includes(s.atmosphere)) {
       errs.push(`${tag}: atmosphere must be "dust", "snow", or "none"`);
     }
+    if (typeof s.floor === "string" && !["road", "studio", "none"].includes(s.floor)) {
+      errs.push(`${tag}: floor must be "road", "studio", "none", or an object`);
+    }
   });
   if (plan.defaults?.atmosphere && !["dust", "snow", "none"].includes(plan.defaults.atmosphere)) {
     errs.push(`storyboard.defaults.atmosphere must be "dust", "snow", or "none"`);
@@ -268,6 +276,20 @@ function backdropMarkup(backdrop: ShotDefaults["backdrop"]): string {
           gl_FragColor = vec4(vec3(0.006,0.009,0.015) + glow * (0.11 + 0.17 * n2) * vig, 1.0);
         }
       </sf-shader>`;
+}
+
+/** A real ground plane so the subject sits on a surface (and the floor occludes the
+ *  fullscreen backdrop below the subject). `road` = damp dark asphalt under neon;
+ *  `studio` = glossy infinity-cove. Slightly below y=0 to avoid z-fighting the
+ *  contact-shadow plane. */
+function floorMarkup(floor: ShotDefaults["floor"]): string {
+  if (floor === undefined || floor === "none") return "";
+  const presets = {
+    road: { color: "#0a0a0d", metalness: 0.25, roughness: 0.6, size: 60 },
+    studio: { color: "#0a0a0c", metalness: 0.8, roughness: 0.16, size: 60 },
+  };
+  const f = typeof floor === "string" ? presets[floor] : { color: "#0a0a0d", metalness: 0.25, roughness: 0.6, size: 60, ...floor };
+  return `<sf-mesh geometry="plane" args="${num(f.size)} ${num(f.size)}" rotation="-90 0 0" position="0 -0.01 0" color="${f.color}" metalness="${num(f.metalness)}" roughness="${num(f.roughness)}"></sf-mesh>`;
 }
 
 /** Drifting atmosphere particles. Caller enforces the crossfade-outgoing guard. */
@@ -353,6 +375,7 @@ export function compileStoryboard(
     const pose = shot.pose ?? plan.defaults?.pose;
     const backdrop = shot.backdrop ?? plan.defaults?.backdrop;
     const atmosphere = shot.atmosphere ?? plan.defaults?.atmosphere;
+    const floor = shot.floor ?? plan.defaults?.floor;
     const secondaryMotion = shot.secondaryMotion ?? plan.defaults?.secondaryMotion;
     const finish = mergeFinish(plan.defaults?.finish, shot.finish);
     const lighting = mergeLighting(plan.defaults?.lighting, shot.lighting);
@@ -429,7 +452,8 @@ export function compileStoryboard(
     // cinematic "always-on backdrop" is a director-layer default, not the compiler's).
     const backdropStr = backdrop === undefined ? "" : backdropMarkup(backdrop);
     const atmosphereStr = emitAtmosphere ? atmosphereMarkup(atmosphere!, i + 1) : "";
-    const head2 = [backdropStr, cam.camera, lightMarkup(lighting, r.metalRig), atmosphereStr]
+    const floorStr = floorMarkup(floor);
+    const head2 = [backdropStr, cam.camera, lightMarkup(lighting, r.metalRig), floorStr, atmosphereStr]
       .filter(Boolean)
       .map((s) => `      ${s}`)
       .join("\n");
@@ -567,6 +591,10 @@ ShotDefaults (inherited by every shot; any shot may override):
                    shot that crossfades out). Good on the cold-open and the hero.
   secondaryMotion: { spin?(rpm), sway?(deg), float?(amplitude) } -> keeps the subject
                    ALIVE while the camera moves. SET THIS (e.g. spin 1-2, sway 1) on most shots.
+  floor?         : "road" (dark damp asphalt under neon) | "studio" (glossy infinity-cove) |
+                   "none" | {color,metalness,roughness,size}. A real ground plane so the
+                   subject doesn't float on the backdrop. SET THIS (with finish.ground:
+                   "contact-shadow") whenever you set a backdrop. "road" suits vehicles.
   finish?        : { exposure?, samples?=2, bloom?, bloomThreshold?, vignette?, contrast?,
                      saturation?, grain?, chromaticAberration?, lightSweep?, ground?:"contact-shadow" }
   lighting?      : { preset:"studio"|"soft"|"sunset" } | "auto" (metal-aware rig) |

@@ -248,6 +248,8 @@ for `lighting:"auto"`/`callout:"auto"`, copies GLBs + runtime into `out/assets/`
 - **Lighting**: `{preset}` | `"auto"` (metal → tamed rim/fill rig) | 3-point `{key,fill,rim}`.
 - **Cinematic richness (use these — a bare camera move per shot is flat):**
   - `backdrop:{coldGlow,warmGlow}` → a moody nebula shader behind the subject (vs flat black).
+  - `floor:"road"|"studio"` → a real ground plane so the subject doesn't float on the
+    backdrop. **Always set this when you set a backdrop** (`"road"` for vehicles).
   - `atmosphere:"dust"|"snow"` → drifting particles. **Not on a shot that crossfades out**
     (dropped+warned) — put it on cut-followed or final shots.
   - `secondaryMotion:{spin,sway,float}` → the subject stays *alive* while the camera moves.
@@ -278,9 +280,11 @@ thing to avoid. Default to the flagship arc:
   to a lit reveal → 1–2 detail/macro beats → a **flythrough** → **hero** (full light)
   with a staggered `text:{title,subtitle,spec}` title card. **Vary the camera type**
   across shots — don't orbit every beat.
-- **Set `backdrop` + `secondaryMotion` on (almost) every shot** — these are what make
-  it not look auto-generated. `atmosphere:"dust"` on the cold-open (cut-followed) and
-  the hero only (never on a crossfade-out shot — it's dropped).
+- **Set `backdrop` + `floor` + `secondaryMotion` on (almost) every shot** — these are what
+  make it not look auto-generated. A `backdrop` without a `floor` makes the subject *float*
+  on the gradient — always pair them (`floor:"road"` for vehicles, `"studio"` otherwise).
+  `atmosphere:"dust"` on the cold-open (cut-followed) and the hero only (never on a
+  crossfade-out shot — it's dropped).
 - **Colour = lighting + grade:** complementary split (cyan key / magenta rim, or
   teal/amber), per-beat `exposure`/`vignette`/`saturation`, `lightSweep` 0.1–0.24.
 - Use the model facts: stand up a genuinely-flat device with `pose`; metal → `lighting:"auto"`.
