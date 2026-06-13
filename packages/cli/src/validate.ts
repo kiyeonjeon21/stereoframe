@@ -110,7 +110,12 @@ export async function validateProject(projectDir: string): Promise<Finding[]> {
       }
     }
 
-    // Idempotency probe: seek mid → elsewhere → mid must be pixel-identical.
+    // Seek-idempotency probe: seek mid → elsewhere → mid. The frame must be a
+    // pure function of t WITHIN a render — that's the seekability contract,
+    // and what makes frame-by-frame capture coherent. Same t = same draw
+    // calls = same pixels, so rich shaders / high poly / sin-noise all pass;
+    // only genuine history-dependence (accumulated state, trails, unseeded
+    // randomness) breaks it. Cross-RUN bit-identity is NOT required.
     const mid = info.duration / 2;
     const first = await page.evaluate(`window.__stereoframe.fingerprint(${mid})`);
     await page.evaluate(`window.__stereoframe.seek(0)`);
@@ -119,9 +124,9 @@ export async function validateProject(projectDir: string): Promise<Finding[]> {
       findings.push({
         rule: "non_idempotent_seek",
         severity: "error",
-        message: `seeking t=${mid.toFixed(2)} twice produced different pixels — some state is not a pure function of seek time.`,
+        message: `seeking t=${mid.toFixed(2)} twice produced a different frame — some state is not a pure function of seek time, so capture would glitch.`,
         fixHint:
-          "Look for accumulated state, wall-clock reads, or unseeded randomness in escape-hatch code.",
+          "Look for accumulated state, trails, wall-clock reads, or unseeded randomness in escape-hatch code.",
       });
     }
 

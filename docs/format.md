@@ -44,9 +44,12 @@ In both modes, load the runtime with an **inline module script**:
 | `width`/`height` | 1920/1080 | canvas size (embed mode: inherits the composition root's `data-width/height`) |
 | `samples` | 2 | supersampling antialiasing factor (1–4). 2 = render at 4× pixels then downsample — deterministic, crisp edges. Use 1 for speed |
 | `environment` | — | HDRI path (.hdr) **or** `room`/`studio` (a procedural studio environment, no asset — gives metal/glass real reflections) |
-| `bloom` | 0 | highlight glow strength (e.g. 0.3–0.5); 0 disables |
+| `bloom` | 0 | highlight glow strength (e.g. 0.3–0.5); 0 disables. Don't bloom bright/light backgrounds |
 | `bloom-threshold`/`bloom-radius` | 0.85 / 0.6 | bloom threshold (higher = only the brightest pixels) / spread |
 | `vignette` | 0 | darken the edges (0–1, e.g. 0.4) — cinematic framing |
+| `chromatic-aberration` | 0 | radial RGB split at the edges (e.g. 0.3–0.5) — lens/film feel |
+| `grain` | 0 | film grain amount (e.g. 0.03–0.06); seeded by `t`, so seekable |
+| `contrast`/`saturation` | 1 / 1 | light color grade (e.g. 1.05 / 1.1) |
 
 **The "finish" attributes** (`samples`, `environment="room"`, `bloom`, `vignette`) are what separate a tech-demo look from a polished one: supersampling removes jaggies, a procedural environment gives metal/glass something to reflect, bloom makes highlights glow, and a vignette frames the shot. All are deterministic. Note the earlier `environment` row (HDRI) — the same attribute now also accepts `room`/`studio`.
 
@@ -96,7 +99,7 @@ Blending: fountain/dust are additive, snow is normal.
 |---|---|---|
 | `geometry` | box | `box` `sphere` `plane` `cylinder` `torus` `icosahedron` `rounded-box` (args: `w h d cornerRadius`) |
 | `args` | per geometry | space-separated numbers (box: `w h d`, cylinder: `rTop rBottom h`, …) |
-| `material` | standard | `standard` \| `physical` \| `glass` (transmission preset: transmission 1, thickness 0.4, clearcoat 1, roughness 0.08) |
+| `material` | standard | `standard` \| `physical` \| `glass` (transmission preset) \| `matcap` (a baked material look needing no lights — set `matcap="pearl\|chrome\|iridescent\|clay\|holo"`; distinctive designer-grade surfaces) |
 | `color` | #ffffff | base color (a tint for glass) |
 | `metalness`/`roughness` | 0 / 0.5 | |
 | `transmission`/`thickness`/`ior`/`clearcoat`/`clearcoat-roughness`/`dispersion` | per preset | physical/glass knobs — explicit attributes override the preset |
@@ -188,6 +191,7 @@ Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, defau
 | `bounce-in` | duration default 0.6, ease default `back.out` | scale 0→original entrance |
 | `fade-in` | duration default 0.6 | material opacity 0→original |
 | `float` | `amplitude` (0.1), `period` (4) | sinusoidal bob on Y; continuous |
+| `sway` | `amount` (6, degrees), `period` (5) | continuous multi-axis secondary motion (gentle wobble) — makes a form feel alive; analytic, seekable |
 | `variant` | `color`/`roughness`/`metalness` (target values), `material` (GLB material name filter), duration default 0.8 | material colorway transitions (configurators). Multiple variants on one target chain in start order — each one's from-state is the previous one's result (resolved at compile time, backward-seek safe) |
 
 ### Easing vocabulary (GSAP-compatible names)
@@ -224,13 +228,21 @@ Determinism rules for custom GLSL (do not skip — broken determinism shows up a
 - Use a **sin-free hash** for noise (e.g. Dave Hoskins' `fract(p*…)` hash). `sin(dot(p, large))*43758` loses GPU precision for large arguments and drifts run-to-run.
 - Keep poly counts sane (`IcosahedronGeometry(r, 8)`, not `24`) — extreme geometry load can make the GPU vary between runs.
 
-## Determinism rules
+## Determinism: two tiers
 
-1. All state is a pure function of `t = frame / fps`. No `Date.now()`, `performance.now()`, or `requestAnimationFrame`-based accumulation.
-2. No `Math.random()` (unseeded randomness differs every frame/run).
-3. Local asset files only. No network fetches during rendering/seeking.
-4. No effects that depend on previous-frame state (trails, feedback, stepped physics) — frames must be seekable in any order.
-5. The renderer pins `antialias: false` and `pixelRatio 1` (cross-machine determinism).
+Determinism governs **structure** — what's where, when, and how it moves — so compositions are seekable, editable, and reproducible. It does **not** straitjacket the visuals.
+
+**Seekability (required).** Each frame must be a pure function of `t` *within a render*, so frame-by-frame capture produces a coherent video and any frame can be re-derived:
+1. Drive everything from `t = frame/fps`. No `Date.now()` / `performance.now()` / wall clock.
+2. Randomness must be **seeded** so it's identical for a given `t` (e.g. `<sf-particles seed>`, a `uTime`/uv-seeded GLSL hash). No unseeded `Math.random()` per frame.
+3. No dependence on previous frames (trails, feedback, accumulators, stepped physics) — frames are seeked in any order.
+4. Local assets only; no network fetch during render.
+
+`stereoframe validate` enforces exactly this (a seek-idempotency probe).
+
+**Bit-exactness across runs (NOT required).** You do *not* need two separate renders to be byte-identical. Inside the seekability envelope, go wild: sin-based GLSL noise, very high poly, heavy custom shaders, rich materials — all fine. (Cross-run identical files are only relevant for byte-level caching/CI, which is not a goal here; if you want them, prefer sin-free hashes and modest poly counts, but it's optional.)
+
+The renderer keeps `antialias: false` (driver MSAA is non-deterministic) and supersamples instead (`samples`), and pins `pixelRatio 1`.
 
 ## Architecture notes
 

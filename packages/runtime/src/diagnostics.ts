@@ -111,7 +111,16 @@ export function collectDiagnostics(scenes: CompiledScene[], t: number): SceneDia
   });
 }
 
-/** djb2 over the canvas dataURL — cheap in-page fingerprint for idempotency probes. */
+/**
+ * djb2 over the canvas dataURL — an exact fingerprint of the current frame.
+ *
+ * Used only for the WITHIN-render seek-idempotency probe (seek t → seek
+ * elsewhere → seek t must match). Same t in one render = same draw calls =
+ * same pixels, so rich shaders/high-poly/sin-noise all pass; only genuine
+ * history-dependence (accumulated state, trails, unseeded randomness) breaks
+ * it. This is the seekability contract — cross-RUN bit-identity is NOT
+ * required and is deliberately not checked.
+ */
 export function canvasFingerprint(scenes: CompiledScene[]): string {
   let hash = 5381;
   for (const s of scenes) {

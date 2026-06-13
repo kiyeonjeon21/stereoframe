@@ -250,6 +250,13 @@ export function compileAnimations(compiled: CompiledScene): void {
           period: parseNumber(el.getAttribute("period"), 4),
         }),
       );
+    } else if (verb === "sway") {
+      compiled.seekFns.push(
+        verbs.sway(target, timing, {
+          amount: (parseNumber(el.getAttribute("amount"), 6) * Math.PI) / 180,
+          period: parseNumber(el.getAttribute("period"), 5),
+        }),
+      );
     }
   }
 

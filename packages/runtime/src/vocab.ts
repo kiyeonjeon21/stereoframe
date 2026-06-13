@@ -32,6 +32,7 @@ export const VERB_NAMES = [
   "bounce-in",
   "fade-in",
   "float",
+  "sway",
   "variant",
 ] as const;
 

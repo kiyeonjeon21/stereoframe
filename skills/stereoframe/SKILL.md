@@ -165,7 +165,11 @@ Multiple sf-scenes = shots. Verbs inside a shot use SHOT-LOCAL seconds (shot sta
 
 Total video duration = max(start + duration). For crossfades, make the previous shot's window cover `next.start + transition-duration`.
 
-## Rules (breaking these breaks the render)
+## Determinism = structure only (high creative freedom otherwise)
+
+The contract is **seekability**: each frame a pure function of `t` within a render (so capture is coherent and frames are reproducible). That's all that's required. You do NOT need two renders to be byte-identical — use rich custom shaders (sin noise is fine), high poly, heavy materials freely. Only avoid things that break seekability: wall-clock reads, unseeded per-frame `Math.random()`, and previous-frame accumulation (trails/feedback). `validate` checks exactly this.
+
+## Rules (these break the render — they break seekability)
 
 1. **Assets must be local** (`assets/...`) — never CDN models/HDRIs. If the user wants a model they don't have, generate one with `stereoframe gen "<prompt>"` (writes a GLB into assets/), then reference it with `<sf-model>`.
 2. **Everything derives from seek time.** In `<script type="stereoframe">` escape-hatch code (`sf.onSeek((t) => ...)`, runs after assets load), no `Date.now()`, no `performance.now()`, no `Math.random()`, no state accumulated across frames. Randomness comes from `<sf-particles seed>`-style seeded attributes.
@@ -184,8 +188,11 @@ Generic output = generic primitives + centered orbit + preset materials. To make
 A flat, jagged, plastic look is almost always a missing-finish problem, not a content problem. On `<sf-scene>`:
 - `samples="2"` — supersampling AA. On by default; the single biggest quality step. Crisp edges.
 - `environment="room"` — a procedural studio environment (no asset). Gives metal/glass real reflections — turns "plastic" into "chrome". Essential whenever you use metalness or glass materials.
-- `bloom="0.3"` (with `bloom-threshold="0.85"`) — soft glow on highlights. Keep it subtle; raise the threshold so only true highlights bloom (emissive objects, bright rims), not the whole frame.
-- `vignette="0.4"` — darken the edges for cinematic framing, especially on dark/moody scenes.
+- `bloom="0.3"` (with `bloom-threshold="0.85"`) — soft glow on highlights. Keep it subtle; raise the threshold so only true highlights bloom. Do NOT bloom bright/light backgrounds (it washes out).
+- `vignette="0.4"` — darken the edges for cinematic framing.
+- `chromatic-aberration="0.4"` + `grain="0.04"` — lens/film feel (RGB edge split + seeded grain). Subtle is better.
+- `contrast="1.05" saturation="1.1"` — light color grade.
+- **`material="matcap" matcap="iridescent|chrome|pearl|clay|holo"`** — distinctive, designer-grade surfaces with zero lighting setup. The fastest way off the generic-preset look. Dark-core looks (iridescent) pop on LIGHT backgrounds; bright looks pop on dark. Match background contrast to the material.
 
 Example moody hero scene: `<sf-scene background="#070709" exposure="0.85" environment="room" samples="2" bloom="0.35" bloom-threshold="0.86" vignette="0.4">`. Metal/glass need `environment` to look right; emissive + `bloom` reads as glow/light.
 

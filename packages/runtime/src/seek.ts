@@ -29,7 +29,7 @@ export interface StereoframeProtocol {
   seek: (t: number) => void;
   /** Seeks to t, then returns per-scene inspection facts (for validate). */
   diagnostics: (t: number) => SceneDiagnostics[];
-  /** Seeks to t, then fingerprints visible canvases (idempotency probes). */
+  /** Seeks to t, then returns an exact fingerprint of the frame (idempotency probe). */
   fingerprint: (t: number) => string;
 }
 
@@ -107,7 +107,7 @@ export function applySeek(compiled: CompiledScene, t: number): void {
     }
   }
 
-  if (compiled.post) compiled.post.render();
+  if (compiled.post) compiled.post.render(time);
   else compiled.renderer.render(compiled.scene, compiled.camera);
 }
 

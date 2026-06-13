@@ -217,3 +217,33 @@ export function float(
     target.position.y = baseY + opts.amplitude * Math.sin(omega * activeTime(t, timing));
   };
 }
+
+/**
+ * Continuous secondary motion — a gentle multi-axis rotational sway (+ a
+ * touch of positional drift) that makes a form feel alive rather than rigid.
+ * Layered sines at incommensurate periods so it never looks like a loop.
+ * Pure function of t.
+ */
+export function sway(
+  target: TransformLike,
+  timing: VerbTiming,
+  opts: { amount: number; period: number },
+): Writer {
+  const base = {
+    rx: target.rotation.x,
+    ry: target.rotation.y,
+    rz: target.rotation.z,
+    px: target.position.x,
+    py: target.position.y,
+  };
+  const w = (Math.PI * 2) / Math.max(0.0001, opts.period);
+  const a = opts.amount;
+  return (t) => {
+    const s = activeTime(t, timing);
+    target.rotation.z = base.rz + a * Math.sin(w * s);
+    target.rotation.x = base.rx + a * 0.6 * Math.sin(w * 0.73 * s + 1.7);
+    target.rotation.y = base.ry + a * 0.4 * Math.sin(w * 0.51 * s + 0.4);
+    target.position.x = base.px + a * 0.25 * Math.sin(w * 0.62 * s + 2.1);
+    target.position.y = base.py + a * 0.2 * Math.sin(w * 0.83 * s);
+  };
+}

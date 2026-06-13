@@ -43,7 +43,9 @@ Because the markup is declarative, a partial edit is a one-line diff, and becaus
 
 **Works in one pass** — turntable/orbit/dolly/spline-flythrough cameras, character clip transitions (idle→run) with a follow camera, paper-swarm typography, glass panels (transmission), ocean/sky (golden hour), particles (fountain/snow/dust), metaball goo, material colorway switching (variant), multi-shot cuts/crossfades, DOM titles/captions.
 
-**Not yet** — the agent will try the escape hatch or tell you the limit: physics simulation (collapse/collision), photorealistic humans, audio, wipe/shader transitions, 3D text meshes (captions are handled as DOM overlays).
+**Not yet** — the agent will try the escape hatch or tell you the limit: physics simulation (collapse/collision), photorealistic humans, audio, depth of field, motion blur, wipe/shader transitions, 3D text meshes (captions are DOM overlays).
+
+**Freedom note**: determinism here only governs structure (layout/timing/motion are reproducible and seekable) — not the visuals. You can ask for arbitrarily rich custom-shader looks, distinctive matcap materials, and film finish (grain, chromatic aberration, grade); none of that is constrained by reproducibility.
 
 ## Most efficient pattern: reference + difference
 

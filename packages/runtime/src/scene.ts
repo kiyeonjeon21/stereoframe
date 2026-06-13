@@ -13,6 +13,7 @@ import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { buildPostFX, type PostFX } from "./postfx";
+import { getMatcap } from "./matcaps";
 import { buildMetaball } from "./blocks/metaball";
 import { buildOcean, type OceanBuild } from "./blocks/ocean";
 import { buildSky } from "./blocks/sky";
@@ -104,6 +105,14 @@ function buildMeshMaterial(el: Element): THREE.Material {
   const emissive = new THREE.Color(parseColorString(el.getAttribute("emissive"), "#000000"));
   const emissiveIntensity = parseNumber(el.getAttribute("emissive-intensity"), 1);
   const envMapIntensity = parseNumber(el.getAttribute("env-map-intensity"), 1);
+  if (kind === "matcap") {
+    // A baked material look that needs no lighting — instant distinctive
+    // materials (pearl/chrome/iridescent/clay/holo). `color` tints it.
+    return new THREE.MeshMatcapMaterial({
+      matcap: getMatcap(el.getAttribute("matcap")),
+      color: el.getAttribute("color") ? color : new THREE.Color("#ffffff"),
+    });
+  }
   if (kind === "glass" || kind === "physical") {
     // `glass` is a tuned MeshPhysicalMaterial preset; every knob can still be
     // overridden by an explicit attribute. Transmission re-renders the scene
@@ -385,6 +394,10 @@ export function compileScene(host: HTMLElement): CompiledScene {
     bloomThreshold: parseNumber(host.getAttribute("bloom-threshold"), 0.85),
     bloomRadius: parseNumber(host.getAttribute("bloom-radius"), 0.6),
     vignette: parseNumber(host.getAttribute("vignette"), 0),
+    contrast: parseNumber(host.getAttribute("contrast"), 1),
+    saturation: parseNumber(host.getAttribute("saturation"), 1),
+    chromaticAberration: parseNumber(host.getAttribute("chromatic-aberration"), 0),
+    grain: parseNumber(host.getAttribute("grain"), 0),
   });
 
   return {
