@@ -69,7 +69,7 @@ The canvas is auto-inserted as sf-scene's first child. Control layering with reg
 
 | attribute | description |
 |---|---|
-| `src` | GLB path (must be local — no remote fetches during render) |
+| `src` | GLB/GLTF path (local). Draco / KTX2 / Meshopt-compressed models work — Meshopt is bundled; Draco/KTX2 decoders load once from a pinned CDN during preload (before the ready gate, so render stays seekable) |
 | `id` | for `#id` references |
 | `position`/`rotation`/`scale` | `x y z` (rotation in degrees); scale accepts a single value |
 | `clip` | initially playing clip name (default: first clip). Other clips wait at weight 0 |

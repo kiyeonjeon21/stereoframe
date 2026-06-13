@@ -9,6 +9,9 @@
  */
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
@@ -267,7 +270,17 @@ export function compileScene(host: HTMLElement): CompiledScene {
   // compile time; compileAnimations appends verb writers later.
   const seekFns: Array<(t: number) => void> = [];
 
+  // Compressed-GLB support so any real downloaded/generated model loads:
+  // Meshopt is bundled (self-contained); Draco + KTX2 decoders are fetched
+  // once from a pinned CDN during preload (before the ready gate, so
+  // seekability is preserved). This covers the vast majority of GLBs.
   const gltfLoader = new GLTFLoader();
+  const DECODER_BASE = "https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/libs";
+  gltfLoader.setDRACOLoader(new DRACOLoader().setDecoderPath(`${DECODER_BASE}/draco/gltf/`));
+  gltfLoader.setKTX2Loader(
+    new KTX2Loader().setTranscoderPath(`${DECODER_BASE}/basis/`).detectSupport(renderer),
+  );
+  gltfLoader.setMeshoptDecoder(MeshoptDecoder);
   const hdrLoader = new HDRLoader();
 
   // Environment map — drives PBR reflections on metal/glass (the difference
