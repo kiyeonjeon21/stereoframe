@@ -13,7 +13,7 @@ Pick the lightest path that fits the request, then refine:
 
 1. **Have a GLB, want a polished video fast?** → `stage <model>.glb --preset <name>` auto-frames + finishes any model (presets below). Then hand-edit the generated `index.html` to taste. **This is the default for "make a product video / Apple-ad reveal."**
 2. **Want the parts labelled (spec sheet / teardown)?** → `inspect` the GLB first to learn its parts, then `stage --preset spec` (annotated, still model) or `--preset teardown` (exploded, per-part labels). Multi-part GLBs only.
-3. **No model yet?** → `stereoframe gen "<prompt>"` writes a textured GLB into `assets/` (real prompt-driven generation when `MESHY_API_KEY` is set — otherwise a sample model), then `stage` it.
+3. **No model yet?** → `stereoframe gen "<prompt>"` writes a textured GLB into `assets/` (real prompt-driven generation when `MESHY_API_KEY` is set — otherwise a sample model). For the whole thing in one command, `gen "<prompt>" --stage <preset> --render` → prompt → model → directed film → mp4.
 4. **Custom scene / full control?** → hand-author `sf-scene` markup (canonical composition below).
 
 Whatever the path, **always `lint` → `validate` before `render`.**
@@ -49,6 +49,7 @@ stereoframe render --draft     # fast iteration render → renders/*.mp4
 stereoframe render             # quality render (crf 18)
 stereoframe preview            # browser playback at http://127.0.0.1:<port>/?sf-preview
 stereoframe gen "<prompt>"     # text-to-3D: generate a textured GLB into assets/ (Meshy)
+stereoframe gen "<prompt>" --stage spec --render   # one-shot: prompt → model → directed film → mp4
 stereoframe bake --target <id> # freeze a mode="forward" sim's InstancedMesh into a seekable cache for <sf-baked>
 stereoframe add ocean          # install a block's assets + print its markup
 stereoframe blocks             # list available blocks

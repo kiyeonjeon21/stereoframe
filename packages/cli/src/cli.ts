@@ -82,10 +82,54 @@ USAGE
       --no-texture     skip the PBR texture pass (faster, untextured mesh)
       --polycount <n>  target polygon count
       --key <key>      Meshy API key (else MESHY_API_KEY / .env / test mode)
+      --stage <preset> one-shot: generate then stage into a film (reveal|hero-orbit|turntable|exploded-view|spec|teardown)
+      --render         with --stage, also render the result to mp4 (--draft for fast)
   stereoframe add <block> [dir]        install a visual block's assets + print usage
   stereoframe blocks                   list available blocks
   stereoframe update [dir]             refresh assets/stereoframe.js from the CLI's bundled runtime
 `;
+
+/** Stage a model with a preset, auto-placing callouts for spec/teardown.
+ *  Shared by the `stage` command and `gen --stage`. */
+async function runStage(opts: {
+  model: string;
+  outDir: string;
+  preset: Preset;
+  duration?: number;
+  background?: string;
+  title?: string;
+}): Promise<string> {
+  const { model, outDir, preset } = opts;
+  const dur = opts.duration && opts.duration > 0 ? opts.duration : 8;
+  let callouts;
+  if (preset === "spec" || preset === "teardown") {
+    console.log(`inspecting ${model} for ${preset} callouts…`);
+    const manifest = await inspectModel({ model, silent: true, write: false });
+    callouts = buildAutoCallouts(
+      manifest,
+      dur,
+      preset === "teardown"
+        ? { max: 5, startAt: explodeTiming(dur).end + 0.2, leadFan: 46 }
+        : { max: 3 },
+    );
+    if (callouts.length === 0) {
+      console.warn(`note: ${model} has <2 separable mesh parts — ${preset} film will render without callouts.`);
+    } else {
+      console.log(`  callouts: ${callouts.map((c) => c.value).join(", ")}`);
+    }
+  }
+  const created = stageModel({
+    model,
+    projectDir: outDir,
+    preset,
+    duration: opts.duration,
+    background: opts.background,
+    title: opts.title,
+    callouts,
+  });
+  console.log(`staged ${model} (${preset}) → ${created}`);
+  return created;
+}
 
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
@@ -163,48 +207,21 @@ async function main(): Promise<void> {
       const stem = basename(model).replace(/\.(glb|gltf)$/i, "");
       const outDir =
         typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${stem}-${preset}`;
-      const duration = options.has("duration") ? Number(options.get("duration")) : undefined;
-
-      // The `spec`/`teardown` presets auto-annotate: inspect the GLB, then place
-      // named callouts on its parts (teardown labels each part as it separates).
-      let callouts;
-      if (preset === "spec" || preset === "teardown") {
-        const dur = duration && duration > 0 ? duration : 8;
-        console.log(`inspecting ${model} for ${preset} callouts…`);
-        const manifest = await inspectModel({ model, silent: true, write: false });
-        callouts = buildAutoCallouts(
-          manifest,
-          dur,
-          preset === "teardown"
-            ? { max: 5, startAt: explodeTiming(dur).end + 0.2, leadFan: 46 }
-            : { max: 3 },
-        );
-        if (callouts.length === 0) {
-          console.warn(
-            `note: ${model} has <2 separable mesh parts — ${preset} film will render without callouts.`,
-          );
-        } else {
-          console.log(`  callouts: ${callouts.map((c) => c.value).join(", ")}`);
-        }
-      }
-
-      const created = stageModel({
+      await runStage({
         model,
-        projectDir: outDir,
+        outDir,
         preset,
-        duration,
+        duration: options.has("duration") ? Number(options.get("duration")) : undefined,
         background: typeof options.get("bg") === "string" ? (options.get("bg") as string) : undefined,
         title: typeof options.get("title") === "string" ? (options.get("title") as string) : undefined,
-        callouts,
       });
-      console.log(`staged ${model} (${preset}) → ${created}`);
       console.log(`next: cd ${outDir} && stereoframe render`);
       return;
     }
     case "gen": {
       const prompt = positional.join(" ").trim();
-      if (!prompt) throw new Error('usage: stereoframe gen "<prompt>"');
-      await genModel({
+      if (!prompt) throw new Error('usage: stereoframe gen "<prompt>" [--stage <preset>] [--render]');
+      const glbPath = await genModel({
         prompt,
         projectDir: typeof options.get("dir") === "string" ? (options.get("dir") as string) : ".",
         out: typeof options.get("out") === "string" ? (options.get("out") as string) : undefined,
@@ -212,6 +229,32 @@ async function main(): Promise<void> {
         polycount: options.has("polycount") ? Number(options.get("polycount")) : undefined,
         key: typeof options.get("key") === "string" ? (options.get("key") as string) : undefined,
       });
+
+      // One-shot: prompt → model → directed film (→ optional render).
+      const stagePreset = options.get("stage");
+      if (typeof stagePreset === "string") {
+        const preset = stagePreset as Preset;
+        if (!PRESETS.includes(preset)) {
+          throw new Error(`unknown preset: ${preset}\n\npresets: ${PRESETS.join(", ")}`);
+        }
+        const slug = prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "gen";
+        const outDir =
+          typeof options.get("stage-dir") === "string" ? (options.get("stage-dir") as string) : `${slug}-${preset}`;
+        const created = await runStage({
+          model: glbPath,
+          outDir,
+          preset,
+          duration: options.has("duration") ? Number(options.get("duration")) : undefined,
+          background: typeof options.get("bg") === "string" ? (options.get("bg") as string) : undefined,
+          title: typeof options.get("title") === "string" ? (options.get("title") as string) : undefined,
+        });
+        if (options.get("render") === true) {
+          const out = await renderProject({ projectDir: created, draft: options.get("draft") === true });
+          console.log(out);
+        } else {
+          console.log(`next: cd ${outDir} && stereoframe render`);
+        }
+      }
       return;
     }
     case "add": {

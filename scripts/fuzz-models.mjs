@@ -20,7 +20,7 @@
  * what `stereoframe gen` + Meshy is for — this only fetches from the catalogue).
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,11 +31,16 @@ const INDEX_URL =
   "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/model-index.json";
 const RAW_BASE = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models";
 
-// --- args: [N] [prompt words...] [--keep] ----------------------------------
+// --- args: [N] [prompt words...] [--keep] [--gen] --------------------------
+// Default: pull N models from the Khronos catalogue (prompt matches names).
+// --gen: instead GENERATE N models from text via Meshy (real key in .env; slow),
+// then run the same inspect→stage→validate pipeline — surfaces how generated
+// (single-mesh, junk-named) models fare. Bigger N is expensive; default 3.
 const argv = process.argv.slice(2);
 const keep = argv.includes("--keep");
-const rest = argv.filter((a) => a !== "--keep");
-let n = 10;
+const genMode = argv.includes("--gen");
+const rest = argv.filter((a) => a !== "--keep" && a !== "--gen");
+let n = genMode ? 3 : 10;
 const promptWords = [];
 for (const a of rest) {
   if (/^\d+$/.test(a) && promptWords.length === 0) n = Number(a);
@@ -43,59 +48,83 @@ for (const a of rest) {
 }
 const prompt = promptWords.join(" ").toLowerCase().trim();
 
+// Curated diverse prompts for --gen (product-y, varied subjects).
+const GEN_PROMPTS = [
+  "a vintage brass desk lamp",
+  "a pair of over-ear headphones, matte black",
+  "a modern espresso machine, stainless steel",
+  "a retro handheld game console",
+  "a ceramic teapot with a bamboo handle",
+  "a robot vacuum, white and grey",
+  "a mechanical wristwatch with a metal bracelet",
+  "a perfume bottle, frosted glass",
+];
+const slug = (p) => p.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32) || "gen";
+
 function run(args, opts = {}) {
   const r = spawnSync("node", [CLI, ...args], { encoding: "utf8", timeout: 180_000, ...opts });
   return { status: r.status ?? -1, out: (r.stdout ?? "") + (r.stderr ?? ""), err: r.error };
 }
 
 async function main() {
-  console.log("fetching Khronos sample catalogue…");
-  const index = await (await fetch(INDEX_URL)).json();
-  const usable = index.filter((m) => m.variants && m.variants["glTF-Binary"]);
-
-  // Candidate selection: prompt match against name/label, else everything.
-  let pool = usable;
-  if (prompt) {
-    const tokens = prompt.split(/\s+/);
-    const scored = usable
-      .map((m) => {
-        const hay = `${m.name} ${m.label ?? ""}`.toLowerCase();
-        const score = tokens.reduce((s, t) => s + (hay.includes(t) ? 1 : 0), 0);
-        return { m, score };
-      })
-      .filter((x) => x.score > 0)
-      .sort((a, b) => b.score - a.score);
-    if (scored.length) {
-      pool = scored.map((x) => x.m);
-      console.log(`prompt "${prompt}" matched ${pool.length}: ${pool.slice(0, 12).map((m) => m.name).join(", ")}`);
-    } else {
-      console.log(`prompt "${prompt}" matched nothing in the catalogue — falling back to random.`);
+  // `picked`: uniform items — {name, url} (catalogue) or {name, prompt} (--gen).
+  let picked;
+  if (genMode) {
+    const list = (prompt ? [prompt] : GEN_PROMPTS).slice(0, n);
+    picked = list.map((p) => ({ name: slug(p), prompt: p }));
+    console.log(`generating ${picked.length} model(s) via Meshy (real key, ~minutes each):\n  ${list.join("\n  ")}\n`);
+  } else {
+    console.log("fetching Khronos sample catalogue…");
+    const index = await (await fetch(INDEX_URL)).json();
+    const usable = index.filter((m) => m.variants && m.variants["glTF-Binary"]);
+    let pool = usable;
+    if (prompt) {
+      const tokens = prompt.split(/\s+/);
+      const scored = usable
+        .map((m) => {
+          const hay = `${m.name} ${m.label ?? ""}`.toLowerCase();
+          const score = tokens.reduce((s, t) => s + (hay.includes(t) ? 1 : 0), 0);
+          return { m, score };
+        })
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score);
+      if (scored.length) {
+        pool = scored.map((x) => x.m);
+        console.log(`prompt "${prompt}" matched ${pool.length}: ${pool.slice(0, 12).map((m) => m.name).join(", ")}`);
+      } else {
+        console.log(`prompt "${prompt}" matched nothing in the catalogue — falling back to random.`);
+      }
     }
+    picked = [...pool]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, Math.min(n, pool.length))
+      .map((m) => ({ name: m.name, url: `${RAW_BASE}/${m.name}/glTF-Binary/${m.variants["glTF-Binary"]}` }));
+    console.log(`testing ${picked.length} model(s): ${picked.map((m) => m.name).join(", ")}\n`);
   }
-
-  // Random pick N (shuffle then slice).
-  const picked = [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(n, pool.length));
-  console.log(`testing ${picked.length} model(s): ${picked.map((m) => m.name).join(", ")}\n`);
 
   const work = mkdtempSync(join(tmpdir(), "sf-fuzz-"));
   mkdirSync(join(work, "models"));
   const results = [];
 
-  for (const m of picked) {
-    const file = m.variants["glTF-Binary"];
-    const url = `${RAW_BASE}/${m.name}/glTF-Binary/${file}`;
-    const glb = join(work, "models", `${m.name}.glb`);
-    const row = { name: m.name, parts: "", flags: "", stage: "", validate: "", status: "ok" };
-    process.stdout.write(`• ${m.name}  `);
+  for (const it of picked) {
+    const glb = join(work, "models", `${it.name}.glb`);
+    const row = { name: it.name, parts: "", flags: "", stage: "", validate: "", status: "ok" };
+    process.stdout.write(`• ${it.name}  `);
     try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`download ${res.status}`);
-      writeFileSync(glb, Buffer.from(await res.arrayBuffer()));
+      if (it.prompt) {
+        // generate via Meshy (cwd=ROOT so it picks up the .env key)
+        const g = run(["gen", it.prompt, "--out", glb], { cwd: ROOT, timeout: 600_000 });
+        if (g.status !== 0 || !existsSync(glb)) throw new Error("gen failed");
+      } else {
+        const res = await fetch(it.url);
+        if (!res.ok) throw new Error(`download ${res.status}`);
+        writeFileSync(glb, Buffer.from(await res.arrayBuffer()));
+      }
     } catch (e) {
-      row.status = "DOWNLOAD-FAIL";
+      row.status = it.prompt ? "GEN-FAIL" : "DOWNLOAD-FAIL";
       row.flags = String(e.message ?? e);
       results.push(row);
-      console.log("✗ download");
+      console.log("✗");
       continue;
     }
 
@@ -117,7 +146,7 @@ async function main() {
     }
 
     // 2. stage --preset spec
-    const stageDir = join(work, `stage-${m.name}`);
+    const stageDir = join(work, `stage-${it.name}`);
     const st = run(["stage", glb, "--preset", "spec", "--dir", stageDir, "--duration", "5"]);
     if (st.status !== 0) {
       row.status = "STAGE-CRASH";
