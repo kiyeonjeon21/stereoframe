@@ -21,6 +21,7 @@ import {
   type Storyboard,
 } from "./storyboard";
 import { renderProject } from "./render";
+import { resolveEnvKey } from "./gen";
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const DEFAULT_MODEL = "gpt-4o";
@@ -35,21 +36,15 @@ export interface BriefOptions {
   key?: string;
 }
 
-/** OpenAI key from --key, env, or the project `.env` (mirrors gen.ts resolveKey). */
+/** OpenAI key from --key, env, or a `.env` found walking up from projectDir. */
 export function resolveOpenAIKey(projectDir: string, explicit?: string): string {
-  if (explicit) return explicit;
-  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
-  const envPath = join(resolve(projectDir), ".env");
-  if (existsSync(envPath)) {
-    const line = readFileSync(envPath, "utf8")
-      .split("\n")
-      .find((l) => l.startsWith("OPENAI_API_KEY="));
-    const v = line?.slice("OPENAI_API_KEY=".length).trim();
-    if (v) return v;
+  const key = resolveEnvKey("OPENAI_API_KEY", projectDir, explicit);
+  if (!key) {
+    throw new Error(
+      "no OpenAI key — set OPENAI_API_KEY in your shell or project .env (https://platform.openai.com/api-keys), or pass --key.",
+    );
   }
-  throw new Error(
-    "no OpenAI key — set OPENAI_API_KEY in your shell or project .env (https://platform.openai.com/api-keys), or pass --key.",
-  );
+  return key;
 }
 
 /** Pull the first JSON object out of an LLM response (handles ```json fences / prose). */

@@ -42,7 +42,15 @@ stereoframe gen "a low-poly treasure chest"   # → assets/a-low-poly-treasure-c
 # then: <sf-model src="assets/a-low-poly-treasure-chest.glb"></sf-model>
 ```
 
-Each generation also writes a provenance sidecar — `assets/<name>.gen.json` records the exact prompt, options, and Meshy task ids next to the GLB, so a generated model always carries how it was made (text-to-3D isn't reproducible — keep at least the recipe).
+**Image-first (more art-directable).** Text-to-3D is a lottery — pin the design in a 2D image first, then lift it to 3D for better fidelity and reliable orientation:
+
+```bash
+stereoframe gen --image front.png                  # image-to-3D from one image
+stereoframe gen --images front.png,side.png,back.png  # multi-image-to-3D (1-4 views)
+stereoframe gen "a matte-black headphone" --via-image # text → image (OpenAI) → 3D, one command
+```
+
+`--via-image` generates a clean reference image (OpenAI `gpt-image-1` by default; provider is swappable) and saves it next to the GLB. Each generation also writes a `<name>.gen.json` provenance sidecar (prompt/source images, options, task ids) — generation isn't reproducible, so keep the recipe.
 
 It runs with no setup using Meshy's free test mode (returns a sample model); set `MESHY_API_KEY` (shell env or project `.env`) for real prompt-driven generations.
 

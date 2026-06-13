@@ -13,7 +13,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { basename } from "node:path";
 import { addBlock, listBlocks } from "./blocks";
-import { genModel } from "./gen";
+import { genModel, genFromImages, genViaImage } from "./gen";
 import { inspectModel } from "./inspect";
 import { bakeProject } from "./bake";
 import { buildStoryboard, readStoryboard, validateStoryboard } from "./storyboard";
@@ -86,7 +86,11 @@ USAGE
       --render         render the compiled film to mp4 (--draft for fast)
   stereoframe inspect <model.glb>      segment + tag a GLB: list its parts (name, material, where, size)
       --json           print the manifest as JSON instead of a table
-  stereoframe gen "<prompt>"           generate a 3D model (GLB) from text via Meshy
+  stereoframe gen "<prompt>"           generate a 3D model (GLB) via Meshy
+      --image <png>    image-to-3D from one local image (instead of text)
+      --images a,b,c   multi-image-to-3D from 1-4 views (front/side/back…)
+      --via-image      text → image (OpenAI gpt-image-1) → image-to-3D, more art-directable
+      --image-provider openai (default; for --via-image)   --size <wxh>   --image-key <key>
       --dir <dir>      project dir (default .)
       --out <path>     output path (default assets/<slug>.glb)
       --no-texture     skip the PBR texture pass (faster, untextured mesh)
@@ -286,24 +290,53 @@ async function main(): Promise<void> {
     }
     case "gen": {
       const prompt = positional.join(" ").trim();
-      if (!prompt) throw new Error('usage: stereoframe gen "<prompt>" [--stage <preset>] [--render]');
-      const glbPath = await genModel({
-        prompt,
-        projectDir: typeof options.get("dir") === "string" ? (options.get("dir") as string) : ".",
-        out: typeof options.get("out") === "string" ? (options.get("out") as string) : undefined,
-        texture: options.get("no-texture") !== true,
-        polycount: options.has("polycount") ? Number(options.get("polycount")) : undefined,
-        key: typeof options.get("key") === "string" ? (options.get("key") as string) : undefined,
-      });
+      const projectDir = typeof options.get("dir") === "string" ? (options.get("dir") as string) : ".";
+      const out = typeof options.get("out") === "string" ? (options.get("out") as string) : undefined;
+      const texture = options.get("no-texture") !== true;
+      const polycount = options.has("polycount") ? Number(options.get("polycount")) : undefined;
+      const key = typeof options.get("key") === "string" ? (options.get("key") as string) : undefined;
+      const imageOpt = options.get("image");
+      const imagesOpt = options.get("images");
 
-      // One-shot: prompt → model → directed film (→ optional render).
+      let glbPath: string;
+      if (typeof imagesOpt === "string" || typeof imageOpt === "string") {
+        // image-to-3D / multi-image-to-3D from local image(s)
+        const images =
+          typeof imagesOpt === "string"
+            ? imagesOpt.split(",").map((s) => s.trim()).filter(Boolean)
+            : [imageOpt as string];
+        glbPath = await genFromImages({ images, projectDir, out, texture, polycount, key });
+      } else if (options.has("via-image")) {
+        // text → reference image → image-to-3D. (Tolerate `gen --via-image "prompt"`
+        // where the prompt is captured as the flag's value.)
+        const viaPrompt = prompt || (typeof options.get("via-image") === "string" ? (options.get("via-image") as string) : "");
+        if (!viaPrompt) throw new Error('usage: stereoframe gen "<prompt>" --via-image');
+        glbPath = await genViaImage({
+          prompt: viaPrompt,
+          projectDir,
+          out,
+          texture,
+          polycount,
+          key,
+          imageKey: typeof options.get("image-key") === "string" ? (options.get("image-key") as string) : undefined,
+          imageProvider: typeof options.get("image-provider") === "string" ? (options.get("image-provider") as string) : undefined,
+          imageSize: typeof options.get("size") === "string" ? (options.get("size") as string) : undefined,
+        });
+      } else {
+        if (!prompt) {
+          throw new Error('usage: stereoframe gen "<prompt>" [--via-image] | --image <png> | --images a,b,c [--stage <preset>] [--render]');
+        }
+        glbPath = await genModel({ prompt, projectDir, out, texture, polycount, key });
+      }
+
+      // One-shot: model → directed film (→ optional render).
       const stagePreset = options.get("stage");
       if (typeof stagePreset === "string") {
         const preset = stagePreset as Preset;
         if (!PRESETS.includes(preset)) {
           throw new Error(`unknown preset: ${preset}\n\npresets: ${PRESETS.join(", ")}`);
         }
-        const slug = prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "gen";
+        const slug = (prompt || basename(glbPath).replace(/\.glb$/i, "")).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "gen";
         const outDir =
           typeof options.get("stage-dir") === "string" ? (options.get("stage-dir") as string) : `${slug}-${preset}`;
         const created = await runStage({
