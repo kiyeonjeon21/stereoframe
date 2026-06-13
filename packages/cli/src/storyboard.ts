@@ -165,6 +165,7 @@ export function validateStoryboard(plan: Storyboard): string[] {
     const n = p.trim().split(/\s+/).map(Number);
     return n.length !== 3 || n.some((x) => !Number.isFinite(x));
   };
+  const badVec3 = (v: string | undefined): boolean => badPose(v); // same shape: 3 finite numbers
   if (badPose(plan.defaults?.pose)) {
     errs.push(`storyboard.defaults.pose must be "x y z" (3 numbers, degrees)`);
   }
@@ -199,6 +200,20 @@ export function validateStoryboard(plan: Storyboard): string[] {
       }
       if (cam.type === "static" && !cam.position) errs.push(`${tag}: static camera needs position`);
       if (cam.ease && !eases.has(cam.ease)) errs.push(`${tag}: unknown ease "${cam.ease}"`);
+      // Catch malformed vectors (e.g. an LLM writing "0 0 z") and camera paths that
+      // run through the subject (the #1 wrecker — chaotic grazing/flicker).
+      if (badVec3(cam.position)) errs.push(`${tag}: camera.position must be "x y z" numbers`);
+      if (badVec3(cam.lookAt)) errs.push(`${tag}: camera.lookAt must be "x y z" numbers`);
+      if (cam.points) {
+        for (const p of cam.points.split(",").map((s) => s.trim()).filter(Boolean)) {
+          const n = p.split(/\s+/).map(Number);
+          if (n.length !== 3 || !n.every((x) => Number.isFinite(x))) {
+            errs.push(`${tag}: camera.points has a bad waypoint "${p}" (need "x y z")`);
+          } else if (Math.hypot(n[0]!, n[1]!, n[2]!) < 1.8) {
+            errs.push(`${tag}: camera waypoint "${p}" is inside the subject — a flythrough/path must arc AROUND it (keep every waypoint ≥ ~4 from origin)`);
+          }
+        }
+      }
     }
     if (s.atmosphere && !["dust", "snow", "none"].includes(s.atmosphere)) {
       errs.push(`${tag}: atmosphere must be "dust", "snow", or "none"`);
@@ -618,6 +633,12 @@ Shot (extends ShotDefaults):
                        path       {points:"x y z, x y z, ..."}           (looks ahead; no lookAt)
                        flythrough {points, lookAt}                       (dynamic, stays on subject)
                        hero       {position, lookAt, around, radius, from, to, height} (low heroic orbit)
+  CAMERA SAFETY (critical — a too-close camera wrecks the shot): the subject is
+  normalized to ~fit units (about 2.6) centered at the origin, so it spans roughly +/-1.3.
+  Keep EVERY camera position / points waypoint OUTSIDE it — distance from origin
+  >= ~4 (never a point like "1 0.5 0", that is INSIDE the model). A flythrough/path
+  must arc AROUND the subject (e.g. all points ~5 out, in front), NEVER a straight
+  line through it. All position/lookAt/points values are plain numbers "x y z".
   isolate?         : { part, dim? }   explode?: { distance? }   spin?: rpm
   callout?         : "auto" | "none"  (auto = inspect-driven spec labels; multi-part models only)
   text?            : { title?, subtitle?, spec? } -> staggered 3-tier title card (use on the hero)

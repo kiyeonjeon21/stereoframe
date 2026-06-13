@@ -51,7 +51,9 @@ const VERTEX_FOUNTAIN = /* glsl */ `
     vec3 pos = position + aVel * age + 0.5 * vec3(0.0, -uGravity, 0.0) * age * age;
     vFade = smoothstep(0.0, 0.08, n) * (1.0 - smoothstep(0.65, 1.0, n));
     vec4 mv = modelViewMatrix * vec4(pos, 1.0);
-    gl_PointSize = uSize * (300.0 / max(0.1, -mv.z));
+    // Floor the on-screen size so distant motes never go sub-pixel (sub-pixel
+    // points twinkle on/off as they cross pixel centers — reads as flicker).
+    gl_PointSize = max(3.0, uSize * (300.0 / max(0.1, -mv.z)));
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -69,7 +71,9 @@ const VERTEX_SNOW = /* glsl */ `
     pos.y = uArea.y * 0.5 - mod(position.y + uTime * aWobble.y, uArea.y);
     vFade = 1.0;
     vec4 mv = modelViewMatrix * vec4(pos, 1.0);
-    gl_PointSize = uSize * (300.0 / max(0.1, -mv.z));
+    // Floor the on-screen size so distant motes never go sub-pixel (sub-pixel
+    // points twinkle on/off as they cross pixel centers — reads as flicker).
+    gl_PointSize = max(3.0, uSize * (300.0 / max(0.1, -mv.z)));
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -89,7 +93,9 @@ const VERTEX_DUST = /* glsl */ `
     );
     vFade = 0.55 + 0.45 * sin(uTime * aFreq.y * 0.7 + aPhase.z);
     vec4 mv = modelViewMatrix * vec4(pos, 1.0);
-    gl_PointSize = uSize * (300.0 / max(0.1, -mv.z));
+    // Floor the on-screen size so distant motes never go sub-pixel (sub-pixel
+    // points twinkle on/off as they cross pixel centers — reads as flicker).
+    gl_PointSize = max(3.0, uSize * (300.0 / max(0.1, -mv.z)));
     gl_Position = projectionMatrix * mv;
   }
 `;

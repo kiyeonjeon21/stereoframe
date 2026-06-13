@@ -279,3 +279,18 @@ describe("floor", () => {
     expect(validateStoryboard({ model: "m.glb", shots: [shot({ floor: "grass" })] }).some((e) => /floor/.test(e))).toBe(true);
   });
 });
+
+describe("camera safety validation", () => {
+  test("a waypoint inside the subject (through-the-model path) is an error", () => {
+    const errs = validateStoryboard({ model: "m.glb", shots: [shot({ camera: { type: "flythrough", points: "-3 0.5 0, 1 0.5 0, 3 0.5 0", lookAt: "0 0.4 0" } })] });
+    expect(errs.some((e) => /inside the subject/.test(e))).toBe(true);
+  });
+  test("a safe arc path validates clean", () => {
+    const errs = validateStoryboard({ model: "m.glb", shots: [shot({ camera: { type: "flythrough", points: "4.5 0.6 3.5, -1.5 0.7 5.4, -4.5 0.6 3.2", lookAt: "0 0.4 0" } })] });
+    expect(errs).toEqual([]);
+  });
+  test("malformed lookAt/position vectors are errors", () => {
+    expect(validateStoryboard({ model: "m.glb", shots: [shot({ camera: { type: "static", position: "0 1 5", lookAt: "0 0 z" } })] }).some((e) => /lookAt/.test(e))).toBe(true);
+    expect(validateStoryboard({ model: "m.glb", shots: [shot({ camera: { type: "static", position: "0 1" } })] }).some((e) => /position/.test(e))).toBe(true);
+  });
+});

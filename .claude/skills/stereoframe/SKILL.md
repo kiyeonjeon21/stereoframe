@@ -245,6 +245,11 @@ for `lighting:"auto"`/`callout:"auto"`, copies GLBs + runtime into `out/assets/`
   `path` (`points` — emits NO `look-at`), `flythrough` (`points`+`lookAt` — dynamic
   spline that stays locked on the subject), `hero` (low-angle + slow orbit). `ease`
   defaults to `sine.inOut`.
+- **Camera safety (critical):** the subject is normalized to ~`fit` (≈2.6) at the origin
+  (spans ≈±1.3). Keep EVERY camera position and `flythrough`/`path` waypoint *outside* it —
+  distance from origin ≥ ~4, arcing AROUND the subject. A waypoint like `"1 0.5 0"` is
+  *inside* the model → the camera flies through it → violent grazing/flicker. `validate`
+  now errors on through-the-subject paths and malformed `"x y z"` vectors.
 - **Lighting**: `{preset}` | `"auto"` (metal → tamed rim/fill rig) | 3-point `{key,fill,rim}`.
 - **Cinematic richness (use these — a bare camera move per shot is flat):**
   - `backdrop:{coldGlow,warmGlow}` → a moody nebula shader behind the subject (vs flat black).
