@@ -186,14 +186,29 @@ const SPEC_AA_INJECT = `#include <normal_fragment_maps>
     vec3 sfNx = dFdx( normal );
     vec3 sfNy = dFdy( normal );
     float sfVar = 0.5 * ( dot( sfNx, sfNx ) + dot( sfNy, sfNy ) );
-    roughnessFactor = min( 1.0, sqrt( roughnessFactor * roughnessFactor + min( sfVar, 0.25 ) ) );
+    roughnessFactor = min( 1.0, sqrt( roughnessFactor * roughnessFactor + min( sfVar, 0.6 ) ) );
   }`;
 
-function tuneMaterial(mat: THREE.Material, specularAA: boolean): void {
+/** Max anisotropic filtering on every texture slot — the cheapest, biggest win
+ *  against grazing-angle texture/normal-map shimmer on metal/glossy surfaces. */
+function applyAnisotropy(mat: THREE.Material, maxAniso: number): void {
+  const m = mat as THREE.MeshStandardMaterial;
+  for (const tex of [m.map, m.normalMap, m.roughnessMap, m.metalnessMap, m.aoMap, m.emissiveMap] as Array<THREE.Texture | null | undefined>) {
+    if (tex && tex.anisotropy !== maxAniso) {
+      tex.anisotropy = maxAniso;
+      tex.needsUpdate = true;
+    }
+  }
+}
+
+function tuneMaterial(mat: THREE.Material, specularAA: boolean, maxAniso: number): void {
   if (!(mat instanceof THREE.MeshStandardMaterial)) return; // Standard + Physical
+  applyAnisotropy(mat, maxAniso);
   const transmission = (mat as THREE.MeshPhysicalMaterial).transmission ?? 0;
   if (transmission > 0) return; // don't frost glass / transmissive materials
-  mat.roughness = Math.max(mat.roughness, 0.06);
+  // Metals are the worst sparklers (near-mirror specular on fine curvature) → a
+  // higher roughness floor softens their specular; matte stays crisp.
+  mat.roughness = Math.max(mat.roughness, mat.metalness > 0.5 ? 0.15 : 0.06);
   if (!specularAA) return;
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = function (shader, renderer) {
@@ -211,9 +226,9 @@ function tuneMaterial(mat: THREE.Material, specularAA: boolean): void {
   mat.needsUpdate = true;
 }
 
-function buildMesh(el: Element, specularAA: boolean): THREE.Mesh {
+function buildMesh(el: Element, specularAA: boolean, maxAniso: number): THREE.Mesh {
   const mesh = new THREE.Mesh(buildGeometry(el), buildMeshMaterial(el));
-  tuneMaterial(mesh.material as THREE.Material, specularAA);
+  tuneMaterial(mesh.material as THREE.Material, specularAA, maxAniso);
   mesh.castShadow = true;
   mesh.receiveShadow = true; // a floor/backdrop plane receives the model's cast shadow
   applyTransform(mesh, el);
@@ -316,9 +331,13 @@ export function compileScene(host: HTMLElement): CompiledScene {
   // Supersampling AA: render the canvas at samples× and let the capture
   // downsample. Deterministic (unlike driver MSAA), and the single biggest
   // step up in visual quality. samples=2 → 4× pixels.
-  const samples = Math.max(1, Math.min(4, Math.round(parseNumber(host.getAttribute("samples"), 2))));
+  const samples = Math.max(1, Math.min(6, Math.round(parseNumber(host.getAttribute("samples"), 2))));
   const bufW = width * samples;
   const bufH = height * samples;
+  // Hardware MSAA on top of supersampling — coverage AA for thin geometry edges
+  // (wheel spokes, splitter mesh). Kept moderate (×4) so it doesn't OOM on the
+  // already-supersampled buffer. `msaa="0"` disables.
+  const msaa = Math.max(0, Math.min(8, Math.round(parseNumber(host.getAttribute("msaa"), 4))));
   // Geometric specular AA on lit materials (on by default; `specular-aa="none"` opts out).
   const specularAA = (host.getAttribute("specular-aa") ?? "") !== "none";
   // Real soft shadow maps from the key light (on by default; `shadows="none"` opts out).
@@ -341,6 +360,7 @@ export function compileScene(host: HTMLElement): CompiledScene {
   });
   renderer.setSize(bufW, bufH, false);
   renderer.setPixelRatio(1);
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
   const toneMapping = (host.getAttribute("tone-mapping") ?? "aces").toLowerCase();
   renderer.toneMapping = toneMapping === "none" ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = parseNumber(host.getAttribute("exposure"), 1);
@@ -423,7 +443,7 @@ export function compileScene(host: HTMLElement): CompiledScene {
       if (la && la.startsWith("#")) lookAtSelector = la.slice(1);
       else if (la) lookAt = { point: parseVec3(la, [0, 0, 0]) };
     } else if (tag === "sf-mesh") {
-      const mesh = buildMesh(el, specularAA);
+      const mesh = buildMesh(el, specularAA, maxAniso);
       scene.add(mesh);
       if (el.id) objectsById.set(el.id, mesh);
     } else if (tag === "sf-model") {
@@ -452,7 +472,7 @@ export function compileScene(host: HTMLElement): CompiledScene {
               mesh.castShadow = true;
               mesh.receiveShadow = true;
               const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-              for (const mat of mats) tuneMaterial(mat, specularAA);
+              for (const mat of mats) tuneMaterial(mat, specularAA, maxAniso);
             });
             // Base pose on the model itself, applied BEFORE `fit` so the box is
             // measured on the posed geometry and recenters in the group's
@@ -598,6 +618,7 @@ export function compileScene(host: HTMLElement): CompiledScene {
     saturation: parseNumber(host.getAttribute("saturation"), 1),
     chromaticAberration: parseNumber(host.getAttribute("chromatic-aberration"), 0),
     grain: parseNumber(host.getAttribute("grain"), 0),
+    msaa,
   });
 
   return {

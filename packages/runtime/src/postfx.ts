@@ -107,6 +107,8 @@ export interface PostFXOptions {
   saturation?: number;
   chromaticAberration?: number;
   grain?: number;
+  /** MSAA samples on the render target (WebGL2) — hardware edge AA for thin geometry. */
+  msaa?: number;
 }
 
 export interface PostFX {
@@ -136,6 +138,7 @@ export function buildPostFX(
   const target = new WebGLRenderTarget(opts.width, opts.height, {
     type: HalfFloatType,
     format: RGBAFormat,
+    samples: Math.max(0, opts.msaa ?? 0), // MSAA (WebGL2) — hardware edge AA for thin geometry
   });
   const composer = new EffectComposer(renderer, target);
   composer.setSize(opts.width, opts.height);

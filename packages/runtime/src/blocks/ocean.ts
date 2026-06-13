@@ -41,6 +41,7 @@ export function buildOcean(el: Element): OceanBuild {
     textureHeight: 512,
     waterNormals: loader.load(normalsSrc, (tex) => {
       tex.wrapS = tex.wrapT = RepeatWrapping;
+      tex.anisotropy = 8; // reduce grazing-angle shimmer on the water surface
       resolveNormals(tex);
     }),
     sunDirection: new Vector3(...parseVec3(el.getAttribute("sun-direction"), [0.7, 0.6, 0.3])),
