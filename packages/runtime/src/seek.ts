@@ -107,7 +107,8 @@ export function applySeek(compiled: CompiledScene, t: number): void {
     }
   }
 
-  compiled.renderer.render(compiled.scene, compiled.camera);
+  if (compiled.post) compiled.post.render();
+  else compiled.renderer.render(compiled.scene, compiled.camera);
 }
 
 /**

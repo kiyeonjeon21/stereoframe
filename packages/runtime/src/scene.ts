@@ -11,6 +11,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { buildPostFX, type PostFX } from "./postfx";
 import { buildMetaball } from "./blocks/metaball";
 import { buildOcean, type OceanBuild } from "./blocks/ocean";
 import { buildSky } from "./blocks/sky";
@@ -36,6 +38,8 @@ export interface CompiledScene {
   width: number;
   height: number;
   canvas: HTMLCanvasElement;
+  /** Post-processing chain (bloom/vignette); null = render directly. */
+  post: PostFX | null;
   /** Shot window — single default scene: start 0, always visible. */
   shot: ShotSpec;
   renderer: THREE.WebGLRenderer;
@@ -199,9 +203,18 @@ export function compileScene(host: HTMLElement): CompiledScene {
     transitionDuration: parseNumber(host.getAttribute("transition-duration"), 0.6),
   };
 
+  // Supersampling AA: render the canvas at samples× and let the capture
+  // downsample. Deterministic (unlike driver MSAA), and the single biggest
+  // step up in visual quality. samples=2 → 4× pixels.
+  const samples = Math.max(1, Math.min(4, Math.round(parseNumber(host.getAttribute("samples"), 2))));
+  const bufW = width * samples;
+  const bufH = height * samples;
+
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = bufW;
+  canvas.height = bufH;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
   host.prepend(canvas);
 
   const backgroundAttr = host.getAttribute("background") ?? "";
@@ -209,10 +222,10 @@ export function compileScene(host: HTMLElement): CompiledScene {
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
-    antialias: false, // context MSAA is driver-dependent; determinism first
+    antialias: false, // context MSAA is driver-dependent; supersampling instead
     alpha: true,
   });
-  renderer.setSize(width, height, false);
+  renderer.setSize(bufW, bufH, false);
   renderer.setPixelRatio(1);
   const toneMapping = (host.getAttribute("tone-mapping") ?? "aces").toLowerCase();
   renderer.toneMapping = toneMapping === "none" ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
@@ -248,9 +261,15 @@ export function compileScene(host: HTMLElement): CompiledScene {
   const gltfLoader = new GLTFLoader();
   const hdrLoader = new HDRLoader();
 
-  // Environment map (also drives PBR reflections on sf-model materials)
+  // Environment map — drives PBR reflections on metal/glass (the difference
+  // between "plastic" and "chrome"). `room`/`studio` build a procedural
+  // studio environment with NO asset; anything else is treated as an HDR path.
   const envSrc = host.getAttribute("environment");
-  if (envSrc) {
+  if (envSrc === "room" || envSrc === "studio") {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+  } else if (envSrc) {
     const pmrem = new THREE.PMREMGenerator(renderer);
     pending.push(
       hdrLoader.loadAsync(envSrc).then((hdr) => {
@@ -359,11 +378,21 @@ export function compileScene(host: HTMLElement): CompiledScene {
     }
   });
 
+  const post = buildPostFX(renderer, scene, camera, {
+    width: bufW,
+    height: bufH,
+    bloom: parseNumber(host.getAttribute("bloom"), 0),
+    bloomThreshold: parseNumber(host.getAttribute("bloom-threshold"), 0.85),
+    bloomRadius: parseNumber(host.getAttribute("bloom-radius"), 0.6),
+    vignette: parseNumber(host.getAttribute("vignette"), 0),
+  });
+
   return {
     host,
     width,
     height,
     canvas,
+    post,
     shot,
     renderer,
     scene,

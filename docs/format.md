@@ -42,6 +42,13 @@ In both modes, load the runtime with an **inline module script**:
 | `exposure` | 1 | tone-mapping exposure |
 | `tone-mapping` | aces | `aces` or `none` |
 | `width`/`height` | 1920/1080 | canvas size (embed mode: inherits the composition root's `data-width/height`) |
+| `samples` | 2 | supersampling antialiasing factor (1–4). 2 = render at 4× pixels then downsample — deterministic, crisp edges. Use 1 for speed |
+| `environment` | — | HDRI path (.hdr) **or** `room`/`studio` (a procedural studio environment, no asset — gives metal/glass real reflections) |
+| `bloom` | 0 | highlight glow strength (e.g. 0.3–0.5); 0 disables |
+| `bloom-threshold`/`bloom-radius` | 0.85 / 0.6 | bloom threshold (higher = only the brightest pixels) / spread |
+| `vignette` | 0 | darken the edges (0–1, e.g. 0.4) — cinematic framing |
+
+**The "finish" attributes** (`samples`, `environment="room"`, `bloom`, `vignette`) are what separate a tech-demo look from a polished one: supersampling removes jaggies, a procedural environment gives metal/glass something to reflect, bloom makes highlights glow, and a vignette frames the shot. All are deterministic. Note the earlier `environment` row (HDRI) — the same attribute now also accepts `room`/`studio`.
 
 The canvas is auto-inserted as sf-scene's first child. Control layering with regular CSS.
 

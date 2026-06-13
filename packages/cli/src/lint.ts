@@ -100,6 +100,8 @@ export function lintHtml(html: string, opts: LintOptions): Finding[] {
     for (const attr of ASSET_ATTRS) {
       const value = readAttr(tag.attrs, attr);
       if (!value) continue;
+      // `environment="room"|"studio"` are procedural, not files.
+      if (attr === "environment" && (value === "room" || value === "studio")) continue;
       if (/^https?:\/\//i.test(value)) {
         findings.push({
           rule: "remote_asset",

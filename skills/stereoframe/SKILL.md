@@ -172,6 +172,16 @@ Total video duration = max(start + duration). For crossfades, make the previous 
 3. No previous-frame-dependent effects (trails, feedback, stepped physics) — frames must be seekable in any order.
 4. Camera motion = verbs on `target="camera"`; one `sf-camera` per scene.
 
+## Polish — the "finish" attributes (use these for premium-looking output)
+
+A flat, jagged, plastic look is almost always a missing-finish problem, not a content problem. On `<sf-scene>`:
+- `samples="2"` — supersampling AA. On by default; the single biggest quality step. Crisp edges.
+- `environment="room"` — a procedural studio environment (no asset). Gives metal/glass real reflections — turns "plastic" into "chrome". Essential whenever you use metalness or glass materials.
+- `bloom="0.3"` (with `bloom-threshold="0.85"`) — soft glow on highlights. Keep it subtle; raise the threshold so only true highlights bloom (emissive objects, bright rims), not the whole frame.
+- `vignette="0.4"` — darken the edges for cinematic framing, especially on dark/moody scenes.
+
+Example moody hero scene: `<sf-scene background="#070709" exposure="0.85" environment="room" samples="2" bloom="0.35" bloom-threshold="0.86" vignette="0.4">`. Metal/glass need `environment` to look right; emissive + `bloom` reads as glow/light.
+
 ## Framing heuristics
 
 - ~2-unit-tall GLB: camera `position="0 0.35 4.4" fov="33"` gives comfortable margin.
