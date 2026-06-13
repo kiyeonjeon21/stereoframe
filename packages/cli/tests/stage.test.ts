@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildAutoCallouts } from "../src/stage";
+import { buildAutoCallouts, explodeTiming } from "../src/stage";
 import type { ModelManifest, PartManifest } from "../src/inspect";
 
 function part(p: Partial<PartManifest>): PartManifest {
@@ -81,5 +81,37 @@ describe("buildAutoCallouts", () => {
     const out = buildAutoCallouts(m, 8);
     expect(out[0]!.start).toBeLessThan(out[1]!.start);
     expect(out[1]!.start + out[1]!.duration).toBeLessThan(8);
+  });
+
+  test("leadFan=0 keeps every label at the same lead (teardown)", () => {
+    const m = manifest([
+      part({ index: 0, name: "A", triangles: 3000 }),
+      part({ index: 1, name: "B", triangles: 2000 }),
+      part({ index: 2, name: "C", triangles: 1000 }),
+    ]);
+    const out = buildAutoCallouts(m, 8, { max: 5, leadFan: 0 });
+    expect(out.map((c) => c.leadY)).toEqual([-82, -82, -82]);
+  });
+
+  test("startAt delays the first callout (teardown waits for the explode)", () => {
+    const m = manifest([
+      part({ index: 0, name: "A", triangles: 3000 }),
+      part({ index: 1, name: "B", triangles: 2000 }),
+    ]);
+    const out = buildAutoCallouts(m, 10, { startAt: 4 });
+    expect(out[0]!.start).toBe(4);
+  });
+});
+
+describe("explodeTiming", () => {
+  test("starts at 0.5 and finishes within the clip", () => {
+    const t = explodeTiming(8);
+    expect(t.start).toBe(0.5);
+    expect(t.end).toBe(t.start + t.dur);
+    expect(t.end).toBeLessThan(8);
+  });
+
+  test("has a floor so short clips still separate", () => {
+    expect(explodeTiming(2).dur).toBeGreaterThanOrEqual(1.6);
   });
 });

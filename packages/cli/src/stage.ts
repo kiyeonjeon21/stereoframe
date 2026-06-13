@@ -13,7 +13,7 @@ import { basename, join, resolve } from "node:path";
 import type { Character, ModelManifest } from "./inspect";
 import { resolveRuntimeBundle } from "./scaffold";
 
-export const PRESETS = ["reveal", "hero-orbit", "turntable", "exploded-view", "spec"] as const;
+export const PRESETS = ["reveal", "hero-orbit", "turntable", "exploded-view", "spec", "teardown"] as const;
 export type Preset = (typeof PRESETS)[number];
 
 /** An auto-generated spec callout (from the segment manifest). */
@@ -179,20 +179,38 @@ const CHARACTER_CAPTION: Record<Character, string> = {
   "—": "Component",
 };
 
+/** Explode timing for the teardown preset — single source for the template and
+ *  the callout start (callouts draw on once the parts have separated). */
+export function explodeTiming(duration: number): { start: number; dur: number; end: number } {
+  const start = 0.5;
+  const dur = Math.round(Math.max(1.6, duration * 0.32) * 100) / 100;
+  return { start, dur, end: start + dur };
+}
+
 /**
  * Derive auto-callouts from a segment manifest: annotate the most detailed mesh
  * parts (by triangle count), label them by name + material caption, side by
- * spatial position, and stagger the draw-ons through the back half of the clip.
- * Returns [] for single-mesh models (nothing to point at).
+ * spatial position, and stagger the draw-ons. Returns [] for single-mesh models
+ * (nothing to point at). `startAt` overrides when the first callout begins
+ * (teardown waits for the parts to finish separating).
  */
-export function buildAutoCallouts(manifest: ModelManifest, duration: number, max = 3): CalloutSpec[] {
+export function buildAutoCallouts(
+  manifest: ModelManifest,
+  duration: number,
+  opts: { max?: number; startAt?: number; leadFan?: number } = {},
+): CalloutSpec[] {
+  const max = opts.max ?? 3;
+  // How much each successive label is pushed up the screen. Needed when parts
+  // cluster (spec); off for teardown, where the explode already separates the
+  // anchors and a fan would push the highest part's label off the top edge.
+  const leadFan = opts.leadFan ?? 66;
   const parts = manifest.parts
     .filter((p) => p.kind === "mesh" && p.bounds)
     .sort((a, b) => b.triangles - a.triangles)
     .slice(0, max);
   if (parts.length < 2) return [];
 
-  const base = Math.max(1, duration * 0.32);
+  const base = opts.startAt ?? Math.max(1, duration * 0.32);
   const step = Math.min(0.9, (duration - base - 0.8) / Math.max(1, parts.length - 1));
   let alt = 0;
   return parts.map((p, i) => {
@@ -210,7 +228,7 @@ export function buildAutoCallouts(manifest: ModelManifest, duration: number, max
       anchor: side,
       // Fan the labels up the screen so parts that cluster (e.g. a canopy on
       // a body) and land on the same side don't stack on top of each other.
-      leadY: -82 - i * 66,
+      leadY: -82 - i * leadFan,
       start: Math.round((base + i * step) * 100) / 100,
       duration: 0.7,
     };
@@ -254,12 +272,38 @@ ${calloutMarkup(callouts)}${t.anim}    </sf-scene>
 ${t.dom}${tail}`;
 }
 
+/**
+ * `teardown` — an exploded view where each separated part is labelled. The
+ * parts fly apart from the model center, the camera makes a slow arc (the model
+ * itself does NOT spin, so the tracked labels stay readable), and a spec callout
+ * draws on over each part once it has settled. Auto-populated by `stage`.
+ */
+function teardown(model: string, d: number, bg: string, title?: string, callouts?: CalloutSpec[]): string {
+  const ex = explodeTiming(d);
+  const t1 = Math.max(1.2, d * 0.4);
+  const t = titleBlock(title, t1);
+  return `${head(bg)}
+    <sf-scene duration="${d}" width="1920" height="1080" background="${bg}"
+              environment="room" exposure="1.0" samples="2"
+              bloom="0.12" bloom-threshold="0.9" vignette="0.32"
+              contrast="1.04" saturation="1.05" light-sweep="0.07">
+      <sf-camera fov="40" position="0 0.7 6.6" look-at="0 0 0"></sf-camera>
+      <sf-light preset="studio"></sf-light>
+      <sf-model id="m" src="assets/${model}" fit="2.3"></sf-model>
+      <sf-animate target="#m" verb="explode" distance="0.8" start="${ex.start}" duration="${ex.dur}" ease="power2.inOut"></sf-animate>
+      <sf-animate target="camera" verb="orbit" around="0 0 0" radius="6.4"
+                  from="-20deg" to="20deg" height="0.5" start="0" duration="${d}" ease="sine.inOut"></sf-animate>
+${calloutMarkup(callouts)}${t.anim}    </sf-scene>
+${t.dom}${tail}`;
+}
+
 const TEMPLATES: Record<Preset, (m: string, d: number, bg: string, t?: string) => string> = {
   "reveal": reveal,
   "hero-orbit": heroOrbit,
   "turntable": turntable,
   "exploded-view": explodedView,
   "spec": spec,
+  "teardown": teardown,
 };
 
 const DEFAULT_BG: Record<Preset, string> = {
@@ -268,6 +312,7 @@ const DEFAULT_BG: Record<Preset, string> = {
   "turntable": "#15171b",
   "exploded-view": "#14161a",
   "spec": "#101216",
+  "teardown": "#0e1014",
 };
 
 export function stageModel(opts: StageOptions): string {
@@ -289,7 +334,9 @@ export function stageModel(opts: StageOptions): string {
   const html =
     opts.preset === "spec"
       ? spec(modelFile, d, bg, opts.title, opts.callouts)
-      : TEMPLATES[opts.preset](modelFile, d, bg, opts.title);
+      : opts.preset === "teardown"
+        ? teardown(modelFile, d, bg, opts.title, opts.callouts)
+        : TEMPLATES[opts.preset](modelFile, d, bg, opts.title);
   writeFileSync(join(dir, "index.html"), html);
 
   return dir;

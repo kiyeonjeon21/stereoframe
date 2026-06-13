@@ -297,19 +297,28 @@ export function compileAnimations(compiled: CompiledScene): void {
       // function of t. Needs a multi-part model (single-mesh = no effect).
       const parts = collectParts(target);
       if (parts.length <= 1) continue; // single-mesh model — nothing to explode
-      const modelCenter = new Box3().setFromObject(target).getCenter(new Vector3());
+      const modelBox = new Box3().setFromObject(target);
+      const modelCenter = modelBox.getCenter(new Vector3());
+      // `distance` is a fraction of the model's world radius (fit-invariant):
+      // distance=1 moves each part out by ~one model-radius, regardless of the
+      // GLB's native scale. We compute travel in world units, then convert to
+      // each part's local space (fit applies a large uniform scale to the group,
+      // so a raw local offset would fling tiny-native models off-screen).
+      const modelRadius = 0.5 * modelBox.getSize(new Vector3()).length();
       const distance = parseNumber(el.getAttribute("distance"), 1.5);
       const movers = parts.map((part) => {
         const base = part.position.clone();
         const dir = new Box3().setFromObject(part).getCenter(new Vector3()).sub(modelCenter);
         if (dir.lengthSq() < 1e-6) dir.set(0, 1, 0);
-        return { part, base, dir: dir.normalize() };
+        const parentScale = part.parent ? part.parent.getWorldScale(new Vector3()).x || 1 : 1;
+        const localTravel = (distance * modelRadius) / parentScale;
+        return { part, base, dir: dir.normalize(), localTravel };
       });
       const tmp = new Vector3();
       compiled.seekFns.push((t) => {
         const p = verbs.easedProgress(t, timing);
         for (const m of movers) {
-          m.part.position.copy(m.base).add(tmp.copy(m.dir).multiplyScalar(distance * p));
+          m.part.position.copy(m.base).add(tmp.copy(m.dir).multiplyScalar(m.localTravel * p));
         }
       });
     } else if (verb === "isolate") {

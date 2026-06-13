@@ -15,7 +15,7 @@ import { basename } from "node:path";
 import { addBlock, listBlocks } from "./blocks";
 import { genModel } from "./gen";
 import { inspectModel } from "./inspect";
-import { buildAutoCallouts, PRESETS, stageModel, type Preset } from "./stage";
+import { buildAutoCallouts, explodeTiming, PRESETS, stageModel, type Preset } from "./stage";
 import { lintHtml, type Finding } from "./lint";
 import { renderProject } from "./render";
 import { scaffoldProject, updateRuntime } from "./scaffold";
@@ -63,8 +63,9 @@ USAGE
   stereoframe preview [dir]            serve with looping wall-clock playback
       --port <n>       fixed port (default: random)
   stereoframe stage <model.glb>        auto-direct a GLB into a cinematic motion graphic
-      --preset <name>  reveal | hero-orbit | turntable | exploded-view | spec (default reveal)
-                       spec = auto-annotated product film (inspects the GLB, places named callouts)
+      --preset <name>  reveal | hero-orbit | turntable | exploded-view | spec | teardown (default reveal)
+                       spec     = auto-annotated product film (inspects the GLB, places named callouts)
+                       teardown = exploded view with a labelled callout tracking each separated part
       --dir <dir>      output project dir (default: <model name>)
       --duration <s>   seconds (default 8)
       --title "<text>" optional title overlay
@@ -146,16 +147,23 @@ async function main(): Promise<void> {
         typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${stem}-${preset}`;
       const duration = options.has("duration") ? Number(options.get("duration")) : undefined;
 
-      // The `spec` preset auto-annotates: inspect the GLB, then place named
-      // callouts on its top parts.
+      // The `spec`/`teardown` presets auto-annotate: inspect the GLB, then place
+      // named callouts on its parts (teardown labels each part as it separates).
       let callouts;
-      if (preset === "spec") {
-        console.log(`inspecting ${model} for spec callouts…`);
+      if (preset === "spec" || preset === "teardown") {
+        const dur = duration && duration > 0 ? duration : 8;
+        console.log(`inspecting ${model} for ${preset} callouts…`);
         const manifest = await inspectModel({ model, silent: true, write: false });
-        callouts = buildAutoCallouts(manifest, duration && duration > 0 ? duration : 8);
+        callouts = buildAutoCallouts(
+          manifest,
+          dur,
+          preset === "teardown"
+            ? { max: 5, startAt: explodeTiming(dur).end + 0.2, leadFan: 46 }
+            : { max: 3 },
+        );
         if (callouts.length === 0) {
           console.warn(
-            `note: ${model} has <2 separable mesh parts — spec film will render without callouts.`,
+            `note: ${model} has <2 separable mesh parts — ${preset} film will render without callouts.`,
           );
         } else {
           console.log(`  callouts: ${callouts.map((c) => c.value).join(", ")}`);
