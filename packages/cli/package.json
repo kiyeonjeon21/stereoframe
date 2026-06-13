@@ -14,7 +14,8 @@
   },
   "files": [
     "dist",
-    "assets"
+    "assets",
+    "README.md"
   ],
   "engines": {
     "node": ">=20"

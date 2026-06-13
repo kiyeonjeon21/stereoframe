@@ -11,7 +11,8 @@
   "type": "module",
   "main": "dist/stereoframe.js",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "exports": {
     ".": "./dist/stereoframe.js",
