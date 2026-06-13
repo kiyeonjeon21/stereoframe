@@ -98,6 +98,9 @@ USAGE
       --images a,b,c   multi-image-to-3D from 1-4 views (front/side/back…)
       --via-image      text → image (OpenAI gpt-image-2) → image-to-3D, more art-directable
       --image-provider openai (default)  --image-model <id>  --size <wxh>  --image-key <key>
+      --provider fal   generate via fal.ai (premium, pay-as-you-go) instead of Meshy
+      --fal-model <id>   fal model, e.g. tripo3d/tripo/v2.5/text-to-3d  (browse fal.ai/models?categories=3d)
+      --input '<json>'   model-specific fal input fields (merged into the request)
       --dir <dir>      project dir (default .)
       --out <path>     output path (default assets/<slug>.glb)
       --no-texture     skip the PBR texture pass (faster, untextured mesh)
@@ -377,6 +380,18 @@ async function main(): Promise<void> {
       const key = typeof options.get("key") === "string" ? (options.get("key") as string) : undefined;
       const imageOpt = options.get("image");
       const imagesOpt = options.get("images");
+      // fal.ai generation gateway: `--provider fal --fal-model <id>` (premium, PAYG).
+      const provider = options.get("provider") === "fal" ? ("fal" as const) : undefined;
+      const falModel = typeof options.get("fal-model") === "string" ? (options.get("fal-model") as string) : undefined;
+      let falInput: Record<string, unknown> | undefined;
+      if (typeof options.get("input") === "string") {
+        try {
+          falInput = JSON.parse(options.get("input") as string);
+        } catch {
+          throw new Error("--input must be valid JSON (model-specific fal input fields)");
+        }
+      }
+      const falOpts = { provider, falModel, falInput };
 
       let glbPath: string;
       if (typeof imagesOpt === "string" || typeof imageOpt === "string") {
@@ -385,7 +400,7 @@ async function main(): Promise<void> {
           typeof imagesOpt === "string"
             ? imagesOpt.split(",").map((s) => s.trim()).filter(Boolean)
             : [imageOpt as string];
-        glbPath = await genFromImages({ images, projectDir, out, texture, polycount, key });
+        glbPath = await genFromImages({ images, projectDir, out, texture, polycount, key, ...falOpts });
       } else if (options.has("via-image")) {
         // text → reference image → image-to-3D. (Tolerate `gen --via-image "prompt"`
         // where the prompt is captured as the flag's value.)
@@ -402,12 +417,13 @@ async function main(): Promise<void> {
           imageProvider: typeof options.get("image-provider") === "string" ? (options.get("image-provider") as string) : undefined,
           imageModel: typeof options.get("image-model") === "string" ? (options.get("image-model") as string) : undefined,
           imageSize: typeof options.get("size") === "string" ? (options.get("size") as string) : undefined,
+          ...falOpts,
         });
       } else {
         if (!prompt) {
           throw new Error('usage: stereoframe gen "<prompt>" [--via-image] | --image <png> | --images a,b,c [--stage <preset>] [--render]');
         }
-        glbPath = await genModel({ prompt, projectDir, out, texture, polycount, key });
+        glbPath = await genModel({ prompt, projectDir, out, texture, polycount, key, ...falOpts });
       }
 
       // One-shot: model → directed film (→ optional render).

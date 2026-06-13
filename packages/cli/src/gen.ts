@@ -1,9 +1,12 @@
 /**
- * `stereoframe gen "<prompt>"` — generate a 3D model from text via Meshy and
- * download it as a self-contained GLB into the project's assets/.
+ * `stereoframe gen "<prompt>"` — generate a 3D model and download it as a
+ * self-contained GLB into the project's assets/. Default backend is Meshy;
+ * `--provider fal` routes through fal.ai (premium, pay-as-you-go) instead.
  *
  * Flow (Meshy async REST): submit a preview task → poll → (optionally) submit
  * a refine task for PBR textures → poll → download `model_urls.glb`.
+ * fal flow (queue REST): submit → poll status → fetch result → download the GLB.
+ * All backends output a single welded mesh (no separable parts).
  *
  * Key resolution: --key flag, then MESHY_API_KEY (env or project .env), then
  * Meshy's public test-mode key — which returns a sample model for free, so
@@ -48,6 +51,10 @@ export interface GenOptions {
   texture: boolean;
   polycount?: number;
   key?: string;
+  /** "fal" routes generation through fal.ai (premium, PAYG) instead of Meshy. */
+  provider?: "meshy" | "fal";
+  falModel?: string;
+  falInput?: Record<string, unknown>;
 }
 
 function resolveKey(projectDir: string, explicit?: string): { key: string; isTest: boolean } {
@@ -114,6 +121,17 @@ async function pollTask(
 
 export async function genModel(opts: GenOptions): Promise<string> {
   const projectDir = resolve(opts.projectDir);
+  if (opts.provider === "fal") {
+    return genViaFal({
+      projectDir,
+      model: opts.falModel ?? "",
+      prompt: opts.prompt,
+      out: opts.out,
+      key: opts.key,
+      label: opts.prompt,
+      input: opts.falInput,
+    });
+  }
   const { key, isTest } = resolveKey(projectDir, opts.key);
   if (isTest) {
     console.log(
@@ -160,7 +178,7 @@ export async function genModel(opts: GenOptions): Promise<string> {
   }
 
   return downloadAndWrite(
-    finalTask,
+    finalTask.model_urls?.glb,
     out,
     projectDir,
     {
@@ -182,14 +200,13 @@ export async function genModel(opts: GenOptions): Promise<string> {
  *  sidecar (the recipe — generation isn't reproducible, so keep how it was made).
  *  Shared by text-to-3D and image-to-3D. */
 async function downloadAndWrite(
-  finalTask: any,
+  glbUrl: string,
   out: string,
   projectDir: string,
   provenance: Record<string, unknown>,
   isTest = false,
 ): Promise<string> {
-  const glbUrl = finalTask.model_urls?.glb;
-  if (!glbUrl) throw new Error("Meshy returned no GLB url");
+  if (!glbUrl) throw new Error("generator returned no GLB url");
   const glb = await fetch(glbUrl);
   if (!glb.ok) throw new Error(`downloading GLB → ${glb.status}`);
   writeFileSync(out, Buffer.from(await glb.arrayBuffer()));
@@ -231,11 +248,27 @@ export interface ImageGenOptions {
   label?: string;
   /** extra provenance fields (e.g. imageProvider/imagePrompt for --via-image). */
   provenance?: Record<string, unknown>;
+  /** "fal" routes the image-to-3D step through fal.ai instead of Meshy. */
+  provider?: "meshy" | "fal";
+  falModel?: string;
+  falInput?: Record<string, unknown>;
 }
 
 /** image-to-3D (1 image) or multi-image-to-3D (2-4 views). */
 export async function genFromImages(opts: ImageGenOptions): Promise<string> {
   const projectDir = resolve(opts.projectDir);
+  if (opts.provider === "fal") {
+    return genViaFal({
+      projectDir,
+      model: opts.falModel ?? "",
+      images: opts.images,
+      out: opts.out,
+      key: opts.key,
+      label: opts.label,
+      provenance: opts.provenance,
+      input: opts.falInput,
+    });
+  }
   const key = resolveEnvKey("MESHY_API_KEY", projectDir, opts.key);
   if (!key) {
     throw new Error("image-to-3D needs a real MESHY_API_KEY (no test mode) — set it in your shell or project .env, or pass --key.");
@@ -264,7 +297,7 @@ export async function genFromImages(opts: ImageGenOptions): Promise<string> {
   const taskId = submit.result;
   const task = await pollTask(taskId, key, multi ? "multi-image-to-3d" : "image-to-3d", endpoint);
 
-  return downloadAndWrite(task, out, projectDir, {
+  return downloadAndWrite(task.model_urls?.glb, out, projectDir, {
     provider: "meshy",
     task: multi ? "multi-image-to-3d" : "image-to-3d",
     aiModel: "latest",
@@ -287,6 +320,10 @@ export interface ViaImageOptions {
   imageProvider?: string;
   imageModel?: string;
   imageSize?: string;
+  /** "fal" routes the image-to-3D step through fal.ai instead of Meshy. */
+  provider?: "meshy" | "fal";
+  falModel?: string;
+  falInput?: Record<string, unknown>;
 }
 
 /** Text → reference image (an ImageProvider) → image-to-3D. The generated image is
@@ -318,6 +355,160 @@ export async function genViaImage(opts: ViaImageOptions): Promise<string> {
     polycount: opts.polycount,
     key: opts.key,
     label: opts.prompt,
+    provider: opts.provider,
+    falModel: opts.falModel,
+    falInput: opts.falInput,
     provenance: { viaImage: true, imageProvider: provider.name, imagePrompt: opts.prompt, sourceImageFile: basename(imgPath) },
+  });
+}
+
+// ── fal.ai generation gateway ──────────────────────────────────────────────
+// fal is pure pay-as-you-go (no provider minimum) and fronts many 3D generators
+// (Hunyuan3D, Tripo, Rodin, Trellis). Premium PBR single-mesh output — the cheap
+// route to a good-looking model when Meshy's look isn't enough. (Per-part still
+// needs a genuinely multi-part GLB; fal generators output one fused mesh.)
+const FAL_QUEUE = "https://queue.fal.run";
+
+interface FalSubmit {
+  requestId: string;
+  statusUrl: string;
+  responseUrl: string;
+}
+
+async function falSubmit(model: string, key: string, input: Record<string, unknown>): Promise<FalSubmit> {
+  const res = await fetch(`${FAL_QUEUE}/${model}`, {
+    method: "POST",
+    headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`fal submit ${model} → ${res.status}: ${text.slice(0, 300)}`);
+  const j = text ? JSON.parse(text) : {};
+  if (!j.request_id) throw new Error(`fal submit: no request_id (${text.slice(0, 200)})`);
+  // Use the canonical URLs fal returns (constructing them by hand breaks for
+  // multi-slash model ids like "fal-ai/hunyuan-3d/v3.1").
+  return {
+    requestId: j.request_id as string,
+    statusUrl: (j.status_url as string) ?? `${FAL_QUEUE}/${model}/requests/${j.request_id}/status`,
+    responseUrl: (j.response_url as string) ?? `${FAL_QUEUE}/${model}/requests/${j.request_id}`,
+  };
+}
+
+async function falPoll(sub: FalSubmit, key: string, label: string): Promise<any> {
+  const auth = { Authorization: `Key ${key}` };
+  const deadline = Date.now() + 8 * 60_000;
+  let last = "";
+  while (Date.now() < deadline) {
+    const res = await fetch(sub.statusUrl, { headers: auth });
+    const j = (await res.json()) as any;
+    const status = j.status as string;
+    if (status !== last) {
+      process.stdout.write(`\r  ${label}: ${status}    `);
+      last = status;
+    }
+    if (status === "COMPLETED") {
+      process.stdout.write("\n");
+      const r = await fetch(sub.responseUrl, { headers: auth });
+      if (!r.ok) throw new Error(`fal result → ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      return r.json();
+    }
+    if (status === "FAILED" || status === "ERROR") {
+      process.stdout.write("\n");
+      throw new Error(`fal ${label} ${status}: ${JSON.stringify(j).slice(0, 300)}`);
+    }
+    await sleep(3000);
+  }
+  throw new Error(`fal ${label} timed out after 8 minutes`);
+}
+
+/** Find the GLB url in a fal result — output field names vary by model
+ *  (model_glb_pbr / model_glb / model_mesh / model), so prefer those then deep-scan. */
+function findGlbUrl(obj: any): string | undefined {
+  for (const k of ["model_glb_pbr", "model_glb", "model_mesh", "model"]) {
+    const v = obj?.[k];
+    const u = typeof v === "string" ? v : v?.url;
+    if (typeof u === "string" && /\.glb(\?|$)/i.test(u)) return u;
+  }
+  let found: string | undefined;
+  const walk = (v: any): void => {
+    if (found || v == null) return;
+    if (typeof v === "string") {
+      if (/^https?:\/\/.*\.glb(\?|$)/i.test(v)) found = v;
+      return;
+    }
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (typeof v === "object") {
+      if (typeof v.url === "string" && /\.glb(\?|$)/i.test(v.url)) found = v.url;
+      else for (const k of Object.keys(v)) walk(v[k]);
+    }
+  };
+  walk(obj);
+  return found;
+}
+
+export interface FalGenOptions {
+  projectDir: string;
+  model: string; // fal model id, e.g. "fal-ai/hyper3d/rodin" or "fal-ai/tripo3d"
+  prompt?: string; // text-to-3D
+  images?: string[]; // image paths / data-uris → image-to-3D
+  out?: string;
+  key?: string;
+  label?: string;
+  provenance?: Record<string, unknown>;
+  /** model-specific input fields passed through verbatim (overrides the defaults). */
+  input?: Record<string, unknown>;
+}
+
+/** Generate a GLB via a fal.ai 3D model (queue REST: submit → poll → fetch). */
+export async function genViaFal(opts: FalGenOptions): Promise<string> {
+  const projectDir = resolve(opts.projectDir);
+  const key = resolveEnvKey("FAL_KEY", projectDir, opts.key);
+  if (!key)
+    throw new Error(
+      "fal generation needs FAL_KEY — set it in your shell or project .env, or pass --key (https://fal.ai/dashboard/keys).",
+    );
+  // Default to verified Tripo v2.5 endpoints; override with --fal-model for any
+  // fal 3D model (fal.ai/models?categories=3d).
+  const model =
+    opts.model ||
+    (opts.images?.length ? "tripo3d/tripo/v2.5/image-to-3d" : "tripo3d/tripo/v2.5/text-to-3d");
+
+  const labelSrc = (opts.label ?? opts.prompt ?? opts.images?.[0] ?? "model").replace(
+    /\.(png|jpe?g|webp|glb)$/i,
+    "",
+  );
+  const out = resolve(projectDir, opts.out ?? join("assets", `${slug(basename(labelSrc))}.glb`));
+  mkdirSync(join(out, ".."), { recursive: true });
+
+  // Image-to-3D uses input_image_url(s); otherwise a text prompt. Both are common
+  // fal conventions; override per-model via `input` (CLI --input '<json>').
+  const input: Record<string, unknown> = { ...(opts.input ?? {}) };
+  if (opts.images && opts.images.length) {
+    const uris = opts.images.map((p) => (p.startsWith("data:") ? p : imageToDataUri(resolve(projectDir, p))));
+    if (uris.length > 1) input.input_image_urls ??= uris;
+    else input.input_image_url ??= uris[0];
+  } else if (opts.prompt && input.prompt === undefined) {
+    input.prompt = opts.prompt;
+  }
+
+  console.log(`generating via fal (${model}) → ${out}`);
+  const sub = await falSubmit(model, key, input);
+  const result = await falPoll(sub, key, "fal");
+  const glbUrl = findGlbUrl(result);
+  if (!glbUrl)
+    throw new Error(
+      `fal ${model} returned no GLB url (output keys: ${Object.keys(result ?? {}).join(", ")}). ` +
+        "Try a different --fal-model, or check that model's output schema.",
+    );
+
+  return downloadAndWrite(glbUrl, out, projectDir, {
+    provider: "fal",
+    falModel: model,
+    ...(opts.prompt ? { prompt: opts.prompt } : {}),
+    ...(opts.images
+      ? { sourceImages: opts.images.map((p) => (p.startsWith("data:") ? "<inline>" : basename(p))) }
+      : {}),
+    requestId: sub.requestId,
+    ...(opts.provenance ?? {}),
   });
 }
