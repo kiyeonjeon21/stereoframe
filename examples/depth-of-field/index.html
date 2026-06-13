@@ -1,0 +1,44 @@
+<!doctype html>
+<!--
+  depth-of-field — cinematic finish: shallow DOF (the subject stays sharp while
+  fore/background blur) + a .cube color-grade LUT. Both are deterministic: the
+  DOF blur is depth-based and its focus auto-tracks the subject (focus distance =
+  f(camera) = f(t)); a LUT is a static display-referred map. Premium look, seekable.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0a0c12; }
+      sf-scene { position: absolute; inset: 0; }
+    </style>
+  </head>
+  <body>
+    <sf-scene duration="6" width="1920" height="1080"
+              background="#0a0c12" environment="studio" exposure="1.0" samples="2"
+              dof="0.7" lut="assets/teal-orange.cube" lut-intensity="0.9"
+              vignette="0.4" contrast="1.05" bloom="0.06" bloom-threshold="0.9"
+              ground="contact-shadow" ground-y="-0.9" ground-size="40">
+      <sf-camera fov="30" position="0 0.6 6" look-at="0 0.4 0"></sf-camera>
+      <sf-light preset="studio"></sf-light>
+
+      <!-- hero at origin (the auto-focus point) -->
+      <sf-mesh id="hero" geometry="icosahedron" args="0.9 3" material="standard"
+               color="#ff6a3d" metalness="0.1" roughness="0.3" position="0 0.4 0"></sf-mesh>
+      <sf-animate target="#hero" verb="turntable" axis="y" rpm="6"></sf-animate>
+
+      <!-- foreground + background spheres at varying depth → DOF blurs them -->
+      <sf-mesh geometry="sphere" args="0.5" color="#5bd6ff" roughness="0.3" position="-2.3 0.1 2.6"></sf-mesh>
+      <sf-mesh geometry="sphere" args="0.5" color="#9b8cff" roughness="0.3" position="2.4 0.2 -3"></sf-mesh>
+      <sf-mesh geometry="sphere" args="0.5" color="#ffd36a" roughness="0.3" position="3.6 0.2 -7"></sf-mesh>
+
+      <!-- a gentle dolly so the depth/parallax (and held focus) reads -->
+      <sf-animate target="camera" verb="dolly" toward="0 0.4 0" distance="1.0" start="0.5" duration="5" ease="sine.inOut"></sf-animate>
+    </sf-scene>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

@@ -340,6 +340,8 @@ A flat, jagged, plastic look is almost always a missing-finish problem, not a co
 - `vignette="0.4"` — darken the edges for cinematic framing.
 - `chromatic-aberration="0.4"` + `grain="0.04"` — lens/film feel (RGB edge split + seeded grain). Subtle is better.
 - `contrast="1.05" saturation="1.1"` — light color grade.
+- **`dof="0.6"`** — shallow depth-of-field: the subject stays sharp while fore/background blur (focus auto-tracks the centred subject; override with `dof-focus="x y z"`). The cheapest jump from "tech demo" to "shot on a lens". Deterministic. Pair with a `dolly` to sell depth. See `examples/depth-of-field`.
+- **`lut="assets/look.cube" lut-intensity="0.9"`** — a `.cube` 3D LUT color grade (display-referred, applied last). Highest film-look-per-effort lever; static map → seekable. Drop a free `.cube` (teal-orange, film-stock emulation, etc.) into `assets/`. A shipped CC0 teal-orange LUT lives at `examples/depth-of-field/assets/teal-orange.cube`.
 - **`material="matcap" matcap="iridescent|chrome|pearl|clay|holo"`** — distinctive, designer-grade surfaces with zero lighting setup. The fastest way off the generic-preset look. Dark-core looks (iridescent) pop on LIGHT backgrounds; bright looks pop on dark. Match background contrast to the material.
 
 **Product-film finish** (kills the "floating CG" look — the difference between a spinning GLB and a real product shot):

@@ -8,11 +8,13 @@
  * Antialiasing is supersampling (scene.ts renders the canvas at Nx and the
  * capture downsamples) — handled outside this chain.
  */
-import { HalfFloatType, RGBAFormat, Vector2, WebGLRenderTarget } from "three";
-import type { Camera, Scene, WebGLRenderer } from "three";
+import { HalfFloatType, RGBAFormat, Vector2, Vector3, WebGLRenderTarget } from "three";
+import type { Camera, Data3DTexture, PerspectiveCamera, Scene, WebGLRenderer } from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
+import { LUTPass } from "three/addons/postprocessing/LUTPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 
@@ -107,14 +109,25 @@ export interface PostFXOptions {
   saturation?: number;
   chromaticAberration?: number;
   grain?: number;
+  /** Depth-of-field strength (0 = off). Focus auto-tracks `dofFocus` each frame,
+   *  so the subject stays sharp while fore/background blur — deterministic (the
+   *  blur is depth-based, focus is a pure function of the camera position = f(t)). */
+  dof?: number;
+  /** World point the DOF keeps in focus (default origin = the auto-fit subject). */
+  dofFocus?: [number, number, number];
+  /** A .cube LUT is wanted (texture arrives async via setLUT). */
+  lut?: boolean;
+  lutIntensity?: number;
   /** MSAA samples on the render target (WebGL2) — hardware edge AA for thin geometry. */
   msaa?: number;
 }
 
 export interface PostFX {
-  /** t drives the grain (and any future time-based pass); pure function of t. */
+  /** t drives the grain + DOF focus (and any future time-based pass); pure function of t. */
   render: (t: number) => void;
   setSize: (w: number, h: number) => void;
+  /** Wire in a loaded .cube LUT (loaded asynchronously by the scene). */
+  setLUT: (texture: Data3DTexture, intensity: number) => void;
 }
 
 export function buildPostFX(
@@ -128,7 +141,9 @@ export function buildPostFX(
   const wantGrade = (opts.contrast ?? 1) !== 1 || (opts.saturation ?? 1) !== 1;
   const wantChroma = (opts.chromaticAberration ?? 0) > 0;
   const wantGrain = (opts.grain ?? 0) > 0;
-  if (!wantBloom && !wantVignette && !wantGrade && !wantChroma && !wantGrain) {
+  const wantDof = (opts.dof ?? 0) > 0;
+  const wantLut = opts.lut === true;
+  if (!wantBloom && !wantVignette && !wantGrade && !wantChroma && !wantGrain && !wantDof && !wantLut) {
     return null;
   }
 
@@ -145,6 +160,21 @@ export function buildPostFX(
   const renderPass = new RenderPass(scene, camera);
   renderPass.clearAlpha = 0;
   composer.addPass(renderPass);
+
+  // Depth of field — added right after the scene render so it has fresh depth.
+  // `dof` (0..1) maps to aperture + max blur; focus distance is set per-frame in
+  // render(t) from the camera→subject distance (so the subject stays sharp).
+  let bokehPass: BokehPass | null = null;
+  const dofFocus = new Vector3(...(opts.dofFocus ?? [0, 0, 0]));
+  if (wantDof) {
+    const d = opts.dof ?? 0;
+    bokehPass = new BokehPass(scene, camera, {
+      focus: 5.0,
+      aperture: d * 0.03, // shallower depth-of-field as dof→1
+      maxblur: 0.006 + d * 0.022, // max circle-of-confusion radius (fraction of screen)
+    });
+    composer.addPass(bokehPass);
+  }
 
   if (wantBloom) {
     composer.addPass(
@@ -176,11 +206,30 @@ export function buildPostFX(
   }
   composer.addPass(new OutputPass());
 
+  // .cube LUT grade — display-referred, so it runs last (after OutputPass'
+  // tone-map + sRGB). Created disabled; the scene loads the .cube async and calls
+  // setLUT, which enables it. EffectComposer routes the last *enabled* pass to the
+  // screen, so OutputPass stays the output until the LUT is ready.
+  let lutPass: LUTPass | null = null;
+  if (wantLut) {
+    lutPass = new LUTPass({ intensity: opts.lutIntensity ?? 1 });
+    lutPass.enabled = false;
+    composer.addPass(lutPass);
+  }
+
+  const cam = camera as PerspectiveCamera;
   return {
     render: (t: number) => {
       if (grainPass) grainPass.uniforms.uTime.value = t;
+      if (bokehPass) bokehPass.uniforms["focus"].value = cam.position.distanceTo(dofFocus);
       composer.render(0); // explicit delta — never reads the wall clock
     },
     setSize: (w, h) => composer.setSize(w, h),
+    setLUT: (texture, intensity) => {
+      if (!lutPass) return;
+      lutPass.lut = texture;
+      lutPass.intensity = intensity;
+      lutPass.enabled = true;
+    },
   };
 }

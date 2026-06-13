@@ -13,6 +13,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
+import { LUTCubeLoader } from "three/addons/loaders/LUTCubeLoader.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { buildPostFX, type PostFX } from "./postfx";
@@ -601,6 +602,20 @@ export function compileScene(host: HTMLElement): CompiledScene {
     });
   }
 
+  // .cube color-grade LUT — loaded async (relative to the page, like other
+  // assets) and wired into the post chain once ready (held in the `ready` gate so
+  // capture waits for it). A LUT is a static, display-referred map → seekable.
+  const lutPath = host.getAttribute("lut");
+  const lutIntensity = parseNumber(host.getAttribute("lut-intensity"), 1);
+  let applyLUT: ((tex: THREE.Data3DTexture) => void) | undefined;
+  if (lutPath) {
+    pending.push(
+      new LUTCubeLoader().loadAsync(lutPath).then((res) => {
+        applyLUT?.(res.texture3D);
+      }),
+    );
+  }
+
   const ready = Promise.all(pending).then(async () => {
     if (lookAtSelector) {
       const target = objectsById.get(lookAtSelector);
@@ -625,8 +640,13 @@ export function compileScene(host: HTMLElement): CompiledScene {
     saturation: parseNumber(host.getAttribute("saturation"), 1),
     chromaticAberration: parseNumber(host.getAttribute("chromatic-aberration"), 0),
     grain: parseNumber(host.getAttribute("grain"), 0),
+    dof: parseNumber(host.getAttribute("dof"), 0),
+    dofFocus: parseVec3(host.getAttribute("dof-focus"), [0, 0, 0]),
+    lut: lutPath != null,
+    lutIntensity,
     msaa,
   });
+  if (post) applyLUT = (tex) => post.setLUT(tex, lutIntensity);
 
   return {
     host,

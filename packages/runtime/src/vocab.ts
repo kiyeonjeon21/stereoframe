@@ -49,4 +49,4 @@ export const VERB_NAMES = [
 ] as const;
 
 /** sf-* attributes whose value is a local asset path the renderer fetches. */
-export const ASSET_ATTRS = ["src", "environment", "normals"] as const;
+export const ASSET_ATTRS = ["src", "environment", "normals", "lut"] as const;

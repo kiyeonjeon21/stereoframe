@@ -50,6 +50,10 @@ In both modes, load the runtime with an **inline module script**:
 | `chromatic-aberration` | 0 | radial RGB split at the edges (e.g. 0.3–0.5) — lens/film feel |
 | `grain` | 0 | film grain amount (e.g. 0.03–0.06); seeded by `t`, so seekable |
 | `contrast`/`saturation` | 1 / 1 | light color grade (e.g. 1.05 / 1.1) |
+| `dof` | 0 | depth-of-field strength (e.g. 0.4–0.8) — shallow focus that blurs fore/background while the subject stays sharp. Focus auto-tracks `dof-focus` (default origin = the auto-fit subject) every frame, so it's deterministic. The cheapest jump from "tech demo" to "shot on a lens" |
+| `dof-focus` | `0 0 0` | the world point DOF keeps sharp (`x y z`) — override when the subject isn't centred |
+| `lut` | — | path to a `.cube` 3D LUT for color grading (display-referred, applied last). The single highest film-look-per-effort lever; static map → seekable. Loaded as a local asset, like `src` |
+| `lut-intensity` | 1 | LUT mix (0 = off, 1 = full) |
 | `ground` | — | `contact-shadow` (or `shadow`) renders a soft top-down depth shadow onto a `y`-plane — grounds the model so it stops looking like floating CG. Pair with model `fit-ground`. Tune with `ground-y` (0), `ground-size` (6), `ground-opacity` (0.75), `ground-blur` (3), `ground-darkness` (1.4) |
 | `light-sweep` | 0 | rotate the environment (reflections) `light-sweep` turns over the whole timeline — a slow specular sweep travels across metal/glass, the signature "premium product film" highlight. Needs `environment` (`room`/`studio`/HDRI). Try 0.1 |
 | `mode` | (default) | `forward` opts the scene OUT of seek-idempotency so escape-hatch code may carry cross-frame state (live sim, accumulating trails). Forward seekFns receive a second arg `dt` (seconds since the last seek; 0 on the first frame / a backward seek). **Cost:** no random-access seek/scrub — correct only under the monotonic render. Must be the **only** scene and span the whole timeline. To use a sim like this in a multi-shot piece, bake it (see `examples/forward-trails`, and `stereoframe bake`) |
