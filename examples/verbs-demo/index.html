@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+      }
+      sf-scene {
+        position: absolute;
+        inset: 0;
+      }
+      #title {
+        position: absolute;
+        top: 96px;
+        width: 100%;
+        text-align: center;
+        font-size: 56px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: #e5e7eb;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="6"
+      data-width="1920"
+      data-height="1080"
+    >
+      <sf-scene background="#101225">
+        <sf-camera fov="40" position="0 0.6 7" look-at="0 0 0"></sf-camera>
+        <sf-light preset="soft"></sf-light>
+
+        <sf-mesh id="hero" geometry="icosahedron" args="1.2 2" color="#7dd3fc"
+                 metalness="0.4" roughness="0.25" position="0 0 0"></sf-mesh>
+        <sf-mesh id="ring" geometry="torus" args="2.1 0.06" color="#f472b6"
+                 metalness="0.6" roughness="0.3" position="0 0 0" rotation="80 0 0"></sf-mesh>
+        <sf-mesh id="cube-l" geometry="box" args="0.5 0.5 0.5" color="#fbbf24"
+                 roughness="0.4" position="-2.6 -0.4 0.5" rotation="0 30 0"></sf-mesh>
+        <sf-mesh id="cube-r" geometry="box" args="0.5 0.5 0.5" color="#34d399"
+                 roughness="0.4" position="2.6 0.5 -0.3" rotation="0 -20 0"></sf-mesh>
+
+        <sf-animate target="#hero" verb="bounce-in" start="0.3" duration="0.8"></sf-animate>
+        <sf-animate target="#hero" verb="float" amplitude="0.15" period="3"></sf-animate>
+        <sf-animate target="#hero" verb="turntable" rpm="8"></sf-animate>
+        <sf-animate target="#ring" verb="fade-in" start="0.8" duration="1"></sf-animate>
+        <sf-animate target="#ring" verb="turntable" rpm="2" axis="z"></sf-animate>
+        <sf-animate target="#cube-l" verb="bounce-in" start="1.1" duration="0.6"></sf-animate>
+        <sf-animate target="#cube-r" verb="bounce-in" start="1.3" duration="0.6"></sf-animate>
+        <sf-animate target="camera" verb="dolly" toward="0 0 0" distance="1.6"
+                     start="0.3" duration="4" ease="power2.inOut"></sf-animate>
+      </sf-scene>
+
+      <div id="title" class="clip" data-start="2" data-duration="4" data-track-index="1">
+        six verbs · one markup
+      </div>
+    </div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.from("#title", { opacity: 0, y: -30, duration: 0.8, ease: "power2.out" }, 2);
+      tl.to({}, { duration: 6 }, 0);
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

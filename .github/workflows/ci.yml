@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build packages
+        run: bun run build
+
+      - name: Unit tests
+        run: |
+          bun run --cwd packages/runtime test
+          bun run --cwd packages/cli test
+
+      - name: Install Chrome for Puppeteer
+        run: bunx puppeteer browsers install chrome
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Lint + validate examples
+        run: |
+          for d in hello-standalone character-run-standalone ocean-flythrough glass-hero paper-swarm multi-shot; do
+            echo "=== $d"
+            node packages/cli/dist/cli.js update "examples/$d"
+            node packages/cli/dist/cli.js lint "examples/$d"
+            node packages/cli/dist/cli.js validate "examples/$d"
+          done
+
+      - name: Render smoke test
+        run: node packages/cli/dist/cli.js render examples/hello-standalone --draft --out /tmp/smoke.mp4

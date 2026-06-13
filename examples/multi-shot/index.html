@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+      body { font-family: ui-sans-serif, system-ui, sans-serif; }
+      sf-scene { position: absolute; inset: 0; }
+      #glass-headline {
+        position: absolute; top: 360px; left: 180px; color: #fafafa;
+        font-size: 96px; font-weight: 650; line-height: 1.05; letter-spacing: -0.02em;
+      }
+      #ending {
+        position: absolute; bottom: 110px; width: 100%; text-align: center;
+        font-size: 44px; font-weight: 700; letter-spacing: 0.14em; color: #fff7e6;
+        text-shadow: 0 4px 28px rgba(0, 0, 0, 0.7);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- shot 1 · 0–5.8s · typography swarm on paper (covers shot 2's fade) -->
+    <sf-scene start="0" duration="5.8" background="#f4f2ed">
+      <sf-camera fov="35" position="0 0 15" look-at="0 0 0"></sf-camera>
+      <sf-light type="hemisphere" color="#ffffff" intensity="2.4"></sf-light>
+      <sf-light type="directional" color="#fff7ed" intensity="1.4" position="4 6 8"></sf-light>
+      <sf-swarm text="STEREOFRAME" font="900 170px Helvetica, Arial, sans-serif"
+                count="2000" seed="11" size="0.13" width="12"
+                palette="#1c1917,#44403c,#a8a29e,#dc2626,#f5f5f4"
+                scatter="24 13 16" start="0.4" duration="3"
+                stagger="0.5" ease="power3.inOut"></sf-swarm>
+      <sf-animate target="camera" verb="dolly" toward="0 0 0" distance="2"
+                  start="0.4" duration="4.6" ease="power2.inOut"></sf-animate>
+    </sf-scene>
+
+    <!-- shot 2 · 5–10.9s · dark glass panels (crossfades in over shot 1, covers shot 3's fade) -->
+    <sf-scene start="5" duration="5.9" transition="crossfade" transition-duration="0.8"
+              background="#0a0a0c" environment="assets/studio.hdr" exposure="0.85">
+      <sf-camera fov="32" position="0.6 0.1 9" look-at="0 0 0"></sf-camera>
+      <sf-light type="directional" color="#9db8ff" intensity="1.6" position="-5 4 6"></sf-light>
+      <sf-light type="point" color="#7c5cff" intensity="60" position="5.5 2.5 -3"></sf-light>
+      <sf-mesh geometry="plane" args="60 34" color="#05070d" emissive="#101b33"
+               emissive-intensity="1.4" position="0 0 -7"></sf-mesh>
+      <sf-mesh geometry="sphere" args="1.4" color="#0a0a0c" emissive="#6d48f5"
+               emissive-intensity="2.6" position="5.8 2 -3.4"></sf-mesh>
+      <sf-mesh id="panel" geometry="rounded-box" args="4.4 2.9 0.22 0.12"
+               material="glass" color="#8493a8" roughness="0.14" thickness="0.5"
+               env-map-intensity="1.2" position="2.2 0.2 0" rotation="6 -24 4"></sf-mesh>
+      <sf-animate target="#panel" verb="float" amplitude="0.12" period="5"></sf-animate>
+      <sf-animate target="#panel" verb="turntable" rpm="0.25" axis="y"></sf-animate>
+      <sf-animate target="camera" verb="orbit" around="0 0 0" radius="9"
+                  from="4deg" to="-7deg" height="0.1" start="0" duration="5.6"
+                  ease="sine.inOut"></sf-animate>
+      <sf-animate target="#glass-headline" verb="fade-in" start="0.9" duration="0.9"
+                  rise="32"></sf-animate>
+    </sf-scene>
+
+    <!-- shot 3 · 10–16s · golden-hour ocean flythrough ending -->
+    <sf-scene start="10" duration="6" transition="crossfade" transition-duration="0.9"
+              exposure="0.55">
+      <sf-camera fov="45" far="5000" position="-26 6 36"></sf-camera>
+      <sf-sky elevation="6" azimuth="195" turbidity="8" rayleigh="2.5"></sf-sky>
+      <sf-ocean size="4000" color="#06222e" speed="1"></sf-ocean>
+      <sf-light type="hemisphere" color="#ffd9b3" intensity="1.2"></sf-light>
+      <sf-animate target="camera" verb="camera-path" look="ahead"
+                  points="-26 6 36, -12 4 16, 0 2.5 0, 3 2.2 -14"
+                  start="0" duration="6" ease="power1.inOut"></sf-animate>
+      <sf-animate target="#ending" verb="fade-in" start="2.2" duration="1"></sf-animate>
+    </sf-scene>
+
+    <!-- DOM overlays use GLOBAL time -->
+    <div id="glass-headline" class="clip" data-start="5.9" data-duration="4.4">
+      Declarative.<br />Deterministic.
+    </div>
+    <div id="ending" class="clip" data-start="12.2">3D VIDEO FOR AGENTS</div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "@stereoframe/cli",
+  "version": "0.1.0",
+  "description": "stereoframe CLI — scaffold, preview, and deterministically render declarative three.js videos.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "stereoframe": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "bun build src/cli.ts --outfile dist/cli.js --format esm --target node --external puppeteer --banner '#!/usr/bin/env node' && chmod +x dist/cli.js",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@stereoframe/runtime": "workspace:*",
+    "puppeteer": "^24.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

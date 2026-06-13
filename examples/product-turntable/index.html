@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+      }
+      sf-scene {
+        position: absolute;
+        inset: 0;
+      }
+      #title {
+        position: absolute;
+        bottom: 110px;
+        width: 100%;
+        text-align: center;
+        font-size: 64px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: #f3f4f6;
+        text-shadow: 0 4px 24px rgba(0, 0, 0, 0.7);
+      }
+      #subtitle {
+        position: absolute;
+        bottom: 64px;
+        width: 100%;
+        text-align: center;
+        font-size: 28px;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #9ca3af;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="8"
+      data-width="1920"
+      data-height="1080"
+    >
+      <sf-scene environment="assets/studio.hdr" background="#0b0f17" exposure="1.1">
+        <sf-camera fov="33" position="0 0.35 4.4" look-at="#product"></sf-camera>
+        <sf-model id="product" src="assets/bottle.glb" position="0 0.15 0" scale="6"></sf-model>
+        <sf-light preset="studio"></sf-light>
+        <sf-mesh
+          geometry="cylinder"
+          args="1.5 1.7 0.08"
+          color="#1f2937"
+          roughness="0.3"
+          metalness="0.6"
+          position="0 -1.05 0"
+        ></sf-mesh>
+        <sf-animate target="#product" verb="turntable" rpm="5"></sf-animate>
+        <sf-animate
+          target="camera"
+          verb="orbit"
+          around="#product"
+          from="0deg"
+          to="35deg"
+          start="0"
+          duration="8"
+          ease="sine.inOut"
+        ></sf-animate>
+      </sf-scene>
+
+      <div id="title" class="clip" data-start="1" data-duration="7" data-track-index="1">
+        Water Bottle
+      </div>
+      <div id="subtitle" class="clip" data-start="1.6" data-duration="6.4" data-track-index="2">
+        stereoframe · declarative 3d video
+      </div>
+    </div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.from("#title", { opacity: 0, y: 40, duration: 1, ease: "power2.out" }, 1);
+      tl.from("#subtitle", { opacity: 0, y: 24, duration: 1, ease: "power2.out" }, 1.6);
+      tl.to({}, { duration: 8 }, 0); // pin composition duration to 8s
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

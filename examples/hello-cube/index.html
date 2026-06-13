@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      #three-layer {
+        position: absolute;
+        inset: 0;
+        width: 1920px;
+        height: 1080px;
+        display: block;
+      }
+      #title {
+        position: absolute;
+        bottom: 120px;
+        width: 100%;
+        text-align: center;
+        font-size: 72px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="6"
+      data-width="1920"
+      data-height="1080"
+    >
+      <canvas id="three-layer" width="1920" height="1080"></canvas>
+      <div id="title" class="clip" data-start="1" data-duration="5" data-track-index="1">
+        stereoframe M0 · hello cube
+      </div>
+    </div>
+
+    <script type="importmap">
+      { "imports": { "three": "./assets/three.module.min.js" } }
+    </script>
+    <script type="module">
+      import * as THREE from "three";
+
+      const W = 1920;
+      const H = 1080;
+
+      const canvas = document.getElementById("three-layer");
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+      renderer.setSize(W, H, false);
+      renderer.setPixelRatio(1);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0f172a);
+
+      const camera = new THREE.PerspectiveCamera(35, W / H, 0.1, 100);
+
+      const cube = new THREE.Mesh(
+        new THREE.BoxGeometry(1.6, 1.6, 1.6),
+        new THREE.MeshStandardMaterial({ color: 0xa855f7, roughness: 0.35 }),
+      );
+      scene.add(cube);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+      const key = new THREE.DirectionalLight(0xffffff, 2.2);
+      key.position.set(3, 4, 5);
+      scene.add(key);
+
+      // All state below is a pure function of HyperFrames time `t` (seconds).
+      function renderAt(t) {
+        cube.rotation.x = t * 0.9;
+        cube.rotation.y = t * 1.4;
+        const angle = t * 0.5;
+        camera.position.set(Math.sin(angle) * 6, 1.5, Math.cos(angle) * 6);
+        camera.lookAt(0, 0, 0);
+        renderer.render(scene, camera);
+      }
+
+      window.addEventListener("hf-seek", (e) => {
+        if (e && e.detail && typeof e.detail.time === "number") {
+          window.__hfThreeTime = e.detail.time;
+        }
+        renderAt(window.__hfThreeTime || 0);
+      });
+      renderAt(window.__hfThreeTime || 0);
+    </script>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.from("#title", { opacity: 0, y: 60, duration: 1, ease: "power2.out" }, 1);
+      tl.to({}, { duration: 6 }, 0); // pin composition duration to 6s
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+      body { font-family: ui-sans-serif, system-ui, sans-serif; }
+      sf-scene { position: absolute; inset: 0; }
+      #title {
+        position: absolute; bottom: 96px; width: 100%; text-align: center;
+        font-size: 60px; font-weight: 700; letter-spacing: 0.05em; color: #fff7e6;
+        text-shadow: 0 4px 30px rgba(0, 0, 0, 0.65);
+      }
+    </style>
+  </head>
+  <body>
+    <sf-scene duration="10" width="1920" height="1080" exposure="0.55">
+      <sf-camera fov="45" far="5000" position="-30 6 40"></sf-camera>
+
+      <sf-sky elevation="6" azimuth="195" turbidity="8" rayleigh="2.5"></sf-sky>
+      <sf-light type="hemisphere" color="#ffd9b3" intensity="1.2"></sf-light>
+      <sf-light type="directional" color="#ffc890" intensity="2.4"
+                position="-2 2 -8"></sf-light>
+      <sf-ocean size="4000" color="#06222e" speed="1" distortion-scale="3.2"></sf-ocean>
+
+      <sf-mesh id="buoy" geometry="icosahedron" args="0.9 1" color="#ff6b35"
+               metalness="0.3" roughness="0.4" position="6 0.6 -14"></sf-mesh>
+      <sf-animate target="#buoy" verb="float" amplitude="0.35" period="3.2"></sf-animate>
+      <sf-animate target="#buoy" verb="turntable" rpm="3" axis="z"></sf-animate>
+
+      <sf-animate target="camera" verb="camera-path" look="ahead"
+                  points="-30 6 40, -14 4 18, 2 2.5 2, 6 2 -8, 4 3 -22"
+                  start="0" duration="10" ease="power1.inOut"></sf-animate>
+
+      <sf-animate target="#title" verb="fade-in" start="2.5" duration="1" rise="34"></sf-animate>
+    </sf-scene>
+
+    <div id="title" class="clip" data-start="2.5">ocean · sky · camera-path</div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

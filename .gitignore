@@ -1,0 +1,13 @@
+node_modules/
+dist/
+renders/
+.hyperframes/
+*.log
+.DS_Store
+.env
+
+# user reference material (large videos, third-party content — never publish)
+refs/
+
+# build artifact copies in example projects (regenerate: stereoframe update)
+examples/*/assets/stereoframe.js

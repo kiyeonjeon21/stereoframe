@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+      }
+      sf-scene {
+        position: absolute;
+        inset: 0;
+      }
+      #title {
+        position: absolute;
+        bottom: 90px;
+        width: 100%;
+        text-align: center;
+        font-size: 58px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        color: #fde9c8;
+        text-shadow: 0 4px 28px rgba(0, 0, 0, 0.8);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="8"
+      data-width="1920"
+      data-height="1080"
+    >
+      <sf-scene background="#1b1430">
+        <sf-camera fov="38" position="-6 1.6 5.5" look-at="#fox"
+                   look-at-offset="0 0.7 0"></sf-camera>
+        <sf-light preset="soft"></sf-light>
+        <sf-light type="directional" color="#ffb070" intensity="2.2"
+                  position="-4 3 4"></sf-light>
+
+        <sf-mesh geometry="plane" args="60 30" color="#332a4d" roughness="0.95"
+                 rotation="-90 0 0" position="0 0 0"></sf-mesh>
+
+        <sf-model id="fox" src="assets/fox.glb" clip="Survey"
+                  position="-6 0 0" rotation="0 90 0" scale="0.02"></sf-model>
+
+        <sf-particles preset="dust" count="900" seed="11" color="#ffb869"
+                      size="0.05" opacity="0.7" amplitude="0.6"
+                      area="16 5 8" position="0 2.2 0"></sf-particles>
+
+        <sf-animate target="#fox" verb="crossfade-clip" from="Survey" to="Run"
+                    start="1.2" duration="0.6"></sf-animate>
+        <sf-animate target="#fox" verb="move" to="6 0 0"
+                    start="1.5" duration="5.5" ease="power1.inOut"></sf-animate>
+        <sf-animate target="camera" verb="follow" subject="#fox"
+                    offset="0 1.6 5.5"></sf-animate>
+      </sf-scene>
+
+      <div id="title" class="clip" data-start="2.2" data-duration="5.8" data-track-index="1">
+        run cycle · camera follow · particles
+      </div>
+    </div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.from("#title", { opacity: 0, y: 36, duration: 0.9, ease: "power2.out" }, 2.2);
+      tl.to({}, { duration: 8 }, 0);
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>
