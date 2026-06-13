@@ -194,6 +194,7 @@ Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, defau
 | `fade-in` | duration default 0.6 | material opacity 0→original |
 | `float` | `amplitude` (0.1), `period` (4) | sinusoidal bob on Y; continuous |
 | `sway` | `amount` (6, degrees), `period` (5) | continuous multi-axis secondary motion (gentle wobble) — makes a form feel alive; analytic, seekable |
+| `explode` | `distance` (1.5) | exploded view — separate a model's parts outward from its center over the window. Needs a **multi-component** GLB (separate part meshes); single-mesh or rigged-character models have nothing to separate (no effect) |
 | `variant` | `color`/`roughness`/`metalness` (target values), `material` (GLB material name filter), duration default 0.8 | material colorway transitions (configurators). Multiple variants on one target chain in start order — each one's from-state is the previous one's result (resolved at compile time, backward-seek safe) |
 
 ### Easing vocabulary (GSAP-compatible names)

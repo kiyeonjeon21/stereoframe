@@ -62,7 +62,7 @@ USAGE
   stereoframe preview [dir]            serve with looping wall-clock playback
       --port <n>       fixed port (default: random)
   stereoframe stage <model.glb>        auto-direct a GLB into a cinematic motion graphic
-      --preset <name>  reveal | hero-orbit | turntable (default reveal)
+      --preset <name>  reveal | hero-orbit | turntable | exploded-view (default reveal)
       --dir <dir>      output project dir (default: <model name>)
       --duration <s>   seconds (default 8)
       --title "<text>" optional title overlay

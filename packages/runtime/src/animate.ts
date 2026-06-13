@@ -11,6 +11,7 @@
  *   float      — sinusoidal bob on Y        (amplitude, period)
  */
 import {
+  Box3,
   CatmullRomCurve3,
   Color,
   Material,
@@ -26,6 +27,17 @@ import * as verbs from "./verbs";
 import type { XYZ } from "./verbs";
 
 const _world = new Vector3();
+
+/**
+ * The parts of a loaded model to explode: descend through single-child
+ * wrapper nodes, then return the shallowest level that branches into
+ * multiple children (the natural component boundary).
+ */
+function collectParts(root: Object3D): Object3D[] {
+  let node = root;
+  while (node.children.length === 1) node = node.children[0]!;
+  return node.children.length > 1 ? [...node.children] : [node];
+}
 
 function resolveTarget(compiled: CompiledScene, spec: string | null): Object3D | null {
   if (!spec) return null;
@@ -91,6 +103,7 @@ export function compileAnimations(compiled: CompiledScene): void {
       "crossfade-clip": 0.5,
       "camera-path": 8,
       "variant": 0.8,
+      "explode": 2.5,
     };
     // Verb timing uses bare start/duration attributes (seconds) — data-start/
     // data-duration are HyperFrames *clip* timing and would trip its linter.
@@ -257,6 +270,29 @@ export function compileAnimations(compiled: CompiledScene): void {
           period: parseNumber(el.getAttribute("period"), 5),
         }),
       );
+    } else if (verb === "explode") {
+      // Separate a loaded model's parts outward from its center — the
+      // classic exploded-view product reveal. Runs after assets are ready
+      // (compileAnimations is called post-load), so the GLB's child nodes
+      // exist. Parts move along their direction-from-center as a pure
+      // function of t. Needs a multi-part model (single-mesh = no effect).
+      const parts = collectParts(target);
+      if (parts.length <= 1) continue; // single-mesh model — nothing to explode
+      const modelCenter = new Box3().setFromObject(target).getCenter(new Vector3());
+      const distance = parseNumber(el.getAttribute("distance"), 1.5);
+      const movers = parts.map((part) => {
+        const base = part.position.clone();
+        const dir = new Box3().setFromObject(part).getCenter(new Vector3()).sub(modelCenter);
+        if (dir.lengthSq() < 1e-6) dir.set(0, 1, 0);
+        return { part, base, dir: dir.normalize() };
+      });
+      const tmp = new Vector3();
+      compiled.seekFns.push((t) => {
+        const p = verbs.easedProgress(t, timing);
+        for (const m of movers) {
+          m.part.position.copy(m.base).add(tmp.copy(m.dir).multiplyScalar(distance * p));
+        }
+      });
     }
   }
 

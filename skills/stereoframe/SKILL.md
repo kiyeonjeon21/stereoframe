@@ -16,7 +16,7 @@ stereoframe stage product.glb --preset reveal --title "Product Name"
 cd product-reveal && stereoframe render
 ```
 
-Presets: `reveal` (dramatic dark spiral-in + rim light), `hero-orbit` (clean studio orbit), `turntable` (product on a pedestal). The model is auto-framed (`<sf-model fit="2.6">` normalizes its size/center), so the preset's camera move + lighting rig + timing + film finish frame ANY model correctly — no per-model camera/scale tweaking. Then hand-edit the generated `index.html` to taste.
+Presets: `reveal` (dramatic dark spiral-in + rim light), `hero-orbit` (clean studio orbit), `turntable` (product on a pedestal), `exploded-view` (parts separate outward — only for multi-component models with separate part meshes; single-mesh/rigged models won't separate). The model is auto-framed (`<sf-model fit="2.6">` normalizes its size/center), so the preset's camera move + lighting rig + timing + film finish frame ANY model correctly — no per-model camera/scale tweaking. Then hand-edit the generated `index.html` to taste.
 
 When a user gives you a model (or you `gen` one) and wants "an Apple-ad-style reveal / a product video", reach for `stage` first.
 
