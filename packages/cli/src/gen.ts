@@ -285,6 +285,7 @@ export interface ViaImageOptions {
   key?: string; // Meshy
   imageKey?: string; // image provider
   imageProvider?: string;
+  imageModel?: string;
   imageSize?: string;
 }
 
@@ -297,6 +298,7 @@ export async function genViaImage(opts: ViaImageOptions): Promise<string> {
   const { data, mime } = await provider.generate(opts.prompt, {
     projectDir,
     key: opts.imageKey,
+    model: opts.imageModel,
     size: opts.imageSize,
   });
   const ext = mime === "image/png" ? "png" : "jpg";

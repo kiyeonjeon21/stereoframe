@@ -2,13 +2,15 @@
  * Text → image, for the image-first asset pipeline (`gen --via-image`): generate a
  * clean reference image from a prompt, then hand it to Meshy image-to-3D. The
  * provider is swappable so fal.ai (or others) can drop in later; OpenAI
- * `gpt-image-1` is the default — strongest at prompt adherence + isolated-subject
- * product shots, which is exactly what lifts cleanly to 3D.
+ * `gpt-image-2` is the default — strongest at prompt adherence + isolated-subject
+ * product shots, which is exactly what lifts cleanly to 3D. Override per-call with
+ * --image-model / OPENAI_IMAGE_MODEL.
  */
 import { resolveEnvKey } from "./gen";
 
 const OPENAI_IMAGE_URL = "https://api.openai.com/v1/images/generations";
-const DEFAULT_IMAGE_MODEL = "gpt-image-1";
+// OpenAI's current image model (GA Apr 2026). Override with --image-model or OPENAI_IMAGE_MODEL.
+const DEFAULT_IMAGE_MODEL = "gpt-image-2";
 
 /** Nudge the prompt toward a clean, single-subject, plain-background shot — the
  *  kind of reference image image-to-3D reconstructs best. */

@@ -89,8 +89,8 @@ USAGE
   stereoframe gen "<prompt>"           generate a 3D model (GLB) via Meshy
       --image <png>    image-to-3D from one local image (instead of text)
       --images a,b,c   multi-image-to-3D from 1-4 views (front/side/back…)
-      --via-image      text → image (OpenAI gpt-image-1) → image-to-3D, more art-directable
-      --image-provider openai (default; for --via-image)   --size <wxh>   --image-key <key>
+      --via-image      text → image (OpenAI gpt-image-2) → image-to-3D, more art-directable
+      --image-provider openai (default)  --image-model <id>  --size <wxh>  --image-key <key>
       --dir <dir>      project dir (default .)
       --out <path>     output path (default assets/<slug>.glb)
       --no-texture     skip the PBR texture pass (faster, untextured mesh)
@@ -320,6 +320,7 @@ async function main(): Promise<void> {
           key,
           imageKey: typeof options.get("image-key") === "string" ? (options.get("image-key") as string) : undefined,
           imageProvider: typeof options.get("image-provider") === "string" ? (options.get("image-provider") as string) : undefined,
+          imageModel: typeof options.get("image-model") === "string" ? (options.get("image-model") as string) : undefined,
           imageSize: typeof options.get("size") === "string" ? (options.get("size") as string) : undefined,
         });
       } else {
