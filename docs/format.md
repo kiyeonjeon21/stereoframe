@@ -206,7 +206,8 @@ In embed mode, DOM clips/animation belong to HyperFrames (GSAP timelines).
 
 ```html
 <script type="stereoframe">
-  // Runs once after assets are loaded. sf = { scene, camera, renderer, objects, scenes, onSeek }
+  // Runs once after assets load.
+  // sf = { THREE, scene, camera, renderer, width, height, objects, scenes, onSeek }
   const product = sf.objects.get("product");
   sf.onSeek((t) => {
     product.rotation.z = Math.sin(t * 2) * 0.05;
@@ -214,7 +215,14 @@ In embed mode, DOM clips/animation belong to HyperFrames (GSAP timelines).
 </script>
 ```
 
-`onSeek` callbacks must also be pure functions of `t`.
+`onSeek` callbacks must be pure functions of `t`.
+
+**`sf.THREE` is the full three.js namespace** — build custom geometry, materials, and GLSL shaders the markup can't express (iridescent/marble/oil-slick materials, vertex displacement, procedural effects), add them to `sf.scene`, and drive uniforms from `onSeek(t)`. This is how you escape the "everything looks like a preset" ceiling. It still goes through the deterministic seek loop and post-processing.
+
+Determinism rules for custom GLSL (do not skip — broken determinism shows up as frames that diverge mid-render):
+- Drive all time from a `uTime` uniform you set to `t`. Never read a clock in the shader.
+- Use a **sin-free hash** for noise (e.g. Dave Hoskins' `fract(p*…)` hash). `sin(dot(p, large))*43758` loses GPU precision for large arguments and drifts run-to-run.
+- Keep poly counts sane (`IcosahedronGeometry(r, 8)`, not `24`) — extreme geometry load can make the GPU vary between runs.
 
 ## Determinism rules
 

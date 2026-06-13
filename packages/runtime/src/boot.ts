@@ -8,6 +8,7 @@
  * HyperFrames embed mode (a `[data-composition-id]` root exists): gates
  * `window.__hf` until assets are ready and follows `hf-seek` events.
  */
+import * as THREE from "three";
 import { compileAnimations } from "./animate";
 import { parseSeconds } from "./parse";
 import { compileScene, sceneDuration } from "./scene";
@@ -76,9 +77,15 @@ function runEscapeHatchScripts(scenes: ReturnType<typeof compileScene>[]): void 
   const first = scenes[0];
   if (!first) return;
   const sf = {
+    // The full three.js namespace — build custom geometry, materials, and
+    // GLSL shaders that the markup vocabulary can't express. Drive any
+    // uniform from `onSeek(t)` to stay deterministic.
+    THREE,
     scene: first.scene,
     camera: first.camera,
     renderer: first.renderer,
+    width: first.width,
+    height: first.height,
     objects: first.objectsById,
     scenes,
     onSeek: (fn: (t: number) => void) => {

@@ -172,6 +172,13 @@ Total video duration = max(start + duration). For crossfades, make the previous 
 3. No previous-frame-dependent effects (trails, feedback, stepped physics) — frames must be seekable in any order.
 4. Camera motion = verbs on `target="camera"`; one `sf-camera` per scene.
 
+## Breaking the "formulaic" look
+
+Generic output = generic primitives + centered orbit + preset materials. To make something that looks designed, not auto-generated:
+- **Custom materials via `sf.THREE`** (escape hatch): write GLSL for looks no preset has — iridescent/oil-slick, marble, gradient-mapped. This is the biggest lever against "it looks like an AI 3D demo". Add a `new sf.THREE.Mesh(...)` with a `ShaderMaterial` to `sf.scene`, drive `uTime` from `sf.onSeek(t)`. Use a sin-free hash for noise and modest poly counts to stay deterministic (see docs/format.md).
+- **Art-directed composition**: off-center the subject (rule of thirds), use big confident negative space, dramatic scale contrast, and let the 3D form overlap/occlude large editorial typography (transparent scene `background`, DOM text BEFORE the sf-scene in document order so the canvas occludes it).
+- **A specific palette**: one bold flat background color + one accent, not "moody dark gradient". Reference real design, not the three.js default aesthetic.
+
 ## Polish — the "finish" attributes (use these for premium-looking output)
 
 A flat, jagged, plastic look is almost always a missing-finish problem, not a content problem. On `<sf-scene>`:
