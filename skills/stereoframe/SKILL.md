@@ -211,6 +211,7 @@ A flat, jagged, plastic look is almost always a missing-finish problem, not a co
 - **`ground="contact-shadow"`** on `<sf-scene>` + **`fit-ground`** on `<sf-model>` — a soft top-down shadow grounds the model on `y=0`. The single highest-impact fix for "it looks fake". Tune `ground-size`/`ground-opacity`/`ground-blur`/`ground-darkness`.
 - **`light-sweep="0.1"`** on `<sf-scene>` — rotates the `environment` over the timeline so a specular highlight travels across metal/glass. The signature premium-product sweep. Needs `environment="room"` (or studio/HDRI).
 - **`isolate` verb** (`part="<index>" dim="0.8"`) — fade every other part to black so one component is the hero. Multi-part GLB only; pair with a slow `dolly` toward it.
+- **`<sf-callout>`** (`target="#m" part="2" value="48MP" text="Main camera" anchor="left" start="1.2"`) — a leader line + typographic label that tracks a 3D part as the camera moves (Apple-style spec callout). Crisp DOM type, deterministic, hidden when off-screen. The strongest "this is a designed product film, not a viewer" signal — pair it with `isolate` on the same `part` for a feature-highlight beat.
 
 The `stage` reveal/hero-orbit/turntable presets already apply ground + light-sweep, so a plain `stage product.glb` gives a grounded, swept product film out of the box.
 

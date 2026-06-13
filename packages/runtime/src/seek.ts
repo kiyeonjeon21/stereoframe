@@ -107,6 +107,12 @@ export function applySeek(compiled: CompiledScene, t: number): void {
     }
   }
 
+  // 6. DOM overlays project against the now-final camera orientation.
+  if (compiled.overlayFns.length) {
+    compiled.camera.updateMatrixWorld();
+    for (const fn of compiled.overlayFns) fn(time);
+  }
+
   compiled.preRender?.(); // e.g. contact-shadow depth pass (resets render target)
   if (compiled.post) compiled.post.render(time);
   else compiled.renderer.render(compiled.scene, compiled.camera);

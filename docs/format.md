@@ -204,6 +204,23 @@ Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, defau
 
 `linear` `none`, `power1–4.in/.out/.inOut`, `sine.*`, `expo.*`, `circ.*`, `back.*`, `elastic.out`, `bounce.out`. Default is `power1.out` (`back.out` for bounce-in).
 
+### `<sf-callout>` — spec-callout labels that track a 3D point
+
+A thin leader line from a feature to a floating typographic label — the signature product-film annotation ("48MP · Main camera"). The tracked point is `Vector3.project()`ed against the final camera each seek and a real DOM label + SVG leader are positioned over the canvas, so the type stays crisp and seekable (it never affects the WebGL determinism check — the validator fingerprints the canvas, not the overlay). Lives inside `<sf-scene>`. Standalone mode only (in embed mode, annotations belong to HyperFrames).
+
+| attribute | default | description |
+|---|---|---|
+| `target` | — | `#id` of an `sf-model`/object to anchor on (tracks it through turntable/orbit) |
+| `part` | — | with `target`: which component to point at (index into the same part list `explode`/`isolate` use). Omit to anchor the whole object's center |
+| `point` | — | `x y z` fixed world point to anchor on, instead of `target`/`part` |
+| `value` | — | the big headline line (e.g. `48MP`, `Titanium`) — optional |
+| `text` | — | the small uppercase caption under the value |
+| `anchor` | right | `left` or `right` — which side the label sits on |
+| `start`/`duration` | 0 / 0.7 | the leader draws on and the label settles in over this window; stays after |
+| `ease` | power2.out | draw-on easing |
+
+Pairs naturally with `isolate`: isolate a part, dolly toward it, and callout the same `part` index — one complete feature-highlight beat. The label is hidden automatically when its point is off-screen or behind the camera.
+
 ## DOM overlays (standalone mode)
 
 - Visibility windows: `class="clip"` + `data-start`/`data-duration` (seconds) — the runtime toggles visibility as a function of t.

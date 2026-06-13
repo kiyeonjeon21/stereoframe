@@ -61,6 +61,9 @@ export interface CompiledScene {
   seekFns: Array<(t: number) => void>;
   /** Writers that must run after seekFns (camera follow tracks moved subjects). */
   lateSeekFns: Array<(t: number) => void>;
+  /** DOM-overlay writers that run after camera lookAt — they read the final
+   *  camera matrices to project 3D points to screen (e.g. sf-callout labels). */
+  overlayFns: Array<(t: number) => void>;
   /** uTime uniforms (particles, escape-hatch shaders) set to t before render. */
   timeUniforms: Array<{ value: number }>;
   ready: Promise<void>;
@@ -476,6 +479,7 @@ export function compileScene(host: HTMLElement): CompiledScene {
     actionsByObject,
     seekFns,
     lateSeekFns: [],
+    overlayFns: [],
     timeUniforms,
     ready,
   };

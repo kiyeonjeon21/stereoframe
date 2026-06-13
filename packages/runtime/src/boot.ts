@@ -10,6 +10,7 @@
  */
 import * as THREE from "three";
 import { compileAnimations } from "./animate";
+import { compileCallouts } from "./callout";
 import { parseSeconds } from "./parse";
 import { compileScene, sceneDuration } from "./scene";
 import { installHfGate, installSeekListener, isStandalone, startPreviewLoop } from "./seek";
@@ -17,7 +18,7 @@ import { installHfGate, installSeekListener, isStandalone, startPreviewLoop } fr
 const STYLES = `
 sf-scene { display: block; line-height: 0; }
 sf-scene > canvas { display: block; }
-sf-camera, sf-model, sf-mesh, sf-light, sf-env, sf-animate, sf-particles, sf-sky, sf-ocean, sf-swarm, sf-metaball { display: none; }
+sf-camera, sf-model, sf-mesh, sf-light, sf-env, sf-animate, sf-particles, sf-sky, sf-ocean, sf-swarm, sf-metaball, sf-callout { display: none; }
 `;
 
 function injectStyles(): void {
@@ -57,7 +58,10 @@ export async function boot(): Promise<void> {
   const controller = installSeekListener(scenes, { duration, standalone });
 
   await Promise.all(scenes.map((s) => s.ready));
-  for (const s of scenes) compileAnimations(s);
+  for (const s of scenes) {
+    compileAnimations(s);
+    compileCallouts(s);
+  }
   runEscapeHatchScripts(scenes);
 
   controller.markReady();

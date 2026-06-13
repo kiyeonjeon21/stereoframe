@@ -33,7 +33,7 @@ const _world = new Vector3();
  * wrapper nodes, then return the shallowest level that branches into
  * multiple children (the natural component boundary).
  */
-function collectParts(root: Object3D): Object3D[] {
+export function collectParts(root: Object3D): Object3D[] {
   let node = root;
   while (node.children.length === 1) node = node.children[0]!;
   return node.children.length > 1 ? [...node.children] : [node];

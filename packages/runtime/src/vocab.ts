@@ -19,6 +19,7 @@ export const ELEMENT_NAMES = [
   "sf-swarm",
   "sf-metaball",
   "sf-animate",
+  "sf-callout",
 ] as const;
 
 export const VERB_NAMES = [
