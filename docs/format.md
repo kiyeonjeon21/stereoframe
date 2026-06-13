@@ -247,7 +247,9 @@ Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, defau
 **Per-part motion.** `turntable`, `sway`, `float`, `move` also accept a `part` (index or
 name, like `isolate`) to animate **one component** of a multi-part model instead of the
 whole thing — e.g. `<sf-animate target="#car" part="wheel" verb="turntable" axis="x">` spins
-just a wheel. Needs a **multi-component** GLB. **Note:** AI text/image-to-3D output (Meshy
+just a wheel. A per-part `turntable` spins about the **part's own center**, so wheels spin
+in place even when the model author parented them at the body origin (no pivot at the hub) —
+you don't need to know how the GLB was rigged. Needs a **multi-component** GLB. **Note:** AI text/image-to-3D output (Meshy
 etc.) is a single welded mesh — `stereoframe segment <glb>` reports whether a model has
 separable components; if it's one welded mesh, per-part features need a genuinely multi-part
 source GLB (DCC/kitbash/CAD).

@@ -187,17 +187,34 @@ export function compileAnimations(compiled: CompiledScene): void {
     // instead of the whole group. Only the object-motion verbs honor `part`;
     // isolate/explode/callout do their own part handling on the whole target.
     let motionTarget = target;
+    let isPart = false;
     const partAttr = el.getAttribute("part");
     if (partAttr !== null && (verb === "turntable" || verb === "sway" || verb === "float" || verb === "move")) {
       const parts = collectParts(target);
-      motionTarget = parts[resolvePartIndex(parts, partAttr, 0)] ?? target;
+      const resolved = parts[resolvePartIndex(parts, partAttr, 0)] ?? target;
+      isPart = resolved !== target;
+      motionTarget = resolved;
     }
 
     if (verb === "turntable") {
+      // Spinning a sub-part (a wheel) rotates about the part's own center, not
+      // the model origin — so wheels modeled in body space spin in place rather
+      // than orbiting. Whole-model spins keep rotating about their origin.
+      let pivot: { x: number; y: number; z: number } | undefined;
+      if (isPart) {
+        motionTarget.updateWorldMatrix(true, true);
+        const box = new Box3().setFromObject(motionTarget);
+        if (!box.isEmpty()) {
+          const cw = box.getCenter(new Vector3());
+          if (motionTarget.parent) motionTarget.parent.worldToLocal(cw);
+          pivot = { x: cw.x, y: cw.y, z: cw.z };
+        }
+      }
       compiled.seekFns.push(
         verbs.turntable(motionTarget, timing, {
           rpm: parseNumber(el.getAttribute("rpm"), 6),
           axis: (el.getAttribute("axis") ?? "y") as "x" | "y" | "z",
+          pivot,
         }),
       );
     } else if (verb === "orbit") {

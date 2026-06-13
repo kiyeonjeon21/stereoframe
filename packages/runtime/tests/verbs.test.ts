@@ -52,6 +52,55 @@ describe("turntable", () => {
   });
 });
 
+describe("turntable about a pivot (sub-part spin)", () => {
+  test("keeps an off-origin part's center fixed (spins in place, not orbiting)", () => {
+    // A wheel modeled in body space: its node origin is at the model center
+    // (0,0,0), but its geometry center sits at (0,0,2). Spinning about the
+    // part's center must keep that center put while the part rotates.
+    const target = makeTarget();
+    const writer = turntable(target, makeTiming({}), {
+      rpm: 30, // 0.5 rev/s → half turn (π) at t=1.0
+      axis: "x",
+      pivot: { x: 0, y: 0, z: 2 },
+    });
+    writer(1.0);
+    expect(target.rotation.x).toBeCloseTo(Math.PI);
+    // O_new = C + Rx(π)·(O − C) = (0,0,2) + Rx(π)·(0,0,−2) = (0,0,4)
+    expect(target.position.x).toBeCloseTo(0);
+    expect(target.position.y).toBeCloseTo(0);
+    expect(target.position.z).toBeCloseTo(4);
+    // The geometry center = O_new + Rx(π)·(C − O_base) lands back on the pivot.
+    const s = Math.sin(Math.PI);
+    const co = Math.cos(Math.PI);
+    const centerZ = target.position.z + (0 * s + 2 * co);
+    expect(centerZ).toBeCloseTo(2);
+  });
+
+  test("without a pivot the position is never touched", () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: 2 } });
+    const writer = turntable(target, makeTiming({}), { rpm: 30, axis: "x" });
+    writer(0.5);
+    expect(target.position.z).toBe(2);
+  });
+
+  test("idempotent: pivot spin is a pure function of t", () => {
+    const target = makeTarget();
+    const writer = turntable(target, makeTiming({}), {
+      rpm: 17,
+      axis: "x",
+      pivot: { x: 0, y: 1, z: 2 },
+    });
+    writer(1.3);
+    const pose = { ...target.position, rx: target.rotation.x };
+    writer(0.4);
+    writer(1.3);
+    expect(target.position.x).toBeCloseTo(pose.x);
+    expect(target.position.y).toBeCloseTo(pose.y);
+    expect(target.position.z).toBeCloseTo(pose.z);
+    expect(target.rotation.x).toBeCloseTo(pose.rx);
+  });
+});
+
 describe("orbit", () => {
   const center = () => ({ x: 0, y: 0, z: 0 });
 

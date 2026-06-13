@@ -73,16 +73,48 @@ export function makeTiming(opts: {
   };
 }
 
-/** Continuous spin around one local axis. rpm > 0 spins counter-clockwise. */
+/** Continuous spin around one local axis. rpm > 0 spins counter-clockwise.
+ *  With `pivot` (a point in the target's parent space), the spin is *about that
+ *  point* — the target's origin is counter-translated each frame so the geometry
+ *  rotates in place. This makes per-part spin (e.g. a wheel) work even when the
+ *  part's pivot isn't at its center (geometry authored in body space). */
 export function turntable(
   target: TransformLike,
   timing: VerbTiming,
-  opts: { rpm: number; axis: "x" | "y" | "z" },
+  opts: { rpm: number; axis: "x" | "y" | "z"; pivot?: XYZ },
 ): Writer {
   const base = target.rotation[opts.axis];
   const radPerSecond = (opts.rpm / 60) * Math.PI * 2;
+  if (!opts.pivot) {
+    return (t) => {
+      target.rotation[opts.axis] = base + radPerSecond * activeTime(t, timing);
+    };
+  }
+  // Rotate the origin→center offset by the same angle so the center stays fixed:
+  // O_new = C + R·(O − C). R matches the Euler spin about `axis` (right-handed).
+  const c = opts.pivot;
+  const dx0 = target.position.x - c.x;
+  const dy0 = target.position.y - c.y;
+  const dz0 = target.position.z - c.z;
+  const axis = opts.axis;
   return (t) => {
-    target.rotation[opts.axis] = base + radPerSecond * activeTime(t, timing);
+    const ang = radPerSecond * activeTime(t, timing);
+    target.rotation[axis] = base + ang;
+    const s = Math.sin(ang);
+    const co = Math.cos(ang);
+    if (axis === "x") {
+      target.position.x = c.x + dx0;
+      target.position.y = c.y + dy0 * co - dz0 * s;
+      target.position.z = c.z + dy0 * s + dz0 * co;
+    } else if (axis === "y") {
+      target.position.x = c.x + dx0 * co + dz0 * s;
+      target.position.y = c.y + dy0;
+      target.position.z = c.z - dx0 * s + dz0 * co;
+    } else {
+      target.position.x = c.x + dx0 * co - dy0 * s;
+      target.position.y = c.y + dx0 * s + dy0 * co;
+      target.position.z = c.z + dz0;
+    }
   };
 }
 
