@@ -86,17 +86,21 @@ run("bun install"); // sync the lockfile to the new versions
 //    so we write the exact version explicitly to guarantee `npx stereoframe@X`
 //    ships runtime X.
 const token = loadNpmToken();
-const publishEnv = { ...process.env, NPM_CONFIG_TOKEN: token };
+// Publish with `npm`, not `bun`: bun packs README.md into the tarball but does
+// not set the registry `readme` metadata field that npmjs.com renders, so the
+// package pages came up blank. npm sets it. Auth via the per-registry authToken
+// env key (npm reads npm_config_* env vars; no .npmrc file to write/clean up).
+const publishEnv = { ...process.env, "npm_config_//registry.npmjs.org/:_authToken": token };
 const cliDir = "packages/cli";
 const cliOriginal = readPkg(cliDir);
 
-run("bun publish --access public", { cwd: join(ROOT, "packages/runtime"), env: publishEnv });
+run("npm publish --access public", { cwd: join(ROOT, "packages/runtime"), env: publishEnv });
 
 const cliPinned = structuredClone(cliOriginal);
 if (cliPinned.dependencies?.[RUNTIME_DEP]) cliPinned.dependencies[RUNTIME_DEP] = next;
 writePkg(cliDir, cliPinned);
 try {
-  run("bun publish --access public", { cwd: join(ROOT, cliDir), env: publishEnv });
+  run("npm publish --access public", { cwd: join(ROOT, cliDir), env: publishEnv });
 } finally {
   writePkg(cliDir, cliOriginal); // restore workspace:* for the commit
 }
