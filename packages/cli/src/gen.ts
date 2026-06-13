@@ -375,6 +375,26 @@ interface FalSubmit {
   responseUrl: string;
 }
 
+/** Upload bytes to fal storage → a public URL (fal models fetch images by URL,
+ *  not data URI). initiate (signed PUT url + file url) → PUT bytes → file_url. */
+async function falUpload(bytes: Buffer, contentType: string, fileName: string, key: string): Promise<string> {
+  const init = await fetch("https://rest.alpha.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3", {
+    method: "POST",
+    headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ content_type: contentType, file_name: fileName }),
+  });
+  if (!init.ok) throw new Error(`fal storage initiate → ${init.status}: ${(await init.text()).slice(0, 200)}`);
+  const j = (await init.json()) as any;
+  if (!j.upload_url || !j.file_url) throw new Error("fal storage initiate: missing upload_url/file_url");
+  const put = await fetch(j.upload_url as string, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: bytes as any,
+  });
+  if (!put.ok) throw new Error(`fal storage PUT → ${put.status}`);
+  return j.file_url as string;
+}
+
 async function falSubmit(model: string, key: string, input: Record<string, unknown>): Promise<FalSubmit> {
   const res = await fetch(`${FAL_QUEUE}/${model}`, {
     method: "POST",
@@ -480,15 +500,39 @@ export async function genViaFal(opts: FalGenOptions): Promise<string> {
   const out = resolve(projectDir, opts.out ?? join("assets", `${slug(basename(labelSrc))}.glb`));
   mkdirSync(join(out, ".."), { recursive: true });
 
-  // Image-to-3D uses input_image_url(s); otherwise a text prompt. Both are common
-  // fal conventions; override per-model via `input` (CLI --input '<json>').
+  // Image-to-3D: fal fetches images by URL (it rejects base64 data URIs), so
+  // upload local images/data-URIs to fal storage first and pass the URLs. Field
+  // name `image_url`/`image_urls` covers Tripo/Trellis/most; override per-model
+  // via `input` (CLI --input '<json>'). Otherwise a text prompt.
   const input: Record<string, unknown> = { ...(opts.input ?? {}) };
   if (opts.images && opts.images.length) {
-    const uris = opts.images.map((p) => (p.startsWith("data:") ? p : imageToDataUri(resolve(projectDir, p))));
-    // Field name varies by fal model; `image_url`/`image_urls` covers Tripo/Trellis/
-    // most. Override via --input for models that want `input_image_url` (Hunyuan).
-    if (uris.length > 1) input.image_urls ??= uris;
-    else input.image_url ??= uris[0];
+    const urls: string[] = [];
+    for (const p of opts.images) {
+      if (/^https?:\/\//i.test(p)) {
+        urls.push(p);
+        continue;
+      }
+      let bytes: Buffer;
+      let mime: string;
+      let fname: string;
+      if (p.startsWith("data:")) {
+        const m = /^data:([^;]+);base64,(.*)$/s.exec(p);
+        if (!m) throw new Error("malformed image data URI");
+        mime = m[1]!;
+        bytes = Buffer.from(m[2]!, "base64");
+        fname = `image.${mime.split("/")[1] ?? "png"}`;
+      } else {
+        const abs = resolve(projectDir, p);
+        if (!existsSync(abs)) throw new Error(`image not found: ${abs}`);
+        mime = IMAGE_MIME[extname(abs).toLowerCase()] ?? "image/png";
+        bytes = readFileSync(abs);
+        fname = basename(abs);
+      }
+      console.log(`  uploading ${fname} to fal storage…`);
+      urls.push(await falUpload(bytes, mime, fname, key));
+    }
+    if (urls.length > 1) input.image_urls ??= urls;
+    else input.image_url ??= urls[0];
   } else if (opts.prompt && input.prompt === undefined) {
     input.prompt = opts.prompt;
   }
