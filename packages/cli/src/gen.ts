@@ -11,7 +11,7 @@
  * prompt; set a real key for actual generations).
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 const MESHY_BASE = "https://api.meshy.ai";
 const TEST_KEY = "msy_dummy_api_key_for_test_mode_12345678";
@@ -123,6 +123,7 @@ export async function genModel(opts: GenOptions): Promise<string> {
 
   // 2. Refine (PBR textures) — optional.
   let finalTask = previewTask;
+  let refineId: string | undefined;
   if (opts.texture) {
     const refine = await meshy("/openapi/v2/text-to-3d", key, {
       method: "POST",
@@ -134,6 +135,7 @@ export async function genModel(opts: GenOptions): Promise<string> {
       }),
     });
     finalTask = await pollTask(refine.result, key, "texture");
+    refineId = refine.result;
   }
 
   // 3. Download the GLB.
@@ -143,8 +145,31 @@ export async function genModel(opts: GenOptions): Promise<string> {
   if (!glb.ok) throw new Error(`downloading GLB → ${glb.status}`);
   writeFileSync(out, Buffer.from(await glb.arrayBuffer()));
 
+  // Provenance sidecar — record the prompt + Meshy task ids next to the GLB, so a
+  // generated model always carries how it was made (text-to-3D is non-reproducible;
+  // keep at least the recipe). Mirrors inspect's `<name>.segments.json` convention.
+  const provenancePath = out.replace(/\.glb$/i, "") + ".gen.json";
+  const provenance = {
+    prompt: opts.prompt,
+    provider: "meshy",
+    task: "text-to-3d",
+    aiModel: "latest",
+    textured: opts.texture !== false,
+    ...(opts.polycount ? { targetPolycount: opts.polycount } : {}),
+    previewTaskId: previewId,
+    ...(refineId ? { refineTaskId: refineId } : {}),
+    output: basename(out),
+    generatedAt: new Date().toISOString(),
+    testMode: isTest,
+  };
+  writeFileSync(provenancePath, JSON.stringify(provenance, null, 2) + "\n");
+
   const rel = out.startsWith(projectDir) ? out.slice(projectDir.length + 1) : out;
+  const provRel = provenancePath.startsWith(projectDir)
+    ? provenancePath.slice(projectDir.length + 1)
+    : provenancePath;
   console.log(`\n✓ saved ${rel}`);
+  console.log(`  prompt recorded → ${provRel}`);
   console.log(`  use it:  <sf-model src="${rel}" scale="1"></sf-model>`);
   if (isTest) console.log("  (sample model — set MESHY_API_KEY to generate from your prompt)");
   return out;

@@ -42,6 +42,8 @@ stereoframe gen "a low-poly treasure chest"   # → assets/a-low-poly-treasure-c
 # then: <sf-model src="assets/a-low-poly-treasure-chest.glb"></sf-model>
 ```
 
+Each generation also writes a provenance sidecar — `assets/<name>.gen.json` records the exact prompt, options, and Meshy task ids next to the GLB, so a generated model always carries how it was made (text-to-3D isn't reproducible — keep at least the recipe).
+
 It runs with no setup using Meshy's free test mode (returns a sample model); set `MESHY_API_KEY` (shell env or project `.env`) for real prompt-driven generations.
 
 ## Direct a multi-shot film from a JSON shot list
