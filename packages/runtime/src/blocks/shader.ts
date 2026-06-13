@@ -16,6 +16,16 @@
  *     }
  *   </sf-shader>
  *
+ * Vertex displacement (mesh mode): add an `<sf-vert>` child to also author the
+ * vertex stage — modify `transformed` (initialized to `position`); the fragment
+ * then comes from an `<sf-frag>` child. `position`/`normal`/`uv`, `uTime`, your
+ * `u-*` uniforms, and the noise toolkit are all in scope:
+ *
+ *   <sf-shader geometry="icosahedron" args="1 6" u-amp="0.25">
+ *     <sf-vert> transformed += normal * fbm(uv * 4.0 + uTime) * uAmp; </sf-vert>
+ *     <sf-frag> void main(){ gl_FragColor = vec4(vUv, 0.6, 1.0); } </sf-frag>
+ *   </sf-shader>
+ *
  * Determinism: `uTime` is a pure function of seek `t` (registered as a
  * timeUniform, set in seek.ts). The noise toolkit is sin-free hash noise, so it
  * is also byte-stable across runs. No wall clock, no accumulation.
@@ -92,12 +102,37 @@ export function buildShader(
     decls.push(`uniform ${parsed.glsl} ${name};`);
   }
 
-  const body = (el.textContent ?? "").trim() || DEFAULT_FRAG;
+  // Optional author vertex stage: an `<sf-vert>` child holds a snippet that
+  // displaces `transformed`; the fragment then comes from an `<sf-frag>` child.
+  // No `<sf-vert>` → unchanged: fragment is the element's own text, default vert.
+  const vertEl = el.querySelector?.("sf-vert") ?? null;
+  const fragEl = el.querySelector?.("sf-frag") ?? null;
+  const vertSnippet = vertEl ? (vertEl.textContent ?? "").trim() : "";
+
+  // Fragment source: an explicit <sf-frag>, else the element's own text — but when
+  // a vert block exists without a frag block, the element text is the vert snippet,
+  // so fall back to the default frag instead of mis-using it.
+  const fragSource = fragEl
+    ? (fragEl.textContent ?? "").trim()
+    : vertEl
+      ? ""
+      : (el.textContent ?? "").trim();
+  const body = fragSource || DEFAULT_FRAG;
   const fragmentShader = `${decls.join("\n")}\n${TOOLKIT}\n${body}`;
+
+  // Vertex displacement only makes sense in mesh mode (fullscreen is a clip-space
+  // quad). When present, build a templated vertex shader sharing the same
+  // uniforms + sin-free toolkit, so displacement stays a pure function of uTime.
+  const vertexShader =
+    vertSnippet && !opts.fullscreen
+      ? `${decls.join("\n")}\n${TOOLKIT}\nvoid main(){\n  vUv = uv;\n  vec3 transformed = position;\n${vertSnippet}\n  gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);\n}`
+      : opts.fullscreen
+        ? FULLSCREEN_VERT
+        : MESH_VERT;
 
   const material = new THREE.ShaderMaterial({
     uniforms,
-    vertexShader: opts.fullscreen ? FULLSCREEN_VERT : MESH_VERT,
+    vertexShader,
     fragmentShader,
     transparent: el.getAttribute("transparent") === "true",
     depthTest: !opts.fullscreen,

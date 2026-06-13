@@ -1,0 +1,67 @@
+<!doctype html>
+<!--
+  shader-vertex — vertex displacement authored directly in <sf-shader>. A
+  subdivided plane is raised by sin-free fbm waves driven by uTime; the fragment
+  shades crests with the SAME field, so geometry and color stay in lockstep. The
+  whole surface is a pure function of seek t — fully deterministic / seekable —
+  yet it's geometry the verb vocabulary can't express. (Add an <sf-vert> child to
+  author the vertex stage; the fragment then lives in <sf-frag>.)
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #04060d; }
+      body { font-family: "Helvetica Neue", Arial, sans-serif; }
+      sf-scene { position: absolute; inset: 0; }
+      #title {
+        position: absolute; left: 96px; bottom: 92px; color: #eaf4ff;
+        font-size: 120px; font-weight: 800; letter-spacing: -0.03em; line-height: 0.92;
+        text-shadow: 0 8px 60px rgba(0,0,0,0.55);
+      }
+      #sub {
+        position: absolute; left: 102px; bottom: 60px; color: #8fbef0;
+        font-size: 20px; font-weight: 500; letter-spacing: 0.5em; text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <sf-scene duration="8" width="1920" height="1080"
+              background="#04060d" vignette="0.5" contrast="1.06" saturation="1.1" grain="0.025">
+      <sf-camera fov="34" position="0 3.2 4.6" look-at="0 0 0"></sf-camera>
+      <sf-light preset="studio"></sf-light>
+
+      <sf-shader geometry="plane" args="6 6 200 200" rotation="-90 0 0"
+                 u-amp="0.55" u-speed="0.35" u-scale="1.6">
+        <sf-vert>
+          // in scope: position, normal, uv, uTime, u-* uniforms, hash21/vnoise/fbm.
+          // Displace `transformed` along the plane normal (object +Z → world up).
+          float h = fbm(uv * (uScale * 4.0) + vec2(uTime * uSpeed, uTime * uSpeed * 0.6));
+          h += 0.5 * fbm(uv * (uScale * 9.0) - uTime * uSpeed * 0.4);
+          transformed.z += (h - 0.75) * uAmp;
+        </sf-vert>
+        <sf-frag>
+          void main() {
+            float h = fbm(vUv * (uScale * 4.0) + vec2(uTime * uSpeed, uTime * uSpeed * 0.6));
+            h += 0.5 * fbm(vUv * (uScale * 9.0) - uTime * uSpeed * 0.4);
+            h = h - 0.5;
+            vec3 deep  = vec3(0.03, 0.05, 0.12);
+            vec3 mid   = vec3(0.10, 0.35, 0.75);
+            vec3 crest = vec3(0.55, 0.85, 1.00);
+            vec3 col = mix(deep, mid, smoothstep(-0.10, 0.35, h));
+            col = mix(col, crest, smoothstep(0.35, 0.70, h));
+            gl_FragColor = vec4(col, 1.0);
+          }
+        </sf-frag>
+      </sf-shader>
+    </sf-scene>
+
+    <div id="title" class="clip" data-start="0.6">VERTEX<br>FIELD</div>
+    <div id="sub" class="clip" data-start="1.0">displacement · deterministic</div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

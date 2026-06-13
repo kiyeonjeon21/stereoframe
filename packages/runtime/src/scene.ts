@@ -111,7 +111,14 @@ function buildGeometry(el: Element): THREE.BufferGeometry {
     case "sphere":
       return new THREE.SphereGeometry(a(0, 1), 48, 24);
     case "plane":
-      return new THREE.PlaneGeometry(a(0, 1), a(1, 1));
+      // args: width height [widthSegments] [heightSegments] — segments default to
+      // 1 (unchanged), but matter for <sf-shader> vertex displacement on a sheet.
+      return new THREE.PlaneGeometry(
+        a(0, 1),
+        a(1, 1),
+        Math.max(1, Math.floor(a(2, 1))),
+        Math.max(1, Math.floor(a(3, 1))),
+      );
     case "cylinder":
       return new THREE.CylinderGeometry(a(0, 1), a(1, 1), a(2, 1), 48);
     case "torus":

@@ -184,11 +184,22 @@ Drop GLSL as the element's text and get the boilerplate wired up — the lowest-
 | attribute | default | description |
 |---|---|---|
 | `fullscreen` | (absent) | present ⇒ a clip-space quad that fills the frame ignoring the camera (a generative background canvas). Absent ⇒ the shader is bound to a `geometry` (+`args`, like sf-mesh) and is camera-projected with `position`/`rotation`/`scale` |
-| `geometry`/`args` | box | (mesh mode) the surface to shade |
+| `geometry`/`args` | box | (mesh mode) the surface to shade. For vertex displacement use a subdivided surface — `plane` takes `args="w h widthSegs heightSegs"`, `icosahedron` takes `args="radius detail"` |
 | `transparent` | false | `true` for alpha blending |
 | `u-<name>` | — | a custom uniform exposed in GLSL as `u<Name>` — a number (`float`), `#hex`/color (`vec3`), or `"x y[ z[ w]]"` (`vec2/3/4`). e.g. `u-speed="0.3"` → `uSpeed`, `u-tint="#ff5a36"` → `uTint` |
 
 In scope inside your fragment `main()`: `vUv` (0–1), `uTime` (seconds), `uResolution` (px), your `u-*` uniforms, and a sin-free noise toolkit — `hash21(vec2)`, `hash22(vec2)`, `vnoise(vec2)`, `fbm(vec2)`. Set `gl_FragColor`. With no body, a default flow-field is used. See `examples/shader-flow`. Note: a `fullscreen` shader draws first (renderOrder −1) so 3D geometry composites on top.
+
+**Vertex displacement (mesh mode).** Add an `<sf-vert>` child to also author the vertex stage; the fragment then lives in an `<sf-frag>` child (the element's own text is the fragment only when there's no `<sf-vert>`). In the vertex snippet, modify `vec3 transformed` (initialized to `position`) — `position`, `normal`, `uv`, `uTime`, your `u-*` uniforms, and the same noise toolkit are all in scope; `vUv` is set for you. This keeps vertex-displaced surfaces (waves, morphs, terrain) inside the deterministic DSL instead of forcing the `sf.THREE` escape hatch. `fullscreen` ignores `<sf-vert>` (a clip-space quad has nothing to displace). See `examples/shader-vertex`.
+
+```html
+<sf-shader geometry="plane" args="6 6 200 200" rotation="-90 0 0" u-amp="0.55">
+  <sf-vert> transformed.z += (fbm(uv * 6.0 + uTime * 0.35) - 0.75) * uAmp; </sf-vert>
+  <sf-frag> void main(){ gl_FragColor = vec4(vUv, 0.6, 1.0); } </sf-frag>
+</sf-shader>
+```
+
+**Deterministic GLSL (applies to `<sf-shader>` and the `sf.THREE` escape hatch alike).** Drive all time from `uTime` — never read a clock in the shader. Use a sin-free hash for noise (the built-in `hash*/vnoise/fbm`; `sin(dot(p, large))*43758` drifts on GPU precision). Seed per-pixel/per-vertex variation from `uv`/`position`, not unseeded randomness. No frame-to-frame feedback (ping-pong textures, `gl_FragCoord` accumulation) — every frame must be a pure function of `t`. `validate`'s seek-idempotency probe catches violations as frames that diverge mid-render.
 
 ### `<sf-scatter>` — seeded instancing (block)
 

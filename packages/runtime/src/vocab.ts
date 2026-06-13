@@ -21,6 +21,8 @@ export const ELEMENT_NAMES = [
   "sf-scatter",
   "sf-baked",
   "sf-shader",
+  "sf-vert", // optional vertex-stage child of <sf-shader>
+  "sf-frag", // optional fragment-stage child of <sf-shader>
   "sf-animate",
   "sf-callout",
 ] as const;
