@@ -64,6 +64,9 @@ export interface CompiledScene {
   /** DOM-overlay writers that run after camera lookAt — they read the final
    *  camera matrices to project 3D points to screen (e.g. sf-callout labels). */
   overlayFns: Array<(t: number) => void>;
+  /** DOM-overlay roots (sf-callout layers). Shown/hidden with the scene's shot
+   *  window so a hidden shot's labels don't linger over later shots. */
+  overlayEls: HTMLElement[];
   /** uTime uniforms (particles, escape-hatch shaders) set to t before render. */
   timeUniforms: Array<{ value: number }>;
   ready: Promise<void>;
@@ -480,6 +483,7 @@ export function compileScene(host: HTMLElement): CompiledScene {
     seekFns,
     lateSeekFns: [],
     overlayFns: [],
+    overlayEls: [],
     timeUniforms,
     ready,
   };

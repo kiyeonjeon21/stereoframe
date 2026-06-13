@@ -162,6 +162,12 @@ export function installSeekListener(
       const state = shotState(t, s.shot);
       s.canvas.style.display = state.visible ? "" : "none";
       s.canvas.style.opacity = state.opacity >= 1 ? "" : String(state.opacity);
+      // DOM-overlay layers (sf-callout) ride the shot window + crossfade so a
+      // hidden shot's labels don't linger and fades stay in sync with the canvas.
+      for (const el of s.overlayEls) {
+        el.style.display = state.visible ? "" : "none";
+        el.style.opacity = state.opacity >= 1 ? "" : String(state.opacity);
+      }
       if (state.visible) applySeek(s, state.localT);
     }
   };

@@ -27,6 +27,7 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 
 const STYLE_ID = "__stereoframe-callout-styles";
 const CSS = `
+.sf-callout-layer { position: fixed; inset: 0; pointer-events: none; }
 .sf-callout-svg { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 49; }
 .sf-callout-line { stroke: #f4f1e8; stroke-width: 1.5; stroke-linecap: round; }
 .sf-callout-dot { fill: #f4f1e8; }
@@ -88,9 +89,16 @@ export function compileCallouts(compiled: CompiledScene): void {
   if (els.length === 0) return;
   injectStyles();
 
+  // One layer per scene, so the whole set can be shown/hidden with the scene's
+  // shot window (a hidden shot's labels must not linger over later shots).
+  const layer = document.createElement("div");
+  layer.className = "sf-callout-layer";
+  document.body.appendChild(layer);
+  compiled.overlayEls.push(layer);
+
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("class", "sf-callout-svg");
-  document.body.appendChild(svg);
+  layer.appendChild(svg);
 
   const callouts: Callout[] = [];
   for (const el of els) {
@@ -121,7 +129,7 @@ export function compileCallouts(compiled: CompiledScene): void {
     t.className = "t";
     t.textContent = el.getAttribute("text") ?? "";
     label.appendChild(t);
-    document.body.appendChild(label);
+    layer.appendChild(label);
 
     callouts.push({
       worldPoint,
