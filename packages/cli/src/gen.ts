@@ -485,8 +485,10 @@ export async function genViaFal(opts: FalGenOptions): Promise<string> {
   const input: Record<string, unknown> = { ...(opts.input ?? {}) };
   if (opts.images && opts.images.length) {
     const uris = opts.images.map((p) => (p.startsWith("data:") ? p : imageToDataUri(resolve(projectDir, p))));
-    if (uris.length > 1) input.input_image_urls ??= uris;
-    else input.input_image_url ??= uris[0];
+    // Field name varies by fal model; `image_url`/`image_urls` covers Tripo/Trellis/
+    // most. Override via --input for models that want `input_image_url` (Hunyuan).
+    if (uris.length > 1) input.image_urls ??= uris;
+    else input.image_url ??= uris[0];
   } else if (opts.prompt && input.prompt === undefined) {
     input.prompt = opts.prompt;
   }
