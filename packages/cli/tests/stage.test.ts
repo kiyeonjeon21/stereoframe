@@ -93,6 +93,33 @@ describe("buildAutoCallouts", () => {
     expect(out.map((c) => c.leadY)).toEqual([-82, -82, -82]);
   });
 
+  test("generic part names are replaced with synthesised labels", () => {
+    const m = manifest([
+      part({ index: 0, name: "Mesh 0", triangles: 3000, character: "glass", spatial: ["top"] }),
+      part({ index: 1, name: "Node001", triangles: 2000, character: "matte", spatial: ["base", "left"] }),
+      part({ index: 2, name: "5", triangles: 1000, character: "matte", spatial: ["core"], sizeRank: 0 }),
+    ]);
+    const out = buildAutoCallouts(m, 8, { max: 5 });
+    // Glass + top → "Glass / TOP"; never the raw "Mesh 0".
+    expect(out[0]!.value).toBe("Glass");
+    expect(out.every((c) => !/^(mesh|node)\s*\d/i.test(c.value))).toBe(true);
+    // Generic-named parts are targeted by index, not the junk name.
+    expect(out[0]!.part).toBe("0");
+    // Placeless matte falls back to a body/part label.
+    expect(out.find((c) => c.part === "2")!.value).toBe("Main body");
+  });
+
+  test("real part names are kept as the callout label and target", () => {
+    const m = manifest([
+      part({ index: 0, name: "Windshield", triangles: 3000, character: "glass" }),
+      part({ index: 1, name: "Chassis", triangles: 2000, character: "metal" }),
+    ]);
+    const out = buildAutoCallouts(m, 8);
+    expect(out[0]!.value).toBe("Windshield");
+    expect(out[0]!.part).toBe("Windshield");
+    expect(out[0]!.text).toBe("Optical glass");
+  });
+
   test("startAt delays the first callout (teardown waits for the explode)", () => {
     const m = manifest([
       part({ index: 0, name: "A", triangles: 3000 }),

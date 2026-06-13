@@ -179,6 +179,50 @@ const CHARACTER_CAPTION: Record<Character, string> = {
   "—": "Component",
 };
 
+/** A one-word noun from the material character (for synthesised labels). */
+const CHARACTER_NOUN: Record<Character, string> = {
+  glass: "Glass",
+  metal: "Metal",
+  fabric: "Fabric",
+  emissive: "Light",
+  matte: "",
+  "—": "",
+};
+
+/**
+ * Default exporter names ("Mesh 0", "Node001", "Object", a bare number) carry
+ * no meaning, so labelling a callout with them is noise. The fuzzer showed this
+ * is common in real/generated GLBs (a well-authored model like ToyCar names its
+ * parts; many don't).
+ */
+function isGenericName(name: string): boolean {
+  const s = (name ?? "").trim();
+  if (!s || s.length <= 1) return true;
+  return (
+    /^(mesh|node|object|primitive|group|polysurface|geometry|default|material)[\s._-]*\d*$/i.test(s) ||
+    /^\d+$/.test(s)
+  );
+}
+
+const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+
+/**
+ * A callout label for a part. A real name is used as-is (name + material
+ * caption); a generic name is replaced with something synthesised from what we
+ * DID tag — material character and where the part sits — so the label still
+ * reads ("Glass / TOP", "Metal / FRONT · LEFT") instead of "Mesh 0".
+ */
+function labelFor(part: PartManifest): { value: string; text: string } {
+  if (!isGenericName(part.name)) {
+    return { value: humanizeName(part.name), text: CHARACTER_CAPTION[part.character] };
+  }
+  const place = part.spatial.filter((s) => s !== "core").map(cap).join(" · ");
+  const noun = CHARACTER_NOUN[part.character];
+  if (noun) return { value: noun, text: place || CHARACTER_CAPTION[part.character] };
+  if (place) return { value: place, text: "Component" };
+  return { value: part.sizeRank === 0 ? "Main body" : `Part ${part.index + 1}`, text: "Component" };
+}
+
 /** Explode timing for the teardown preset — single source for the template and
  *  the callout start (callouts draw on once the parts have separated). */
 export function explodeTiming(duration: number): { start: number; dur: number; end: number } {
@@ -221,10 +265,13 @@ export function buildAutoCallouts(
         : alt++ % 2 === 0
           ? "right"
           : "left";
+    const { value, text } = labelFor(p);
     return {
-      part: p.name || String(p.index),
-      value: humanizeName(p.name || `Part ${p.index}`),
-      text: CHARACTER_CAPTION[p.character],
+      // Target by name when it's real (stable across re-exports); fall back to
+      // the index for generic/unnamed parts.
+      part: isGenericName(p.name) ? String(p.index) : p.name,
+      value,
+      text,
       anchor: side,
       // Fan the labels up the screen so parts that cluster (e.g. a canopy on
       // a body) and land on the same side don't stack on top of each other.
