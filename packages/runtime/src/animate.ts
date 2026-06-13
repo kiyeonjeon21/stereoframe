@@ -28,6 +28,19 @@ import type { XYZ } from "./verbs";
 
 const _world = new Vector3();
 
+/** Vertex-shader prelude for the `deform` verb: sin-free 3D value noise that
+ *  displaces vertices along their normals. Injected via onBeforeCompile. */
+const DEFORM_HEADER = `
+uniform float uDeformTime; uniform float uDeformAmt; uniform float uDeformFreq;
+float sfHash31(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float sfVNoise3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(sfHash31(i+vec3(0.,0.,0.)), sfHash31(i+vec3(1.,0.,0.)), f.x),
+                 mix(sfHash31(i+vec3(0.,1.,0.)), sfHash31(i+vec3(1.,1.,0.)), f.x), f.y),
+             mix(mix(sfHash31(i+vec3(0.,0.,1.)), sfHash31(i+vec3(1.,0.,1.)), f.x),
+                 mix(sfHash31(i+vec3(0.,1.,1.)), sfHash31(i+vec3(1.,1.,1.)), f.x), f.y), f.z); }
+float sfDeform(vec3 p){ return sfVNoise3(p) * 2.0 - 1.0; }
+`;
+
 /**
  * The parts of a loaded model to explode: descend through single-child
  * wrapper nodes, then return the shallowest level that branches into
@@ -120,6 +133,8 @@ export function compileAnimations(compiled: CompiledScene): void {
       "move": 2,
       "crossfade-clip": 0.5,
       "camera-path": 8,
+      "path": 8,
+      "morph": 1,
       "variant": 0.8,
       "explode": 2.5,
       "isolate": 0.8,
@@ -391,6 +406,81 @@ export function compileAnimations(compiled: CompiledScene): void {
             e.phys.clearcoat = e.clearcoat * k;
           }
         }
+      });
+    } else if (verb === "path") {
+      // Object-follow along a Catmull-Rom path (the object cousin of camera-path).
+      const waypoints = (el.getAttribute("points") ?? "")
+        .split(",")
+        .map((c) => parseVec3(c.trim(), [Number.NaN, Number.NaN, Number.NaN]))
+        .filter((p) => p.every(Number.isFinite))
+        .map((p) => new Vector3(p[0], p[1], p[2]));
+      if (waypoints.length < 2) continue;
+      const curve = new CatmullRomCurve3(waypoints, el.getAttribute("closed") === "true", "centripetal");
+      const orient = (el.getAttribute("orient") ?? "none").toLowerCase();
+      const pos = new Vector3();
+      const ahead = new Vector3();
+      compiled.lateSeekFns.push((t) => {
+        const p = Math.min(1, Math.max(0, verbs.easedProgress(t, timing)));
+        curve.getPointAt(p, pos);
+        target.position.set(pos.x, pos.y, pos.z);
+        if (orient === "ahead") {
+          curve.getPointAt(Math.min(1, p + 0.02), ahead);
+          if (ahead.distanceToSquared(pos) > 1e-9) (target as Object3D).lookAt(ahead);
+        }
+      });
+    } else if (verb === "morph") {
+      // Animate a GLB morph-target influence over the window (distinct from
+      // crossfade-clip, which blends whole animation clips).
+      const index = Math.max(0, Math.round(parseNumber(el.getAttribute("index"), 0)));
+      const to = parseNumber(el.getAttribute("to"), 1);
+      const fromAttr = el.getAttribute("from");
+      const meshes: Mesh[] = [];
+      target.traverse((o) => {
+        const m = o as Mesh;
+        if (m.morphTargetInfluences && m.morphTargetInfluences.length > index) meshes.push(m);
+      });
+      if (meshes.length === 0) continue;
+      const from = fromAttr != null ? parseNumber(fromAttr, 0) : meshes[0]!.morphTargetInfluences![index] ?? 0;
+      compiled.seekFns.push((t) => {
+        const v = from + (to - from) * verbs.easedProgress(t, timing);
+        for (const m of meshes) m.morphTargetInfluences![index] = v;
+      });
+    } else if (verb === "deform") {
+      // Continuous organic vertex displacement along normals — GPU + analytic
+      // (sin-free noise driven by a uTime uniform, injected via onBeforeCompile).
+      // Pure function of t. Normals are not recomputed (cheap; fine for gentle
+      // wobble). Targets MeshStandardMaterial meshes under the target.
+      const amount = parseNumber(el.getAttribute("amount"), 0.15);
+      const frequency = parseNumber(el.getAttribute("frequency"), 1.5);
+      const speed = parseNumber(el.getAttribute("speed"), 1);
+      const uTime = { value: 0 };
+      const seenMats = new Set<Material>();
+      let patched = false;
+      target.traverse((o) => {
+        const mesh = o as Mesh;
+        const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+        for (const mat of mats) {
+          if (!(mat instanceof MeshStandardMaterial) || seenMats.has(mat)) continue;
+          seenMats.add(mat);
+          mat.onBeforeCompile = (shader) => {
+            shader.uniforms.uDeformTime = uTime;
+            shader.uniforms.uDeformAmt = { value: amount };
+            shader.uniforms.uDeformFreq = { value: frequency };
+            shader.vertexShader =
+              DEFORM_HEADER +
+              shader.vertexShader.replace(
+                "#include <begin_vertex>",
+                "#include <begin_vertex>\n  transformed += normal * sfDeform(position * uDeformFreq + uDeformTime) * uDeformAmt;",
+              );
+          };
+          mat.needsUpdate = true;
+          patched = true;
+        }
+      });
+      if (!patched) continue;
+      const start = timing.start;
+      compiled.seekFns.push((t) => {
+        uTime.value = Math.max(0, t - start) * speed;
       });
     }
   }

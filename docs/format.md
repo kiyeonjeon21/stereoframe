@@ -189,6 +189,22 @@ Drop GLSL as the element's text and get the boilerplate wired up — the lowest-
 
 In scope inside your fragment `main()`: `vUv` (0–1), `uTime` (seconds), `uResolution` (px), your `u-*` uniforms, and a sin-free noise toolkit — `hash21(vec2)`, `hash22(vec2)`, `vnoise(vec2)`, `fbm(vec2)`. Set `gl_FragColor`. With no body, a default flow-field is used. See `examples/shader-flow`. Note: a `fullscreen` shader draws first (renderOrder −1) so 3D geometry composites on top.
 
+### `<sf-scatter>` — seeded instancing (block)
+
+A field of objects — a forest, a debris cloud, a tile grid — from one element: the primitive `geometry`/`args` (and `material`, like sf-mesh) instanced `count` times across a seeded distribution, each with analytic per-instance spin + float. Deterministic: every instance transform is `f(seed, t)`.
+
+| attribute | default | description |
+|---|---|---|
+| `geometry`/`args`, `material`/… | box / standard | the instanced primitive + material (full sf-mesh material vocabulary, incl. `matcap`) |
+| `count` / `seed` | 80 / 1 | instance count / PRNG seed |
+| `area` | `6 3 6` | distribution extents (box half-sizes, or ellipsoid radii) |
+| `distribution` | box | `box` or `sphere` |
+| `position` | `0 0 0` | cluster center |
+| `scale-min`/`scale-max` | 0.6 / 1.2 | per-instance scale range |
+| `spin` | 0 | per-instance spin (rpm; random axis + direction) |
+| `float` | 0 | per-instance vertical bob amplitude |
+| `palette` | — | comma-separated colors assigned per instance (e.g. `#fff,#f43,#18181b`) |
+
 ### `<sf-animate>` — semantic verbs
 
 Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, default 0), `duration` (seconds), `ease`.
@@ -209,6 +225,9 @@ Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, defau
 | `fade-in` | duration default 0.6 | material opacity 0→original |
 | `float` | `amplitude` (0.1), `period` (4) | sinusoidal bob on Y; continuous |
 | `sway` | `amount` (6, degrees), `period` (5) | continuous multi-axis secondary motion (gentle wobble) — makes a form feel alive; analytic, seekable |
+| `path` | `points` (comma-separated `x y z`, ≥2), `orient` (`none`\|`ahead`), `closed` (false) | object-follow along a Catmull-Rom path (the object cousin of `camera-path`); `orient="ahead"` turns the object to face its travel direction. Runs in the late pass |
+| `morph` | `index` (0), `to` (1), `from` (current) | animate a GLB morph-target influence over the window (needs a mesh with morph targets; distinct from `crossfade-clip`, which blends whole clips) |
+| `deform` | `amount` (0.15), `frequency` (1.5), `speed` (1) | continuous organic vertex displacement along normals (sin-free GPU noise, injected via onBeforeCompile) — makes a surface ripple/undulate. Targets `MeshStandardMaterial` meshes. Analytic/seekable; normals aren't recomputed (fine for gentle wobble) |
 | `explode` | `distance` (1.5) | exploded view — separate a model's parts outward from its center over the window. `distance` is a fraction of the model's radius (fit-invariant: `1` ≈ one model-radius of travel, regardless of the GLB's native scale). Needs a **multi-component** GLB (separate part meshes); single-mesh or rigged-character models have nothing to separate (no effect) |
 | `isolate` | `part` (index or name, required), `dim` (0.8) | feature spotlight — fade every *other* part's material toward black over the window so one component reads as the hero. `dim` is how far the rest darken (1 = fully). Needs a multi-component GLB; pair with a slow `dolly`/`orbit` toward the part. `part` accepts a name (`part="Glass"`) — run `stereoframe inspect <model>` to learn the names |
 | `variant` | `color`/`roughness`/`metalness` (target values), `material` (GLB material name filter), duration default 0.8 | material colorway transitions (configurators). Multiple variants on one target chain in start order — each one's from-state is the previous one's result (resolved at compile time, backward-seek safe) |

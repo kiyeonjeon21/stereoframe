@@ -114,9 +114,14 @@ Verbs (`start`/`duration` in seconds, `ease` = GSAP-compatible names like `power
 | `fade-in` | rise (px, DOM only) | opacity entrance (3D materials or DOM) |
 | `float` | amplitude, period | gentle hover (continuous) |
 | `camera-path` | points ("x y z, x y z, …"), look (ahead\|none) | spline flythroughs/walkthroughs |
+| `path` | points, orient (none\|ahead), closed | move an OBJECT along a Catmull-Rom path (object cousin of camera-path) |
+| `morph` | index, to, from | animate a GLB morph-target influence (needs morph targets) |
+| `deform` | amount, frequency, speed | continuous organic vertex ripple/undulation (sin-free GPU noise, MeshStandardMaterial) |
 | `variant` | color/roughness/metalness, material (name filter) | colorway switches (configurators); chain multiple at different starts |
 
-Block: `sf-metaball` (count, seed, resolution, scale, speed + sf-mesh material attrs) — gooey blobs. Omit the scene `background` and place DOM typography BEFORE the sf-scene to get text occluded by the blobs (see examples/metaball).
+Blocks:
+- `sf-metaball` (count, seed, resolution, scale, speed + sf-mesh material attrs) — gooey blobs. Omit the scene `background` and place DOM typography BEFORE the sf-scene to get text occluded by the blobs (see examples/metaball).
+- `sf-scatter` (geometry/args + material, count, seed, area, distribution box\|sphere, scale-min/max, spin, float, palette) — a seeded field of instanced objects (forest/debris/grid) with per-instance spin+float; deterministic.
 
 ## Ocean flythrough recipe
 
