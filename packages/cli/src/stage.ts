@@ -36,6 +36,24 @@ export interface StageOptions {
   title?: string;
   /** spec preset: auto-callouts derived from `stereoframe inspect`. */
   callouts?: CalloutSpec[];
+  /** when the model is dominantly metallic: tame exposure + swap the studio
+   *  preset for a cool-rim/warm-fill rig so chrome doesn't blow out. */
+  metalRig?: boolean;
+}
+
+/** A cool rim + warm fill + dim hemisphere — separates a metal subject and
+ *  keeps highlights from blowing out (the killer-demos dark-metal recipe). */
+const METAL_RIG = `<sf-light type="hemisphere" color="#2a3040" intensity="0.4"></sf-light>
+      <sf-light type="directional" color="#bcd4ff" intensity="2.0" position="-5 3.5 -4"></sf-light>
+      <sf-light type="directional" color="#ffd0a0" intensity="1.4" position="5 2 3"></sf-light>`;
+
+/** For a metallic model: drop exposure ~0.12 (floor 0.6) and replace the studio
+ *  light preset with the metal rig. Applied to the generated HTML — markers
+ *  (`exposure="…"`, `<sf-light preset="studio">`) are stable in our templates. */
+function applyMetalRig(html: string): string {
+  return html
+    .replace(/exposure="([\d.]+)"/, (_m, v) => `exposure="${Math.max(0.6, Number(v) - 0.12).toFixed(2)}"`)
+    .replace(/<sf-light preset="studio"><\/sf-light>/g, METAL_RIG);
 }
 
 function head(bg: string): string {
@@ -378,12 +396,13 @@ export function stageModel(opts: StageOptions): string {
 
   const d = opts.duration && opts.duration > 0 ? opts.duration : 8;
   const bg = opts.background ?? DEFAULT_BG[opts.preset];
-  const html =
+  const base =
     opts.preset === "spec"
       ? spec(modelFile, d, bg, opts.title, opts.callouts)
       : opts.preset === "teardown"
         ? teardown(modelFile, d, bg, opts.title, opts.callouts)
         : TEMPLATES[opts.preset](modelFile, d, bg, opts.title);
+  const html = opts.metalRig ? applyMetalRig(base) : base;
   writeFileSync(join(dir, "index.html"), html);
 
   return dir;

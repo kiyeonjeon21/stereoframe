@@ -101,10 +101,17 @@ async function runStage(opts: {
 }): Promise<string> {
   const { model, outDir, preset } = opts;
   const dur = opts.duration && opts.duration > 0 ? opts.duration : 8;
+
+  // Inspect once — used both for spec/teardown callouts and to auto-adapt the
+  // lighting (a dominantly-metal model gets a tamed exposure + rim/fill rig).
+  console.log(`inspecting ${model}…`);
+  const manifest = await inspectModel({ model, silent: true, write: false });
+  const metalRig =
+    manifest.dominant.character === "metal" && (manifest.dominant.metalness ?? 0) > 0.6;
+  if (metalRig) console.log("  dominant material is metal → tamed exposure + rim/fill rig");
+
   let callouts;
   if (preset === "spec" || preset === "teardown") {
-    console.log(`inspecting ${model} for ${preset} callouts…`);
-    const manifest = await inspectModel({ model, silent: true, write: false });
     callouts = buildAutoCallouts(
       manifest,
       dur,
@@ -126,6 +133,7 @@ async function runStage(opts: {
     background: opts.background,
     title: opts.title,
     callouts,
+    metalRig,
   });
   console.log(`staged ${model} (${preset}) → ${created}`);
   return created;

@@ -42,6 +42,9 @@ export interface ModelManifest {
   isSingleMesh: boolean;
   hasRig: boolean;
   recommendedFit: number;
+  /** The most-detailed mesh part's material — the model's "dominant" look,
+   *  used to auto-adapt lighting (e.g. a fully-metal model needs a tamed rig). */
+  dominant: { character: Character; metalness: number | null };
   bounds: { center: number[]; size: number[]; min: number[]; max: number[] };
   parts: PartManifest[];
 }
@@ -239,6 +242,15 @@ export async function inspectModel(opts: {
     material: p.material,
   }));
 
+  // Dominant look = the most-detailed mesh part's material (parts carry the
+  // derived `character`; meshParts are the raw pre-tagged parts).
+  const heroPart = parts
+    .filter((p) => p.kind === "mesh")
+    .sort((a, b) => b.triangles - a.triangles)[0];
+  const dominant: { character: Character; metalness: number | null } = heroPart
+    ? { character: heroPart.character, metalness: heroPart.material?.metalness ?? null }
+    : { character: "—", metalness: null };
+
   const manifest: ModelManifest = {
     model: modelFile,
     generatedBy: "stereoframe inspect",
@@ -247,6 +259,7 @@ export async function inspectModel(opts: {
     isSingleMesh: meshParts.length <= 1,
     hasRig: raw.hasRig,
     recommendedFit: 2.6,
+    dominant,
     bounds,
     parts,
   };
