@@ -32,6 +32,8 @@ export interface BriefOptions {
   llmProvider?: string;
   llmModel?: string;
   key?: string;
+  width?: number;
+  height?: number;
 }
 
 /** Pull the first JSON object out of an LLM response (handles ```json fences / prose). */
@@ -70,7 +72,16 @@ export function manifestFacts(m: ModelManifest): string {
   ].join("\n");
 }
 
-export function buildMessages(brief: string, manifest: ModelManifest): ChatMessage[] {
+export function buildMessages(brief: string, manifest: ModelManifest, dims?: { width: number; height: number }): ChatMessage[] {
+  const w = dims?.width ?? 1920;
+  const h = dims?.height ?? 1080;
+  const aspect = h > w ? "PORTRAIT (vertical, social)" : w > h ? "landscape (16:9)" : "SQUARE";
+  const formatRule =
+    h > w
+      ? `- OUTPUT FORMAT: ${aspect} ${w}x${h}. Frame EVERY shot for a tall 9:16 frame — get closer, fill the height, use head/footroom, keep the subject centered; cameras nearer than for 16:9 (smaller radius / shorter distance).`
+      : h === w
+        ? `- OUTPUT FORMAT: ${aspect} ${w}x${h}. Frame for a square 1:1 crop — centered, tight.`
+        : `- OUTPUT FORMAT: ${aspect} ${w}x${h}.`;
   const system = `You are a world-class product-film director and director of photography for "stereoframe", a deterministic 3D-video framework. You translate a creative brief into a STORYBOARD PLAN (strict JSON) that compiles into a cinematic film from a single 3D model.
 
 ${STORYBOARD_SCHEMA_DOC}
@@ -80,6 +91,7 @@ OUTPUT RULES:
 - Make it genuinely cinematic and DYNAMIC (this is the whole point): 6-9 shots, 18-28s total,
   varied beat lengths, a clear arc, varied camera types, backdrop + secondaryMotion on most
   shots, atmosphere only where allowed, complementary split lighting, per-beat grade + light-sweep.
+${formatRule}
 - Obey the determinism constraint: never put "atmosphere" on a shot that crossfades out.
 - Respect the model facts (pose a flat model; metal → auto/rim-fill rig).
 - The "model" field will be overwritten by the tool; you may omit it.`;
@@ -120,8 +132,10 @@ export async function runBrief(opts: BriefOptions): Promise<{ dir: string; plan:
   console.log(`inspecting ${basename(glb)}…`);
   const manifest = await inspectModel({ model: glb, silent: true, write: false });
 
+  const W = opts.width ?? 1920;
+  const H = opts.height ?? 1080;
   console.log(`directing via ${provider.name}:${opts.llmModel ?? provider.defaultModel} (one creative call)…`);
-  const messages = buildMessages(briefText, manifest);
+  const messages = buildMessages(briefText, manifest, { width: W, height: H });
   let raw = await provider.chat(messages, chatOpts);
   let plan = asPlan(extractJson(raw));
 
@@ -129,8 +143,8 @@ export async function runBrief(opts: BriefOptions): Promise<{ dir: string; plan:
   const outDir = resolve(opts.outDir);
   mkdirSync(outDir, { recursive: true });
   plan.model = relative(outDir, glb) || basename(glb);
-  plan.width ??= 1920;
-  plan.height ??= 1080;
+  plan.width = W;
+  plan.height = H;
 
   let errors = validateStoryboard(plan);
   if (errors.length) {
@@ -140,8 +154,8 @@ export async function runBrief(opts: BriefOptions): Promise<{ dir: string; plan:
     raw = await provider.chat(messages, chatOpts);
     plan = asPlan(extractJson(raw));
     plan.model = relative(outDir, glb) || basename(glb);
-    plan.width ??= 1920;
-    plan.height ??= 1080;
+    plan.width = W;
+    plan.height = H;
     errors = validateStoryboard(plan);
   }
   if (errors.length) {

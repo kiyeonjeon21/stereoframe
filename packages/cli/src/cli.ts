@@ -82,9 +82,11 @@ USAGE
       --dir <dir>      output project dir (default: <brief> slug or film)
       --render         compile + render the result to mp4 (--draft for fast)
       --llm-provider   openai (default) | anthropic        --llm-model <id>   --llm-key <key>
+      --vertical       frame for 1080x1920 (social) · --square for 1080x1080
   stereoframe storyboard <plan.json>   compile a shot plan (JSON) into a multi-shot directed film
       --dir <dir>      output project dir (default: <title> slug or <stem>-film)
       --render         render the compiled film to mp4 (--draft for fast)
+      --vertical       force 1080x1920 (social) · --square forces 1080x1080
   stereoframe inspect <model.glb>      segment + tag a GLB: list its parts (name, material, where, size)
       --json           print the manifest as JSON instead of a table
   stereoframe gen "<prompt>"           generate a 3D model (GLB) via Meshy
@@ -247,6 +249,13 @@ async function main(): Promise<void> {
         throw new Error("usage: stereoframe storyboard <plan.json> [--dir out] [--render]");
       }
       const { plan, planDir } = readStoryboard(planPath);
+      if (options.get("vertical") === true) {
+        plan.width = 1080;
+        plan.height = 1920;
+      } else if (options.get("square") === true) {
+        plan.width = 1080;
+        plan.height = 1080;
+      }
       const errs = validateStoryboard(plan);
       if (errs.length) throw new Error(`storyboard plan has errors:\n  - ${errs.join("\n  - ")}`);
       const slug =
@@ -319,10 +328,17 @@ async function main(): Promise<void> {
         model = modelOpt as string;
       }
 
+      const vdims =
+        options.get("vertical") === true
+          ? { width: 1080, height: 1920 }
+          : options.get("square") === true
+            ? { width: 1080, height: 1080 }
+            : {};
       await runBrief({
         brief,
         model,
         outDir,
+        ...vdims,
         render: options.get("render") === true,
         draft: options.get("draft") === true,
         llmProvider: typeof options.get("llm-provider") === "string" ? (options.get("llm-provider") as string) : undefined,

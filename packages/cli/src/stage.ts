@@ -56,14 +56,14 @@ export function applyMetalRig(html: string): string {
     .replace(/<sf-light preset="studio"><\/sf-light>/g, METAL_RIG);
 }
 
-export function head(bg: string): string {
+export function head(bg: string, width = 1920, height = 1080): string {
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { width: 1920px; height: 1080px; overflow: hidden; background: ${bg}; }
+      html, body { width: ${width}px; height: ${height}px; overflow: hidden; background: ${bg}; }
       body { font-family: "Helvetica Neue", Arial, sans-serif; }
       sf-scene { position: absolute; inset: 0; }
       #title {

@@ -485,7 +485,7 @@ ${anims.map((a) => `      ${a}`).join("\n")}${calloutBlock ? "\n" + calloutBlock
     );
   });
 
-  return `${head(firstBg)}
+  return `${head(firstBg, W, H)}
 ${sceneBlocks.join("\n\n")}
 
 ${domBlocks.map((d) => `    ${d}`).join("\n")}

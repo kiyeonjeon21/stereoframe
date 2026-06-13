@@ -72,6 +72,13 @@ describe("buildMessages", () => {
     expect(msgs[1]!.content).toMatch(/neon supercar reveal/);
     expect(msgs[1]!.content).toMatch(/MODEL FACTS/);
   });
+  test("portrait dims inject a vertical framing rule", () => {
+    const v = buildMessages("x", manifest(), { width: 1080, height: 1920 });
+    expect(v[0]!.content).toMatch(/PORTRAIT/);
+    expect(v[0]!.content).toMatch(/1080x1920/);
+    // landscape default does not
+    expect(buildMessages("x", manifest())[0]!.content).not.toMatch(/PORTRAIT/);
+  });
 });
 
 describe("repairMessage", () => {
