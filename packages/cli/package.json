@@ -1,6 +1,6 @@
 {
   "name": "stereoframe",
-  "version": "0.2.52",
+  "version": "0.2.53",
   "description": "Declarative, deterministic 3D video on three.js — scaffold, lint, validate, and render compositions built for AI agents.",
   "license": "MIT",
   "repository": {
