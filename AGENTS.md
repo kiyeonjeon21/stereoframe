@@ -30,8 +30,9 @@ Requires Node ≥ 20, ffmpeg on PATH, and bun (for building). Rendering uses hea
 
 For **how to write stereoframe compositions** (presets, the `<sf-*>` vocabulary,
 finish attributes, recipes, determinism rules), use the authoring guide:
-`.claude/skills/stereoframe/SKILL.md` (a Claude skill; also the markup spec in
-`docs/format.md`). Don't duplicate that here — read it before authoring `sf-*` markup.
+`.claude/skills/stereoframe/SKILL.md` (also discoverable by Codex through
+`.agents/skills/stereoframe`; also the markup spec in `docs/format.md`). Don't
+duplicate that here — read it before authoring `sf-*` markup.
 
 ## Conventions (important)
 
@@ -43,9 +44,19 @@ finish attributes, recipes, determinism rules), use the authoring guide:
 - **Secrets live in `.env`** (gitignored, never commit): `NPM_TOKEN` (publish), `MESHY_API_KEY` (`gen`). `refs/` is gitignored too (third-party reference videos — never publish).
 - **Match surrounding style**; keep comments at the density of the file you're editing.
 
+## Git workflow
+
+- Commit and push only when explicitly asked.
+- Before committing, inspect `git status` and the relevant diff.
+- Stage only files that belong to the requested task; avoid `git add .`.
+- Do not include unrelated changes or changes made by another tool/session.
+- Follow feat-then-release: commit feature/fix work first, then run the release separately.
+- Before pushing, run `bun test`; for compositions, run `stereoframe lint` then `stereoframe validate`.
+
 ## Cross-tool layout
 
-The authoring skill is canonical at `.claude/skills/stereoframe/SKILL.md`; the
-root `skills/stereoframe/SKILL.md` is a symlink to it (for `npx skills add`
-distribution). "Skills" are Claude-only — Codex and Cursor get the same knowledge
-through this file and `docs/format.md`, not a skills folder.
+The authoring skill is canonical at `.claude/skills/stereoframe/SKILL.md`. For
+Codex repo-scoped skill discovery, `.agents/skills/stereoframe` symlinks to that
+canonical folder. The root `skills/stereoframe/SKILL.md` symlink is kept for
+skills distribution compatibility. Cursor gets the same guidance through this
+file and `docs/format.md`.
