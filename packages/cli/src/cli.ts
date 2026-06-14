@@ -10,7 +10,7 @@
  * codes — designed so coding agents can scaffold → edit → render in a loop.
  */
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
-import { join, resolve, relative, isAbsolute, basename } from "node:path";
+import { join, resolve, basename } from "node:path";
 import {
   ELEMENT_NAMES,
   VERB_NAMES,
@@ -72,19 +72,6 @@ const WANT_JSON = process.argv.includes("--json") || !process.stdout.isTTY;
 class CliError extends Error {
   constructor(message: string, readonly code = "runtime_error", readonly hint?: string) {
     super(message);
-  }
-}
-
-/** Reject paths that escape the working directory (agents hallucinate `../..`). */
-function assertWithinCwd(p: string | undefined, flag: string): void {
-  if (!p) return;
-  const rel = relative(process.cwd(), resolve(p));
-  if (rel.startsWith("..") || isAbsolute(rel)) {
-    throw new CliError(
-      `${flag} "${p}" escapes the working directory`,
-      "path_escape",
-      "Use a path inside the current project (no leading '..' or absolute paths).",
-    );
   }
 }
 
@@ -252,7 +239,6 @@ async function main(): Promise<void> {
     case "init": {
       const name = positional[0];
       if (!name) throw new Error("usage: stereoframe init <name>");
-      assertWithinCwd(name, "init <name>");
       const created = scaffoldProject(name);
       reportResult("init", { outputs: [created], next: `cd ${name} && stereoframe render` }, [
         `created ${created}`,
@@ -280,7 +266,6 @@ async function main(): Promise<void> {
         throw new Error("usage: stereoframe bake [dir] --target <element-id> [--fps n] [--out file.bin]");
       }
       const bakeOut = typeof options.get("out") === "string" ? (options.get("out") as string) : undefined;
-      assertWithinCwd(bakeOut, "--out");
       const out = await bakeProject({
         projectDir: dir,
         target,
@@ -292,7 +277,6 @@ async function main(): Promise<void> {
     }
     case "render": {
       const renderOut = typeof options.get("out") === "string" ? (options.get("out") as string) : undefined;
-      assertWithinCwd(renderOut, "--out");
       const out = await renderProject({
         projectDir: dir,
         fps: options.has("fps") ? Number(options.get("fps")) : undefined,
@@ -326,7 +310,6 @@ async function main(): Promise<void> {
       const stem = basename(model).replace(/\.(glb|gltf)$/i, "");
       const outDir =
         typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${stem}-${preset}`;
-      assertWithinCwd(outDir, "--dir");
       const staged = await runStage({
         model,
         outDir,
@@ -362,7 +345,6 @@ async function main(): Promise<void> {
           .replace(/^-|-$/g, "")
           .slice(0, 40) || "film";
       const outDir = typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${slug}-film`;
-      assertWithinCwd(outDir, "--dir");
       const { dir: built, duration } = await buildStoryboard({ plan, planDir, outDir });
       console.error(`compiled ${plan.shots.length} shot(s), ${duration.toFixed(1)}s → ${built}`);
       if (options.get("render") === true) {
@@ -417,7 +399,6 @@ async function main(): Promise<void> {
         .replace(/^-|-$/g, "")
         .slice(0, 32) || "film";
       const outDir = typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${slug}-film`;
-      assertWithinCwd(outDir, "--dir");
 
       let model: string;
       if (oneShot) {
@@ -474,8 +455,6 @@ async function main(): Promise<void> {
       const prompt = positional.join(" ").trim();
       const projectDir = typeof options.get("dir") === "string" ? (options.get("dir") as string) : ".";
       const out = typeof options.get("out") === "string" ? (options.get("out") as string) : undefined;
-      assertWithinCwd(projectDir, "--dir");
-      assertWithinCwd(out, "--out");
       const texture = options.get("no-texture") !== true;
       const polycount = options.has("polycount") ? Number(options.get("polycount")) : undefined;
       const key = typeof options.get("key") === "string" ? (options.get("key") as string) : undefined;
@@ -569,7 +548,6 @@ async function main(): Promise<void> {
         const slug = (prompt || basename(glbPath).replace(/\.glb$/i, "")).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "gen";
         const stageDir =
           typeof options.get("stage-dir") === "string" ? (options.get("stage-dir") as string) : `${slug}-${preset}`;
-        assertWithinCwd(stageDir, "--stage-dir");
         const created = await runStage({
           model: glbPath,
           outDir: stageDir,

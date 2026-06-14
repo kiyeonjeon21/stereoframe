@@ -17,28 +17,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build packages
-        run: bun run build
-
-      - name: Unit tests
-        run: |
-          bun run --cwd packages/runtime test
-          bun run --cwd packages/cli test
-
       - name: Install Chrome for Puppeteer
         run: bunx puppeteer browsers install chrome
 
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      - name: Lint + validate examples
-        run: |
-          for d in hello-standalone character-run-standalone ocean-flythrough glass-hero paper-swarm multi-shot variant-demo metaball; do
-            echo "=== $d"
-            node packages/cli/dist/cli.js update "examples/$d"
-            node packages/cli/dist/cli.js lint "examples/$d"
-            node packages/cli/dist/cli.js validate "examples/$d"
-          done
-
-      - name: Render smoke test
-        run: node packages/cli/dist/cli.js render examples/hello-standalone --draft --out /tmp/smoke.mp4
+      # The single source of truth — the same `bun run check` that `bun run release`
+      # runs before publishing, so CI and the local release can never diverge:
+      # build + unit tests + examples lint/validate + render smoke.
+      - name: Check (build, tests, examples, render smoke)
+        run: bun run check

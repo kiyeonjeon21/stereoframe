@@ -62,10 +62,10 @@ function run(cmd, opts = {}) {
   execSync(cmd, { cwd: ROOT, stdio: "inherit", ...opts });
 }
 
-// 1. Build + test on current code first (fail fast, version-independent).
-run("bun run build");
-run("bun run --cwd packages/runtime test");
-run("bun run --cwd packages/cli test");
+// 1. Run the FULL CI check suite on current code first — the same `bun run check`
+//    CI runs, so a release can never publish something CI would reject (build +
+//    unit tests + examples lint/validate + render smoke). Fail-fast.
+run("bun run check");
 
 // 2. Compute the shared next version (lock-step: bump the max of both).
 const current = PACKAGES.map((d) => readPkg(d).version);
