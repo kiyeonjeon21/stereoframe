@@ -36,7 +36,8 @@ bun run release minor      # only for a breaking change
 bun run release major      # only to cut 1.0.0
 ```
 
-The script (`scripts/release.mjs`) bumps both package.json versions in
-lock-step, pins the CLI's `stereoframe-runtime` dependency to the new exact
-version, builds, runs tests, publishes both to npm, then commits, tags
-(`vX.Y.Z`), and pushes. It reads `NPM_TOKEN` from `.env` (gitignored).
+The script (`scripts/release.mjs`) runs the full check suite, bumps both
+package.json versions in lock-step, commits the version bump, tags (`vX.Y.Z`),
+and pushes. The `release.yml` workflow then re-runs the full check suite on the
+tagged commit, publishes both packages to npm, and creates a GitHub Release with
+generated release notes. `NPM_TOKEN` lives in GitHub Actions secrets.

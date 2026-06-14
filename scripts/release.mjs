@@ -4,7 +4,8 @@
  * version, then commit/tag/push. **Publishing happens in CI** — the `release.yml`
  * workflow re-runs `check` on the pushed `v*` tag and only then runs
  * `scripts/publish.mjs`, so npm can never receive a version GitHub hasn't verified
- * green. No NPM_TOKEN needed locally.
+ * green. The workflow also creates a GitHub Release with generated notes.
+ * No NPM_TOKEN needed locally.
  *
  *   bun run release            # patch (default)
  *   bun run release minor      # breaking change
