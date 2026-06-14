@@ -62,7 +62,7 @@ function resolveKey(projectDir: string, explicit?: string): { key: string; isTes
   return key ? { key, isTest: false } : { key: TEST_KEY, isTest: true };
 }
 
-function slug(prompt: string): string {
+export function slug(prompt: string): string {
   return (
     prompt
       .toLowerCase()

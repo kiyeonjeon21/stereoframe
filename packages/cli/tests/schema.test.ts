@@ -11,6 +11,7 @@ import {
 import { PRESETS } from "../src/stage";
 
 const sceneSrc = readFileSync(new URL("../../runtime/src/scene.ts", import.meta.url), "utf8");
+const cliSrc = readFileSync(new URL("../src/cli.ts", import.meta.url), "utf8");
 
 describe("schema vocab consistency", () => {
   test("VERB_PARAMS has an entry for every verb (and no extras)", () => {
@@ -43,5 +44,11 @@ describe("schema ↔ source drift guards", () => {
       if (name === "standard") continue; // default fallback
       expect(sceneSrc).toContain(`"${name}"`);
     }
+  });
+
+  test("every COMMANDS entry appears in the HELP usage block", () => {
+    const names = [...cliSrc.matchAll(/name: "([a-z-]+)", summary:/g)].map((m) => m[1]!);
+    expect(names.length).toBeGreaterThan(10);
+    for (const n of names) expect(cliSrc).toContain(`stereoframe ${n}`);
   });
 });

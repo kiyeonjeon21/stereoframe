@@ -25,7 +25,7 @@ import {
   GEN_PROVIDERS,
 } from "stereoframe-runtime/vocab";
 import { addBlock, listBlocks } from "./blocks";
-import { genModel, genFromImages, genViaImage } from "./gen";
+import { genModel, genFromImages, genViaImage, slug as genSlug, resolveEnvKey } from "./gen";
 import { inspectModel } from "./inspect";
 import { bakeProject } from "./bake";
 import { buildStoryboard, readStoryboard, validateStoryboard } from "./storyboard";
@@ -151,14 +151,16 @@ USAGE
       --no-texture     skip the PBR texture pass (faster, untextured mesh)
       --polycount <n>  target polygon count
       --key <key>      Meshy API key (else MESHY_API_KEY / .env / test mode)
+      --dry-run        resolve the plan (mode, provider, output path, key presence) without spending
       --stage <preset> one-shot: generate then stage into a film (reveal|hero-orbit|turntable|exploded-view|spec|teardown)
       --render         with --stage, also render the result to mp4 (--draft for fast)
   stereoframe add <block> [dir]        install a visual block's assets + print usage
   stereoframe blocks                   list available blocks
   stereoframe update [dir]             refresh assets/stereoframe.js from the CLI's bundled runtime
-  stereoframe schema                   machine-readable spec: commands + authoring vocabulary (JSON)
+  stereoframe schema [--command <c>]   machine-readable spec: commands + authoring vocabulary (JSON)
 
 Output: prose on a TTY; JSON when piped/non-TTY or with --json. Run \`stereoframe schema\` for the full vocabulary.
+Exit codes: 0 ok · 1 tool error · 2 lint/validate findings.
 `;
 
 /** Declarative command table — the source for unknown-command help + \`schema\`. */
@@ -174,11 +176,11 @@ const COMMANDS = [
   { name: "storyboard", summary: "compile a shot plan (JSON) into a multi-shot film", args: ["plan.json"], flags: ["dir", "render", "vertical", "square", "json"] },
   { name: "inspect", summary: "segment + tag a GLB: list its parts", args: ["model.glb"], flags: ["json"] },
   { name: "segment", summary: "report a mesh's separable connected components", args: ["model.glb"], flags: ["min-faces", "json"] },
-  { name: "gen", summary: "generate a 3D model (GLB) via Meshy or fal.ai", args: ["prompt"], flags: ["image", "images", "via-image", "provider", "fal-model", "dir", "out", "no-texture", "stage", "render", "json"] },
+  { name: "gen", summary: "generate a 3D model (GLB) via Meshy or fal.ai", args: ["prompt"], flags: ["image", "images", "via-image", "provider", "fal-model", "dir", "out", "no-texture", "dry-run", "stage", "render", "json"] },
   { name: "add", summary: "install a visual block's assets + print usage", args: ["block"] },
   { name: "blocks", summary: "list available blocks" },
   { name: "update", summary: "refresh assets/stereoframe.js", flags: ["json"] },
-  { name: "schema", summary: "machine-readable spec: commands + authoring vocabulary" },
+  { name: "schema", summary: "machine-readable spec: commands + authoring vocabulary", flags: ["command"] },
 ] as const;
 
 const COMMAND_NAMES = COMMANDS.map((c) => c.name);
@@ -492,6 +494,38 @@ async function main(): Promise<void> {
       }
       const falOpts = { provider, falModel, falInput };
 
+      // --dry-run: resolve the plan (mode, provider, output path, key presence)
+      // WITHOUT calling any paid API or writing files. Generation costs real money
+      // (Meshy/fal/OpenAI) — let an agent verify before spending.
+      if (options.has("dry-run")) {
+        const isImg = typeof imagesOpt === "string" || typeof imageOpt === "string";
+        const viaImg = options.has("via-image");
+        const label = isImg
+          ? basename(typeof imagesOpt === "string" ? imagesOpt.split(",")[0]! : (imageOpt as string)).replace(/\.(png|jpe?g|webp)$/i, "")
+          : prompt || (typeof options.get("via-image") === "string" ? (options.get("via-image") as string) : "");
+        const outPath = out ?? join("assets", `${genSlug(label || "model")}.glb`);
+        const prov = provider ?? "meshy";
+        const keyVar = prov === "fal" ? "FAL_KEY" : "MESHY_API_KEY";
+        const hasKey = !!resolveEnvKey(keyVar, projectDir, key);
+        const hasOpenai = viaImg ? !!resolveEnvKey("OPENAI_API_KEY", projectDir, undefined) : undefined;
+        const notes: string[] = [];
+        if (prov === "meshy" && !hasKey) notes.push("no MESHY_API_KEY → would use test mode (sample model, ignores prompt)");
+        if (prov === "fal" && !hasKey) notes.push("no FAL_KEY → generation would fail");
+        if (viaImg && !hasOpenai) notes.push("no OPENAI_API_KEY → the --via-image image step would fail");
+        const mode = isImg ? "image-to-3d" : viaImg ? "via-image" : "text-to-3d";
+        reportResult(
+          "gen",
+          { dryRun: true, mode, provider: prov, output: join(resolve(projectDir), outPath), [keyVar]: hasKey, ...(viaImg ? { OPENAI_API_KEY: hasOpenai } : {}), ...(notes.length ? { notes } : {}) },
+          [
+            `dry-run: ${mode} via ${prov} → ${outPath}`,
+            `  ${keyVar}: ${hasKey ? "present" : "MISSING"}`,
+            ...(viaImg ? [`  OPENAI_API_KEY: ${hasOpenai ? "present" : "MISSING"}`] : []),
+            ...notes.map((n) => `  note: ${n}`),
+          ],
+        );
+        return;
+      }
+
       let glbPath: string;
       if (typeof imagesOpt === "string" || typeof imageOpt === "string") {
         // image-to-3D / multi-image-to-3D from local image(s)
@@ -575,6 +609,13 @@ async function main(): Promise<void> {
     case "schema": {
       // Always JSON — this command exists for agents to read the spec from code
       // (so it never drifts from the SKILL/docs).
+      const only = typeof options.get("command") === "string" ? (options.get("command") as string) : undefined;
+      if (only) {
+        const cmd = COMMANDS.find((c) => c.name === only);
+        if (!cmd) throw new CliError(`unknown command: ${only}`, "unknown_command", `valid: ${COMMAND_NAMES.join(", ")}`);
+        console.log(JSON.stringify(cmd, null, 2));
+        return;
+      }
       const spec = {
         commands: COMMANDS,
         vocab: {
@@ -623,7 +664,9 @@ function reportFindings(command: string, findings: Finding[], asJson: boolean): 
     }
     console.log(`${command}: ${errors} error(s), ${warnings} warning(s)`);
   }
-  if (errors > 0) process.exit(1);
+  // Exit 2 = the composition has findings (distinct from 1 = the tool errored), so
+  // agents/CI can tell "your scene is broken" from "stereoframe crashed".
+  if (errors > 0) process.exit(2);
 }
 
 main().catch((err: unknown) => {
