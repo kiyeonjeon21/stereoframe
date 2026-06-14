@@ -37,7 +37,7 @@ stereoframe preview                              # looping playback in the brows
 
 **Generate assets** with `gen`: text-to-3D, `--image`/`--images` for image-to-3D, or `--via-image` (text → reference image → 3D). Defaults to [Meshy](https://www.meshy.ai) (free test mode; set `MESHY_API_KEY` for real generations); `--provider fal` routes any [fal.ai](https://fal.ai/models?categories=3d) 3D model instead (Tripo, Hyper3D/Rodin, Hunyuan3D…) via `FAL_KEY` + `--fal-model`.
 
-**Presets:** `reveal` (dramatic spiral-in), `hero-orbit` (clean studio orbit), `turntable` (pedestal), `exploded-view` (parts fly apart), **`spec`** (grounded film with auto-placed material callouts), **`teardown`** (exploded breakdown with a tracked label on each part). `stage` auto-frames the model, so a fixed preset frames any GLB correctly — then hand-edit the generated `index.html` to taste.
+**Presets:** `reveal` (dramatic spiral-in), `hero-orbit` (clean studio orbit), `turntable` (pedestal), `exploded-view` (parts fly apart), **`spec`** (grounded film with auto-placed material callouts), **`teardown`** (exploded breakdown with a tracked label on each part), **`cinematic`** (multi-shot reveal/macro/hero film). `stage` auto-frames the model, so a fixed preset frames any GLB correctly — then hand-edit the generated `index.html` to taste.
 
 ## How it works
 

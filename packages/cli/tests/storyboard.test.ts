@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  analyzeStoryboardMotion,
   compileStoryboard,
   computeTimeline,
+  critiqueStoryboard,
   validateStoryboard,
   type ResolvedShot,
   type Shot,
@@ -100,6 +102,54 @@ describe("validateStoryboard", () => {
     });
     expect(errs.some((e) => /camera.type/.test(e))).toBe(true);
     expect(errs.some((e) => /ease/.test(e))).toBe(true);
+  });
+});
+
+describe("motion critique", () => {
+  test("flags a short static plan as creatively weak", () => {
+    const plan: Storyboard = {
+      model: "m.glb",
+      shots: [
+        shot({ name: "still", duration: 3, camera: { type: "static", position: "0 1 5", lookAt: "0 1 0" } }),
+        shot({ name: "stiller", duration: 3, camera: { type: "static", position: "0 1 5", lookAt: "0 1 0" } }),
+      ],
+    };
+    const warnings = critiqueStoryboard(plan);
+    expect(warnings.map((w) => w.code)).toContain("too_few_shots");
+    expect(warnings.map((w) => w.code)).toContain("low_motion_energy");
+  });
+
+  test("scores camera and secondary motion higher than a still shot", () => {
+    const still: Storyboard = { model: "m.glb", shots: [shot({ duration: 3 })] };
+    const dynamic: Storyboard = {
+      model: "m.glb",
+      defaults: { secondaryMotion: { spin: 1.2, sway: 1, float: 0.06 }, finish: { lightSweep: 0.08, ground: "contact-shadow" }, floor: "studio" },
+      shots: [
+        shot({ duration: 2.4, camera: { type: "push-in", position: "0 1 5", lookAt: "0 1 0", distance: 0.6 } }),
+        shot({ duration: 2.8, camera: { type: "orbit", radius: 5, from: -20, to: 22 } }),
+        shot({ duration: 3, camera: { type: "flythrough", points: "4 0.8 4, 0 1 5, -4 0.8 4", lookAt: "0 0.8 0" } }),
+        shot({ duration: 3.4, camera: { type: "hero", radius: 5, from: 10, to: -24 } }),
+        shot({ duration: 2.6, camera: { type: "pull-back", position: "0 1 4.5", lookAt: "0 1 0", distance: 0.5 } }),
+        shot({ duration: 3.2, camera: { type: "path", points: "4 1 4, 2 1 5, -3 1 4" } }),
+      ],
+    };
+    expect(analyzeStoryboardMotion(dynamic).averageMotionEnergy).toBeGreaterThan(analyzeStoryboardMotion(still).averageMotionEnergy);
+    expect(critiqueStoryboard(dynamic).some((w) => w.code === "missing_secondary_motion")).toBe(false);
+  });
+
+  test("flags backdrop-without-ground and risky metal reflection stacking", () => {
+    const plan: Storyboard = {
+      model: "m.glb",
+      defaults: { backdrop: { coldGlow: "#0a3550", warmGlow: "#2a0a1e" }, secondaryMotion: { spin: 2.4 }, finish: { lightSweep: 0.16 } },
+      shots: [
+        shot({ duration: 3, camera: { type: "orbit", radius: 5, from: -60, to: 60 } }),
+        shot({ duration: 3, camera: { type: "static", position: "0 1 5", lookAt: "0 1 0" } }),
+        shot({ duration: 3, camera: { type: "hero", radius: 5, from: 30, to: -50 } }),
+      ],
+    };
+    const warnings = critiqueStoryboard(plan, { metal: true });
+    expect(warnings.map((w) => w.code)).toContain("floating_subject_risk");
+    expect(warnings.map((w) => w.code)).toContain("metal_flicker_risk");
   });
 });
 

@@ -7,7 +7,7 @@
  * luminance (black-frame suspicion). The caller must seek to the probe time
  * in the same task before reading — `protocol.diagnostics(t)` does both.
  */
-import { Box3, Frustum, Light, Matrix4, Mesh, Points, Vector3 } from "three";
+import { Box3, Frustum, Light, Matrix4, Mesh, Points, Vector3, type Object3D } from "three";
 import type { CompiledScene } from "./scene";
 import { shotState, type ShotSpec } from "./shots";
 
@@ -26,6 +26,19 @@ export interface SceneDiagnostics {
   meanLuminance: number | null;
   /** sRGB luminance 0..1 of a solid-color scene background (null if transparent/env). */
   backgroundLuminance: number | null;
+  /** Projected subject bounds in normalized device coordinates; null when no model-like subject exists. */
+  screenBounds: ScreenBounds | null;
+}
+
+export interface ScreenBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  cx: number;
+  cy: number;
+  /** NDC area normalized so a full frame is roughly 1. */
+  area: number;
 }
 
 const toSRGB = (c: number): number => (c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
@@ -65,6 +78,80 @@ function bgLuminance(s: CompiledScene): number | null {
   const bg = s.scene.background as { isColor?: boolean; r: number; g: number; b: number } | null;
   if (!bg || !bg.isColor) return null; // transparent (null) or a Texture env background
   return 0.2126 * toSRGB(bg.r) + 0.7152 * toSRGB(bg.g) + 0.0722 * toSRGB(bg.b);
+}
+
+function hasGeometry(obj: Object3D): boolean {
+  let found = false;
+  obj.traverse((o) => {
+    if (o instanceof Mesh || o instanceof Points) found = true;
+  });
+  return found;
+}
+
+function subjectObject(s: CompiledScene): Object3D | null {
+  for (const obj of s.objectsById.values()) {
+    if (hasGeometry(obj)) return obj;
+  }
+  let best: Object3D | null = null;
+  let bestVol = 0;
+  for (const child of s.scene.children) {
+    if (!hasGeometry(child)) continue;
+    _box.setFromObject(child);
+    if (_box.isEmpty()) continue;
+    const size = _box.getSize(_vec);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim > 20) continue; // floor/backdrop planes are not the subject
+    const vol = Math.max(1e-6, size.x) * Math.max(1e-6, size.y) * Math.max(1e-6, size.z);
+    if (vol > bestVol) {
+      best = child;
+      bestVol = vol;
+    }
+  }
+  return best;
+}
+
+function projectedSubjectBounds(s: CompiledScene): ScreenBounds | null {
+  const subject = subjectObject(s);
+  if (!subject) return null;
+  _box.setFromObject(subject);
+  if (_box.isEmpty()) return null;
+
+  s.camera.updateMatrixWorld();
+  s.camera.updateProjectionMatrix();
+  const min = _box.min;
+  const max = _box.max;
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let points = 0;
+  for (const x of [min.x, max.x]) {
+    for (const y of [min.y, max.y]) {
+      for (const z of [min.z, max.z]) {
+        _vec.set(x, y, z).project(s.camera);
+        if (!isFiniteVec(_vec) || _vec.z < -1.2 || _vec.z > 1.2) continue;
+        minX = Math.min(minX, _vec.x);
+        minY = Math.min(minY, _vec.y);
+        maxX = Math.max(maxX, _vec.x);
+        maxY = Math.max(maxY, _vec.y);
+        points++;
+      }
+    }
+  }
+  if (points === 0 || !Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return null;
+  }
+  const w = Math.max(0, maxX - minX);
+  const h = Math.max(0, maxY - minY);
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    cx: (minX + maxX) / 2,
+    cy: (minY + maxY) / 2,
+    area: (w * h) / 4,
+  };
 }
 
 export function collectDiagnostics(scenes: CompiledScene[], t: number): SceneDiagnostics[] {
@@ -119,6 +206,7 @@ export function collectDiagnostics(scenes: CompiledScene[], t: number): SceneDia
       frustumCoverage: geomObjects > 0 ? inFrustum / geomObjects : null,
       meanLuminance: state.visible ? meanLuminance(s.canvas) : null,
       backgroundLuminance: bgLuminance(s),
+      screenBounds: state.visible ? projectedSubjectBounds(s) : null,
     };
   });
 }

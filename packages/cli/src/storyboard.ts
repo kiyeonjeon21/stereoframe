@@ -228,6 +228,200 @@ export function validateStoryboard(plan: Storyboard): string[] {
   return errs;
 }
 
+export type StoryboardWarningCode =
+  | "too_few_shots"
+  | "low_motion_energy"
+  | "low_camera_variety"
+  | "missing_secondary_motion"
+  | "floating_subject_risk"
+  | "metal_flicker_risk";
+
+export interface StoryboardWarning {
+  code: StoryboardWarningCode;
+  message: string;
+  shot?: number;
+}
+
+export interface ShotMotionScore {
+  shot: number;
+  name?: string;
+  cameraType: Camera["type"] | "unknown";
+  energy: number;
+}
+
+export interface MotionAnalysis {
+  totalDuration: number;
+  shotCount: number;
+  cameraTypes: Camera["type"][];
+  cameraVariety: number;
+  averageMotionEnergy: number;
+  shotScores: ShotMotionScore[];
+  warnings: StoryboardWarning[];
+}
+
+const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
+const cleanEnergy = (n: number): number => Math.round(n * 100) / 100;
+
+function hasSecondaryMotion(shot: Shot, defaults?: ShotDefaults): boolean {
+  const secondary = shot.secondaryMotion ?? defaults?.secondaryMotion;
+  return !!(
+    shot.spin ||
+    secondary?.spin ||
+    secondary?.sway ||
+    secondary?.float
+  );
+}
+
+function effectiveFinish(shot: Shot, defaults?: ShotDefaults): Finish {
+  return { ...(defaults?.finish ?? {}), ...(shot.finish ?? {}) };
+}
+
+function cameraSweep(cam: Camera): number {
+  if (cam.type === "orbit" || cam.type === "hero") return Math.abs((cam.to ?? 0) - (cam.from ?? 0));
+  return 0;
+}
+
+function waypointCount(points: string | undefined): number {
+  return points ? points.split(",").map((p) => p.trim()).filter(Boolean).length : 0;
+}
+
+function cameraEnergy(cam: Camera): number {
+  switch (cam.type) {
+    case "static":
+      return 0;
+    case "orbit":
+    case "hero":
+      return clamp(cameraSweep(cam) / 45, 0.2, 2.1);
+    case "dolly":
+    case "push-in":
+    case "pull-back":
+      return clamp(Math.abs(cam.distance ?? 0.6) / 0.45, 0.45, 1.7);
+    case "path":
+      return 1.55 + clamp((waypointCount(cam.points) - 2) * 0.12, 0, 0.35);
+    case "flythrough":
+      return 1.75 + clamp((waypointCount(cam.points) - 2) * 0.12, 0, 0.35);
+  }
+}
+
+function shotMotionEnergy(shot: Shot, defaults?: ShotDefaults): number {
+  const secondary = shot.secondaryMotion ?? defaults?.secondaryMotion;
+  const finish = effectiveFinish(shot, defaults);
+  const spin = secondary?.spin ?? shot.spin ?? 0;
+  const energy =
+    cameraEnergy(shot.camera) +
+    clamp(Math.abs(spin) / 2, 0, 1.4) * 0.55 +
+    clamp(Math.abs(secondary?.sway ?? 0) / 2, 0, 0.6) +
+    clamp(Math.abs(secondary?.float ?? 0) / 0.12, 0, 0.5) +
+    clamp(Math.abs(finish.lightSweep ?? 0) / 0.12, 0, 0.4) +
+    (shot.explode ? 0.65 : 0) +
+    (shot.isolate ? 0.25 : 0);
+  return cleanEnergy(energy);
+}
+
+function hasBackdrop(shot: Shot, defaults?: ShotDefaults): boolean {
+  const backdrop = shot.backdrop ?? defaults?.backdrop;
+  return backdrop !== undefined && backdrop !== "none";
+}
+
+function hasFloorAndContact(shot: Shot, defaults?: ShotDefaults): boolean {
+  const floor = shot.floor ?? defaults?.floor;
+  const finish = effectiveFinish(shot, defaults);
+  return floor !== undefined && floor !== "none" && finish.ground !== undefined && finish.ground !== "none";
+}
+
+export function analyzeStoryboardMotion(plan: Storyboard, opts: { metal?: boolean } = {}): MotionAnalysis {
+  const shots = Array.isArray(plan?.shots) ? plan.shots : [];
+  const windows = computeTimeline(shots);
+  const totalDuration = windows.reduce((m, w) => Math.max(m, w.end), 0);
+  const shotScores = shots.map((shot, i): ShotMotionScore => ({
+    shot: i + 1,
+    ...(shot.name ? { name: shot.name } : {}),
+    cameraType: shot.camera?.type ?? "unknown",
+    energy: shot.camera ? shotMotionEnergy(shot, plan.defaults) : 0,
+  }));
+  const cameraTypes = shots.map((s) => s.camera?.type).filter(Boolean) as Camera["type"][];
+  const cameraVariety = new Set(cameraTypes).size;
+  const averageMotionEnergy =
+    shotScores.length > 0
+      ? cleanEnergy(shotScores.reduce((sum, s) => sum + s.energy, 0) / shotScores.length)
+      : 0;
+
+  const warnings: StoryboardWarning[] = [];
+  if (shots.length > 0 && shots.length < 6) {
+    warnings.push({
+      code: "too_few_shots",
+      message: `cinematic briefs should usually use 6-9 shots; this plan has ${shots.length}.`,
+    });
+  }
+  if (shots.length >= 3 && cameraVariety < 3) {
+    warnings.push({
+      code: "low_camera_variety",
+      message: `camera variety is low (${[...new Set(cameraTypes)].join(", ") || "none"}); mix orbit/dolly/path/flythrough/hero beats.`,
+    });
+  }
+  if (shots.length >= 2 && averageMotionEnergy < 0.85) {
+    warnings.push({
+      code: "low_motion_energy",
+      message: `average motion energy is ${averageMotionEnergy}; add camera moves, secondaryMotion, or a reveal beat.`,
+    });
+  }
+  for (const score of shotScores) {
+    const shot = shots[score.shot - 1]!;
+    if (shot.duration >= 1.8 && score.energy < 0.45) {
+      warnings.push({
+        code: "low_motion_energy",
+        shot: score.shot,
+        message: `shot ${score.shot}${shot.name ? ` "${shot.name}"` : ""} has very low motion energy (${score.energy}).`,
+      });
+    }
+  }
+
+  const movingShots = shots.filter((s) => hasSecondaryMotion(s, plan.defaults)).length;
+  if (shots.length >= 3 && movingShots / shots.length < 0.5) {
+    warnings.push({
+      code: "missing_secondary_motion",
+      message: `only ${movingShots}/${shots.length} shots include secondaryMotion/spin; add subtle spin/sway/float so the subject stays alive.`,
+    });
+  }
+
+  shots.forEach((shot, i) => {
+    if (hasBackdrop(shot, plan.defaults) && !hasFloorAndContact(shot, plan.defaults)) {
+      warnings.push({
+        code: "floating_subject_risk",
+        shot: i + 1,
+        message: `shot ${i + 1}${shot.name ? ` "${shot.name}"` : ""} uses a backdrop without both floor and finish.ground contact shadow.`,
+      });
+    }
+    if (opts.metal && shot.camera) {
+      const secondary = shot.secondaryMotion ?? plan.defaults?.secondaryMotion;
+      const spin = Math.abs(secondary?.spin ?? shot.spin ?? 0);
+      const sweep = cameraSweep(shot.camera);
+      const lightSweep = Math.abs(effectiveFinish(shot, plan.defaults).lightSweep ?? 0);
+      if ((spin > 2.2 && sweep > 70) || (spin > 1.7 && lightSweep > 0.12) || (sweep > 90 && lightSweep > 0.12)) {
+        warnings.push({
+          code: "metal_flicker_risk",
+          shot: i + 1,
+          message: `shot ${i + 1}${shot.name ? ` "${shot.name}"` : ""} stacks fast metal motion/reflection changes; reduce spin, orbit sweep, or lightSweep.`,
+        });
+      }
+    }
+  });
+
+  return {
+    totalDuration: cleanEnergy(totalDuration),
+    shotCount: shots.length,
+    cameraTypes,
+    cameraVariety,
+    averageMotionEnergy,
+    shotScores,
+    warnings,
+  };
+}
+
+export function critiqueStoryboard(plan: Storyboard, opts: { metal?: boolean } = {}): StoryboardWarning[] {
+  return analyzeStoryboardMotion(plan, opts).warnings;
+}
+
 // ── compile (pure) ──────────────────────────────────────────────────────────
 /** Per-shot data the compiler needs that can't be derived purely (resolved by
  *  buildStoryboard from `inspect`). Defaults make the compiler usable in tests. */

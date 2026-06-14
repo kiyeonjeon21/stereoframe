@@ -11,7 +11,7 @@ npx stereoframe stage product.glb --preset reveal --title "Product"
 cd product-reveal && npx stereoframe render   # → an Apple-ad-style reveal, zero hand-tuning
 ```
 
-Asset generation (Meshy/Tripo/Rodin) is a solved, crowded space. The underserved, higher-value layer is **directing** a model — camera, lighting, timing, easing, staging — which is where motion designers actually spend their time. stereoframe auto-frames any model and applies a director preset (reveal / hero-orbit / turntable / exploded-view / **spec** / **teardown**); it can also `inspect` a GLB to segment and tag its parts, then auto-place tracked spec callouts that label each one. All deterministic and agent-drivable — and a full declarative 3D-video framework underneath (below).
+Asset generation (Meshy/Tripo/Rodin) is a solved, crowded space. The underserved, higher-value layer is **directing** a model — camera, lighting, timing, easing, staging — which is where motion designers actually spend their time. stereoframe auto-frames any model and applies a director preset (reveal / hero-orbit / turntable / exploded-view / **spec** / **teardown** / **cinematic**); it can also `inspect` a GLB to segment and tag its parts, then auto-place tracked spec callouts that label each one. All deterministic and agent-drivable — and a full declarative 3D-video framework underneath (below).
 
 Describe a three.js scene, camera, lighting, and motion in plain HTML custom elements; render it frame-perfectly to MP4 with the bundled CLI. The thesis (borrowed from [HyperFrames](https://github.com/heygen-com/hyperframes), which proved it for 2D): LLMs write HTML fluently, so HTML is the right authoring surface for AI-generated video — stereoframe applies it to 3D.
 
@@ -77,7 +77,7 @@ stereoframe brief "a dark neon showroom reveal, hard-cut ignition, flythrough, \
 ```
 
 `brief` sends your paragraph to an LLM that writes a rich, model-aware
-`plan.json` (it inspects the GLB), validates + repairs it, then compiles and renders
+`plan.json` (it inspects the GLB), validates + critiques/repairs it, then compiles and renders
 — saving the brief as `brief.md` (provenance). LLM via `--llm-provider openai`
 (default) `| anthropic`; needs the matching API key.
 
@@ -166,9 +166,9 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 **v0 (Tier 3b+).** Determinism is scoped to seekability: every frame is a pure function of `t`, frame-hash-identical across runs — which leaves the visuals free.
 
 **Direct any GLB**
-- `brief` — natural-language directing: a paragraph → a model-aware, cinematic `plan.json` via an LLM (the directing twin of the `gen` prompt), validated + repaired, then compiled + rendered.
+- `brief` — natural-language directing: a paragraph → a model-aware, cinematic `plan.json` via an LLM (the directing twin of the `gen` prompt), validated + creatively critiqued/repaired, then compiled + rendered.
 - `storyboard` compiler — a JSON shot list (camera / lighting / grade / backdrop / atmosphere / secondary-motion / crossfade per beat) → a multi-shot film, timeline computed so crossfades never gap.
-- `stage` auto-director — auto-framing + presets: reveal, hero-orbit, turntable, exploded-view, **spec** (annotated product film), **teardown** (per-part exploded breakdown).
+- `stage` auto-director — auto-framing + presets: reveal, hero-orbit, turntable, exploded-view, **spec** (annotated product film), **teardown** (per-part exploded breakdown), **cinematic** (multi-shot reveal/macro/hero film).
 - `inspect` segment + tag pipeline — reads a GLB's parts (name, material character, position, size) so they can be targeted by name.
 - `sf-callout` tracked spec labels — leader lines that follow a 3D part as the camera moves; auto-placed by `spec`/`teardown`.
 - Product-film finish — contact-shadow grounding, environment light-sweep, feature-isolate spotlight.
@@ -189,7 +189,7 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 **Pipeline & verification**
 - CLI — init / gen / inspect / lint / validate / render / frame / preview / add / update / schema (Puppeteer + ffmpeg).
 - Text/image-to-3D — `stereoframe gen` → textured GLB via Meshy (default, free test mode) **or any fal.ai 3D model** (`--provider fal`: Tripo, Hyper3D/Rodin, Hunyuan3D, Trellis…), incl. `--via-image` (text → reference image → 3D).
-- `lint` — markup / asset / time-purity static checks. `validate` — headless probes for lighting, framing, black frames, and seek idempotency (the determinism contract, machine-checked).
+- `lint` — markup / asset / time-purity static checks. `validate` — headless probes for lighting, framing, static screen-space motion, black frames, and seek idempotency (the determinism contract, machine-checked).
 
 HyperFrames embed mode retained. **Roadmap:** depth of field + motion blur, audio mux, alpha output, Docker bit-parity CI.
 

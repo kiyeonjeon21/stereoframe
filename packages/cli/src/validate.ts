@@ -13,6 +13,16 @@ interface ShotSpecWire {
   duration: number;
 }
 
+export interface ScreenBoundsWire {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  cx: number;
+  cy: number;
+  area: number;
+}
+
 interface SceneDiagnosticsWire {
   shot: ShotSpecWire;
   visible: boolean;
@@ -24,6 +34,50 @@ interface SceneDiagnosticsWire {
   frustumCoverage: number | null;
   meanLuminance: number | null;
   backgroundLuminance: number | null;
+  screenBounds: ScreenBoundsWire | null;
+}
+
+export interface ScreenMotionSample {
+  t: number;
+  shot: ShotSpecWire;
+  bounds: ScreenBoundsWire;
+}
+
+export interface ScreenMotionSummary {
+  centerShift: number;
+  areaLogChange: number;
+}
+
+export function screenMotionSummary(samples: ScreenMotionSample[]): ScreenMotionSummary | null {
+  if (samples.length < 2) return null;
+  let centerShift = 0;
+  let minArea = Number.POSITIVE_INFINITY;
+  let maxArea = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const a = samples[i]!.bounds;
+    minArea = Math.min(minArea, Math.max(0, a.area));
+    maxArea = Math.max(maxArea, Math.max(0, a.area));
+    for (let j = i + 1; j < samples.length; j++) {
+      const b = samples[j]!.bounds;
+      centerShift = Math.max(centerShift, Math.hypot(a.cx - b.cx, a.cy - b.cy));
+    }
+  }
+  const areaLogChange = Math.abs(Math.log((maxArea + 1e-5) / (minArea + 1e-5)));
+  return { centerShift, areaLogChange };
+}
+
+export function staticFramingFinding(sceneIndex: number, samples: ScreenMotionSample[]): Finding | null {
+  const first = samples[0];
+  if (!first || first.shot.duration < 1.8) return null;
+  const summary = screenMotionSummary(samples);
+  if (!summary) return null;
+  if (summary.centerShift >= 0.035 || summary.areaLogChange >= 0.08) return null;
+  return {
+    rule: "static_framing",
+    severity: "warning",
+    message: `scene ${sceneIndex + 1}: subject framing barely changes over this ${first.shot.duration.toFixed(2)}s shot (center shift ${summary.centerShift.toFixed(3)}, size change ${summary.areaLogChange.toFixed(3)}).`,
+    fixHint: "Add a camera dolly/orbit/path, subtle secondary motion, or vary FOV/framing so the 3D result feels directed.",
+  };
 }
 
 export async function validateProject(projectDir: string): Promise<Finding[]> {
@@ -69,6 +123,7 @@ export async function validateProject(projectDir: string): Promise<Finding[]> {
       sampleTimes.add(Math.max(shot.start, end - 0.05));
     }
 
+    const motionSamples = new Map<number, ScreenMotionSample[]>();
     for (const t of [...sampleTimes].sort((a, b) => a - b)) {
       const all = (await page.evaluate(
         `window.__stereoframe.diagnostics(${t})`,
@@ -76,6 +131,11 @@ export async function validateProject(projectDir: string): Promise<Finding[]> {
       for (let i = 0; i < all.length; i++) {
         const d = all[i]!;
         if (!d.visible) continue;
+        if (d.screenBounds) {
+          const samples = motionSamples.get(i) ?? [];
+          samples.push({ t, shot: d.shot, bounds: d.screenBounds });
+          motionSamples.set(i, samples);
+        }
         const where = `scene ${i + 1} at t=${t.toFixed(2)}s`;
         if (d.hasNaN) {
           findings.push({
@@ -124,6 +184,10 @@ export async function validateProject(projectDir: string): Promise<Finding[]> {
           });
         }
       }
+    }
+    for (const [i, samples] of motionSamples) {
+      const finding = staticFramingFinding(i, samples);
+      if (finding) findings.push(finding);
     }
 
     // Forward-only scenes opt out of seek-idempotency by design (live sim /

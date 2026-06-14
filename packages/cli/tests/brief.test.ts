@@ -88,4 +88,11 @@ describe("repairMessage", () => {
     expect(m).toMatch(/orbit camera needs radius/);
     expect(m).toMatch(/JSON only/);
   });
+
+  test("can include creative warnings for the repair pass", () => {
+    const m = repairMessage([], ["low_motion_energy: add a camera move"]);
+    expect(m).toMatch(/Creative warnings/);
+    expect(m).toMatch(/low_motion_energy/);
+    expect(m).toMatch(/addresses the creative warnings/);
+  });
 });

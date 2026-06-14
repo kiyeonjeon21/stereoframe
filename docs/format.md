@@ -411,7 +411,7 @@ dominantly-metal models get a tamed-exposure rim/fill rig, else studio), or a
 `chromaticAberration`, `lightSweep`, `ground`.
 
 Very dark opening beats can trip `subject_bg_low_contrast` *warnings* in
-`validate` — those are advisory (a deliberately moody cold-open is fine);
+`validate` — those are advisory (a deliberately moody cold-open or intentionally locked-off shot is fine);
 `lint`/`validate` errors are not. For accents the schema doesn't cover (emissive
 backdrops, extra point lights, particles), hand-edit the emitted HTML.
 

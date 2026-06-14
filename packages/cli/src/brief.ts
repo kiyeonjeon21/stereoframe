@@ -16,8 +16,10 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { inspectModel, type ModelManifest } from "./inspect";
 import {
   buildStoryboard,
+  critiqueStoryboard,
   STORYBOARD_SCHEMA_DOC,
   validateStoryboard,
+  type StoryboardWarning,
   type Storyboard,
 } from "./storyboard";
 import { renderProject } from "./render";
@@ -109,8 +111,15 @@ Return the storyboard plan JSON now.`;
   ];
 }
 
-export function repairMessage(errors: string[]): string {
-  return `That plan failed validation with these errors:\n- ${errors.join("\n- ")}\nReturn a corrected full JSON plan that fixes every error. JSON only.`;
+function warningText(w: StoryboardWarning): string {
+  return `${w.code}${w.shot ? ` shot ${w.shot}` : ""}: ${w.message}`;
+}
+
+export function repairMessage(errors: string[], warnings: string[] = []): string {
+  const sections: string[] = [];
+  if (errors.length) sections.push(`Validation errors:\n- ${errors.join("\n- ")}`);
+  if (warnings.length) sections.push(`Creative warnings:\n- ${warnings.join("\n- ")}`);
+  return `That plan needs revision.\n\n${sections.join("\n\n")}\n\nReturn a corrected full JSON plan that fixes every validation error and addresses the creative warnings. JSON only.`;
 }
 
 /** Normalize the LLM object into a Storyboard (unwrap {plan:…}, coerce model). */
@@ -146,20 +155,32 @@ export async function runBrief(opts: BriefOptions): Promise<{ dir: string; plan:
   plan.width = W;
   plan.height = H;
 
+  const metal =
+    manifest.dominant.character === "metal" && (manifest.dominant.metalness ?? 0) > 0.6;
   let errors = validateStoryboard(plan);
-  if (errors.length) {
-    console.log(`  plan had ${errors.length} issue(s) — asking for one repair…`);
+  let warnings = critiqueStoryboard(plan, { metal });
+  if (errors.length || warnings.length) {
+    const bits = [
+      errors.length ? `${errors.length} validation issue(s)` : "",
+      warnings.length ? `${warnings.length} creative warning(s)` : "",
+    ].filter(Boolean).join(" and ");
+    console.log(`  plan had ${bits} — asking for one repair…`);
     messages.push({ role: "assistant", content: raw });
-    messages.push({ role: "user", content: repairMessage(errors) });
+    messages.push({ role: "user", content: repairMessage(errors, warnings.map(warningText)) });
     raw = await provider.chat(messages, chatOpts);
     plan = asPlan(extractJson(raw));
     plan.model = relative(outDir, glb) || basename(glb);
     plan.width = W;
     plan.height = H;
     errors = validateStoryboard(plan);
+    warnings = critiqueStoryboard(plan, { metal });
   }
   if (errors.length) {
     throw new Error(`brief: the generated plan is still invalid:\n  - ${errors.join("\n  - ")}`);
+  }
+  if (warnings.length) {
+    console.warn(`note: generated plan still has ${warnings.length} creative warning(s):`);
+    for (const w of warnings) console.warn(`  - ${warningText(w)}`);
   }
 
   // Write plan.json + the brief (provenance, like .gen.json).

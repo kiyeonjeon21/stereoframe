@@ -61,7 +61,7 @@ Because the markup is declarative, a partial edit is a one-line diff, and becaus
 
 ## What's in range of the current vocabulary
 
-**Works in one pass** — auto-directing a GLB (`stage`: reveal/hero-orbit/turntable/exploded-view/spec/teardown), compiling a shot list into a multi-shot film (`storyboard`), turntable/orbit/dolly/spline-flythrough cameras, character clip transitions (idle→run) with a follow camera, paper-swarm typography, glass panels (transmission), ocean/sky (golden hour), particles (fountain/snow/dust), metaball goo, material colorway switching (variant), multi-shot cuts/crossfades, DOM titles/captions.
+**Works in one pass** — auto-directing a GLB (`stage`: reveal/hero-orbit/turntable/exploded-view/spec/teardown/cinematic), compiling a shot list into a multi-shot film (`storyboard`), turntable/orbit/dolly/spline-flythrough cameras, character clip transitions (idle→run) with a follow camera, paper-swarm typography, glass panels (transmission), ocean/sky (golden hour), particles (fountain/snow/dust), metaball goo, material colorway switching (variant), multi-shot cuts/crossfades, DOM titles/captions.
 
 **Not yet** — the agent will try the escape hatch or tell you the limit: physics simulation (collapse/collision), photorealistic humans, audio, depth of field, motion blur, wipe/shader transitions, 3D text meshes (captions are DOM overlays).
 

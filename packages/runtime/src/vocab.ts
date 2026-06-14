@@ -105,7 +105,7 @@ export const VERB_PARAMS: Record<string, readonly string[]> = {
 
 /** `stereoframe stage --preset` values. */
 export const STAGE_PRESETS = [
-  "reveal", "hero-orbit", "turntable", "exploded-view", "spec", "teardown",
+  "reveal", "hero-orbit", "turntable", "exploded-view", "spec", "teardown", "cinematic",
 ] as const;
 
 /** `stereoframe gen --provider` backends. */

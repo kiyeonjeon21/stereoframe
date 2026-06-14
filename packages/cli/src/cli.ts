@@ -115,11 +115,11 @@ USAGE
   stereoframe preview [dir]            serve with looping wall-clock playback
       --port <n>       fixed port (default: random)
   stereoframe stage <model.glb>        auto-direct a GLB into a cinematic motion graphic
-      --preset <name>  reveal | hero-orbit | turntable | exploded-view | spec | teardown (default reveal)
+      --preset <name>  reveal | hero-orbit | turntable | exploded-view | spec | teardown | cinematic (default reveal)
                        spec     = auto-annotated product film (inspects the GLB, places named callouts)
                        teardown = exploded view with a labelled callout tracking each separated part
       --dir <dir>      output project dir (default: <model name>)
-      --duration <s>   seconds (default 8)
+      --duration <s>   seconds (default 8; cinematic default 11.5)
       --title "<text>" optional title overlay
       --bg <color>     background color (preset default otherwise)
   stereoframe brief "<brief>" | <brief.md>   natural-language directing → a cinematic plan.json (via an LLM)
@@ -155,7 +155,7 @@ USAGE
       --key <key>      Meshy API key (else MESHY_API_KEY / .env / test mode)
       --dry-run        resolve the plan (mode, provider, output path, key presence) without spending
       --quality-report inspect the generated GLB and write <name>.quality.json
-      --stage <preset> one-shot: generate then stage into a film (reveal|hero-orbit|turntable|exploded-view|spec|teardown)
+      --stage <preset> one-shot: generate then stage into a film (reveal|hero-orbit|turntable|exploded-view|spec|teardown|cinematic)
       --render         with --stage, also render the result to mp4 (--draft for fast)
   stereoframe add <block> [dir]        install a visual block's assets + print usage
   stereoframe blocks                   list available blocks
@@ -435,7 +435,7 @@ async function main(): Promise<void> {
     }
     case "stage": {
       const model = positional[0];
-      if (!model) throw new Error('usage: stereoframe stage <model.glb> [--preset reveal|hero-orbit|turntable]');
+      if (!model) throw new Error(`usage: stereoframe stage <model.glb> [--preset ${PRESETS.join("|")}]`);
       const preset = (typeof options.get("preset") === "string" ? options.get("preset") : "reveal") as Preset;
       if (!PRESETS.includes(preset)) {
         throw new CliError(`unknown preset: ${preset}`, "unknown_preset", `presets: ${PRESETS.join(", ")}`);

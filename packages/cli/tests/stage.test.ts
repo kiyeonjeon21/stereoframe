@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildAutoCallouts, explodeTiming } from "../src/stage";
+import { buildAutoCallouts, DEFAULT_BG, explodeTiming, PRESETS } from "../src/stage";
 import type { ModelManifest, PartManifest } from "../src/inspect";
 
 function part(p: Partial<PartManifest>): PartManifest {
@@ -140,5 +140,12 @@ describe("explodeTiming", () => {
 
   test("has a floor so short clips still separate", () => {
     expect(explodeTiming(2).dur).toBeGreaterThanOrEqual(1.6);
+  });
+});
+
+describe("stage presets", () => {
+  test("includes the cinematic multi-shot preset", () => {
+    expect(PRESETS).toContain("cinematic");
+    expect(DEFAULT_BG.cinematic).toMatch(/^#/);
   });
 });

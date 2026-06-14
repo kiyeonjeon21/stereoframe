@@ -31,7 +31,7 @@ stereoframe stage product.glb --preset reveal --title "Product Name"
 cd product-reveal && stereoframe render
 ```
 
-Presets: `reveal` (dramatic dark spiral-in + rim light), `hero-orbit` (clean studio orbit), `turntable` (product on a pedestal), `exploded-view` (parts separate outward — only for multi-component models with separate part meshes; single-mesh/rigged models won't separate), `spec` (auto-annotated product film). The model is auto-framed (`<sf-model fit="2.6">` normalizes its size/center), so the preset's camera move + lighting rig + timing + film finish frame ANY model correctly — no per-model camera/scale tweaking. Then hand-edit the generated `index.html` to taste.
+Presets: `reveal` (dramatic dark spiral-in + rim light), `hero-orbit` (clean studio orbit), `turntable` (product on a pedestal), `exploded-view` (parts separate outward — only for multi-component models with separate part meshes; single-mesh/rigged models won't separate), `spec` (auto-annotated product film), `teardown` (exploded labelled breakdown), `cinematic` (multi-shot reveal → macro → hero film). The model is auto-framed (`<sf-model fit="2.6">` normalizes its size/center), so the preset's camera move + lighting rig + timing + film finish frame ANY model correctly — no per-model camera/scale tweaking. Then hand-edit the generated `index.html` to taste.
 
 **`spec` is the fully-automatic annotated film**: `stage` runs `inspect` on the GLB, then writes a grounded, still-model, slow-arc scene with named spec callouts drawn onto its top parts (by triangle count), labeled by name + material character, fanned so they don't overlap, staggered through the back half. One command (`stereoframe stage product.glb --preset spec`) → an annotated product film. Multi-part GLBs only (it warns and renders un-annotated for single-mesh models). The model is kept still (not spun) so the tracked labels stay readable.
 
@@ -61,7 +61,7 @@ stereoframe blocks             # list available blocks
 stereoframe update             # refresh assets/stereoframe.js after upgrading
 ```
 
-**ALWAYS run `lint` then `validate` after editing, before rendering.** Both support `--json` and exit 1 on errors. They catch: missing/remote assets, unknown verbs/elements/eases, wall-clock or RNG in scripts, targets that don't exist, crossfade gaps, unlit scenes, everything-offscreen framing, near-black frames, and non-idempotent seeking (the determinism contract). Fix all errors and investigate warnings before `render`.
+**ALWAYS run `lint` then `validate` after editing, before rendering.** Both support `--json` and exit 1 on errors. They catch: missing/remote assets, unknown verbs/elements/eases, wall-clock or RNG in scripts, targets that don't exist, crossfade gaps, unlit scenes, everything-offscreen framing, static screen-space motion, near-black frames, and non-idempotent seeking (the determinism contract). Fix all errors and investigate warnings before `render`.
 
 Non-interactive, plain-text output, exit code 1 on failure — safe to run in agent loops. Requires ffmpeg on PATH.
 
@@ -355,6 +355,7 @@ A flat, jagged, plastic look is almost always a missing-finish problem, not a co
 - **`<sf-callout>`** (`target="#m" part="2" value="48MP" text="Main camera" anchor="left" start="1.2"`) — a leader line + typographic label that tracks a 3D part as the camera moves (Apple-style spec callout). Crisp DOM type, deterministic, hidden when off-screen. The strongest "this is a designed product film, not a viewer" signal — pair it with `isolate` on the same `part` for a feature-highlight beat.
 
 The `stage` presets already apply ground + light-sweep (and `spec`/`teardown` add the auto-callouts), so a plain `stage product.glb` gives a grounded, swept product film out of the box.
+Use `stage --preset cinematic` when the request needs an immediate directed result with multiple beats instead of one continuous move.
 
 Example moody hero scene: `<sf-scene background="#070709" exposure="0.85" environment="room" samples="2" bloom="0.35" bloom-threshold="0.86" vignette="0.4">`. Metal/glass need `environment` to look right; emissive + `bloom` reads as glow/light.
 
