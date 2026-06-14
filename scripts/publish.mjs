@@ -13,7 +13,7 @@
  *   DRY_RUN=1   bun scripts/publish.mjs     # pack only, no upload (safe to test)
  */
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,18 +37,27 @@ function npmToken() {
 }
 
 const version = readPkg("packages/cli").version;
-// npm reads npm_config_* env vars; per-registry authToken, no .npmrc to clean up.
-// (Never logged — execSync inherits stdio and npm doesn't echo the token.)
-const env = { ...process.env, "npm_config_//registry.npmjs.org/:_authToken": npmToken() };
-const run = (cmd, cwd) => {
-  console.log(`$ ${cmd}`);
-  execSync(cmd, { cwd: join(ROOT, cwd), stdio: "inherit", env });
-};
+const token = npmToken();
+
+// Auth via a per-package-dir `.npmrc` (npm reads cwd/.npmrc), NOT an env var:
+// the per-registry key `//registry.npmjs.org/:_authToken` is not a valid POSIX
+// env-var name, so passing it via env is dropped on Linux CI (ENEEDAUTH). npm
+// excludes .npmrc from the tarball, and we delete it after, so it never leaks.
+function publishPkg(dir) {
+  const rc = join(ROOT, dir, ".npmrc");
+  writeFileSync(rc, `//registry.npmjs.org/:_authToken=${token}\n`);
+  try {
+    console.log(`$ npm publish --access public${DRY}  (in ${dir})`);
+    execSync(`npm publish --access public${DRY}`, { cwd: join(ROOT, dir), stdio: "inherit" });
+  } finally {
+    rmSync(rc, { force: true });
+  }
+}
 
 console.log(`publishing v${version}${DRY ? " (dry-run)" : ""}`);
 
 // 1. runtime first (the CLI depends on it at install time).
-run(`npm publish --access public${DRY}`, "packages/runtime");
+publishPkg("packages/runtime");
 
 // 2. CLI with its runtime dep pinned to the exact version for the published
 //    artifact, then restore workspace:* so a local run leaves the tree clean.
@@ -58,7 +67,7 @@ const cliPinned = structuredClone(cliOriginal);
 if (cliPinned.dependencies?.[RUNTIME_DEP]) cliPinned.dependencies[RUNTIME_DEP] = version;
 writePkg(cliDir, cliPinned);
 try {
-  run(`npm publish --access public${DRY}`, cliDir);
+  publishPkg(cliDir);
 } finally {
   writePkg(cliDir, cliOriginal);
 }
