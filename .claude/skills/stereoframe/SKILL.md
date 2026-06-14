@@ -20,6 +20,8 @@ Pick the lightest path that fits the request, then refine:
 
 Whatever the path, **always `lint` → `validate` before `render`.**
 
+**Need the exact vocabulary at runtime?** `stereoframe schema` prints the canonical machine-readable spec as JSON — every command + the full `<sf-*>` vocabulary (elements, verbs + their params, eases, geometry/material kinds, scene finish attrs, stage presets, gen providers), generated from code so it never drifts from this guide. CLI output is JSON when piped/non-TTY (or with `--json`); results are `{ok,command,outputs,…}`, errors `{ok:false,error:{code,message,hint}}`.
+
 ## The fast path: auto-direct any GLB
 
 stereoframe's core job is **directing** a model, not making it. To turn any GLB into a polished cinematic motion graphic with zero hand-tuning:

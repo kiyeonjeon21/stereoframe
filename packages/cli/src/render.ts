@@ -38,7 +38,7 @@ export async function renderProject(opts: RenderOptions): Promise<string> {
     }
 
     const totalFrames = Math.max(1, Math.round(info.duration * fps));
-    console.log(
+    console.error(
       `rendering ${totalFrames} frames @ ${fps}fps (${info.width}x${info.height}, ${info.duration}s) → ${out}`,
     );
 
@@ -85,13 +85,13 @@ export async function renderProject(opts: RenderOptions): Promise<string> {
       if (!ok) await new Promise((r) => ffmpeg.stdin.once("drain", r));
       if (frame % Math.max(1, Math.floor(totalFrames / 10)) === 0) {
         const pct = Math.round((frame / totalFrames) * 100);
-        process.stdout.write(`\r  ${pct}% (frame ${frame}/${totalFrames})`);
+        process.stderr.write(`\r  ${pct}% (frame ${frame}/${totalFrames})`);
       }
     }
     ffmpeg.stdin.end();
     await ffmpegDone;
     const secs = ((Date.now() - started) / 1000).toFixed(1);
-    process.stdout.write(`\r  100% (${totalFrames} frames in ${secs}s)\n`);
+    process.stderr.write(`\r  100% (${totalFrames} frames in ${secs}s)\n`);
     return out;
   } finally {
     await session.close();

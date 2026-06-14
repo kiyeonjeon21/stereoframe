@@ -12,8 +12,9 @@ import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Character, ModelManifest, PartManifest } from "./inspect";
 import { resolveRuntimeBundle } from "./scaffold";
+import { STAGE_PRESETS } from "stereoframe-runtime/vocab";
 
-export const PRESETS = ["reveal", "hero-orbit", "turntable", "exploded-view", "spec", "teardown"] as const;
+export const PRESETS = STAGE_PRESETS;
 export type Preset = (typeof PRESETS)[number];
 
 /** An auto-generated spec callout (from the segment manifest). */

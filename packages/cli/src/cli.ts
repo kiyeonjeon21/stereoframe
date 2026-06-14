@@ -10,8 +10,20 @@
  * codes — designed so coding agents can scaffold → edit → render in a loop.
  */
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { basename } from "node:path";
+import { join, resolve, relative, isAbsolute, basename } from "node:path";
+import {
+  ELEMENT_NAMES,
+  VERB_NAMES,
+  VERB_PARAMS,
+  COMMON_VERB_ATTRS,
+  EASE_NAMES,
+  ASSET_ATTRS,
+  GEOMETRY_KINDS,
+  MATERIAL_KINDS,
+  FINISH_ATTRS,
+  STAGE_PRESETS,
+  GEN_PROVIDERS,
+} from "stereoframe-runtime/vocab";
 import { addBlock, listBlocks } from "./blocks";
 import { genModel, genFromImages, genViaImage } from "./gen";
 import { inspectModel } from "./inspect";
@@ -50,6 +62,39 @@ function parseArgs(argv: string[]): Flags {
     }
   }
   return { positional, options };
+}
+
+// Agents (and pipes) get machine-readable JSON; humans on a TTY get prose.
+// `--json` forces it; a non-TTY stdout auto-enables it (per agentic-CLI guidance).
+const WANT_JSON = process.argv.includes("--json") || !process.stdout.isTTY;
+
+/** A CLI error carrying a machine-readable code + actionable hint. */
+class CliError extends Error {
+  constructor(message: string, readonly code = "runtime_error", readonly hint?: string) {
+    super(message);
+  }
+}
+
+/** Reject paths that escape the working directory (agents hallucinate `../..`). */
+function assertWithinCwd(p: string | undefined, flag: string): void {
+  if (!p) return;
+  const rel = relative(process.cwd(), resolve(p));
+  if (rel.startsWith("..") || isAbsolute(rel)) {
+    throw new CliError(
+      `${flag} "${p}" escapes the working directory`,
+      "path_escape",
+      "Use a path inside the current project (no leading '..' or absolute paths).",
+    );
+  }
+}
+
+/** A command's result: JSON `{ok,command,...}` to stdout for agents, prose for humans. */
+function reportResult(command: string, payload: Record<string, unknown>, lines: string[]): void {
+  if (WANT_JSON) {
+    console.log(JSON.stringify({ ok: true, command, ...payload }));
+  } else {
+    for (const l of lines) console.log(l);
+  }
 }
 
 const HELP = `stereoframe — declarative, deterministic 3D video on three.js
@@ -111,7 +156,40 @@ USAGE
   stereoframe add <block> [dir]        install a visual block's assets + print usage
   stereoframe blocks                   list available blocks
   stereoframe update [dir]             refresh assets/stereoframe.js from the CLI's bundled runtime
+  stereoframe schema                   machine-readable spec: commands + authoring vocabulary (JSON)
+
+Output: prose on a TTY; JSON when piped/non-TTY or with --json. Run \`stereoframe schema\` for the full vocabulary.
 `;
+
+/** Declarative command table — the source for unknown-command help + \`schema\`. */
+const COMMANDS = [
+  { name: "init", summary: "scaffold a new composition project", args: ["name"] },
+  { name: "lint", summary: "static checks (markup, assets, time purity)", flags: ["json"] },
+  { name: "validate", summary: "headless run: errors, lighting, framing, seek-idempotency", flags: ["json"] },
+  { name: "render", summary: "render index.html to mp4", flags: ["fps", "out", "crf", "draft", "json"] },
+  { name: "bake", summary: "freeze a forward-mode sim into a seekable cache", flags: ["target", "fps", "out"] },
+  { name: "preview", summary: "serve with looping wall-clock playback", flags: ["port"] },
+  { name: "stage", summary: "auto-direct a GLB into a cinematic motion graphic", args: ["model.glb"], flags: ["preset", "dir", "duration", "title", "bg", "json"] },
+  { name: "brief", summary: "natural-language directing → a plan.json (via an LLM)", flags: ["model", "gen", "dir", "render", "llm-provider", "vertical", "square"] },
+  { name: "storyboard", summary: "compile a shot plan (JSON) into a multi-shot film", args: ["plan.json"], flags: ["dir", "render", "vertical", "square", "json"] },
+  { name: "inspect", summary: "segment + tag a GLB: list its parts", args: ["model.glb"], flags: ["json"] },
+  { name: "segment", summary: "report a mesh's separable connected components", args: ["model.glb"], flags: ["min-faces", "json"] },
+  { name: "gen", summary: "generate a 3D model (GLB) via Meshy or fal.ai", args: ["prompt"], flags: ["image", "images", "via-image", "provider", "fal-model", "dir", "out", "no-texture", "stage", "render", "json"] },
+  { name: "add", summary: "install a visual block's assets + print usage", args: ["block"] },
+  { name: "blocks", summary: "list available blocks" },
+  { name: "update", summary: "refresh assets/stereoframe.js", flags: ["json"] },
+  { name: "schema", summary: "machine-readable spec: commands + authoring vocabulary" },
+] as const;
+
+const COMMAND_NAMES = COMMANDS.map((c) => c.name);
+
+/** Closest command name (prefix or single-edit) for an unknown-command hint. */
+function suggestCommand(input: string): string | undefined {
+  return (
+    COMMAND_NAMES.find((c) => c.startsWith(input) || input.startsWith(c)) ??
+    COMMAND_NAMES.find((c) => Math.abs(c.length - input.length) <= 2 && [...c].filter((ch, i) => ch !== input[i]).length <= 2)
+  );
+}
 
 /** Stage a model with a preset, auto-placing callouts for spec/teardown.
  *  Shared by the `stage` command and `gen --stage`. */
@@ -128,11 +206,11 @@ async function runStage(opts: {
 
   // Inspect once — used both for spec/teardown callouts and to auto-adapt the
   // lighting (a dominantly-metal model gets a tamed exposure + rim/fill rig).
-  console.log(`inspecting ${model}…`);
+  console.error(`inspecting ${model}…`);
   const manifest = await inspectModel({ model, silent: true, write: false });
   const metalRig =
     manifest.dominant.character === "metal" && (manifest.dominant.metalness ?? 0) > 0.6;
-  if (metalRig) console.log("  dominant material is metal → tamed exposure + rim/fill rig");
+  if (metalRig) console.error("  dominant material is metal → tamed exposure + rim/fill rig");
 
   let callouts;
   if (preset === "spec" || preset === "teardown") {
@@ -144,9 +222,9 @@ async function runStage(opts: {
         : { max: 3 },
     );
     if (callouts.length === 0) {
-      console.warn(`note: ${model} has <2 separable mesh parts — ${preset} film will render without callouts.`);
+      console.error(`note: ${model} has <2 separable mesh parts — ${preset} film will render without callouts.`);
     } else {
-      console.log(`  callouts: ${callouts.map((c) => c.value).join(", ")}`);
+      console.error(`  callouts: ${callouts.map((c) => c.value).join(", ")}`);
     }
   }
   const created = stageModel({
@@ -159,7 +237,7 @@ async function runStage(opts: {
     callouts,
     metalRig,
   });
-  console.log(`staged ${model} (${preset}) → ${created}`);
+  console.error(`staged ${model} (${preset}) → ${created}`);
   return created;
 }
 
@@ -172,9 +250,12 @@ async function main(): Promise<void> {
     case "init": {
       const name = positional[0];
       if (!name) throw new Error("usage: stereoframe init <name>");
+      assertWithinCwd(name, "init <name>");
       const created = scaffoldProject(name);
-      console.log(`created ${created}`);
-      console.log(`next: cd ${name} && stereoframe render`);
+      reportResult("init", { outputs: [created], next: `cd ${name} && stereoframe render` }, [
+        `created ${created}`,
+        `next: cd ${name} && stereoframe render`,
+      ]);
       return;
     }
     case "lint": {
@@ -183,12 +264,12 @@ async function main(): Promise<void> {
       const findings = lintHtml(readFileSync(htmlPath, "utf8"), {
         fileExists: (rel) => existsSync(join(resolve(dir), rel)),
       });
-      reportFindings("lint", findings, options.get("json") === true);
+      reportFindings("lint", findings, WANT_JSON);
       return;
     }
     case "validate": {
       const findings = await validateProject(dir);
-      reportFindings("validate", findings, options.get("json") === true);
+      reportFindings("validate", findings, WANT_JSON);
       return;
     }
     case "bake": {
@@ -196,37 +277,41 @@ async function main(): Promise<void> {
       if (typeof target !== "string") {
         throw new Error("usage: stereoframe bake [dir] --target <element-id> [--fps n] [--out file.bin]");
       }
+      const bakeOut = typeof options.get("out") === "string" ? (options.get("out") as string) : undefined;
+      assertWithinCwd(bakeOut, "--out");
       const out = await bakeProject({
         projectDir: dir,
         target,
         fps: options.has("fps") ? Number(options.get("fps")) : undefined,
-        out: typeof options.get("out") === "string" ? (options.get("out") as string) : undefined,
+        out: bakeOut,
       });
-      console.log(`baked → ${out}`);
+      reportResult("bake", { outputs: [out] }, [`baked → ${out}`]);
       return;
     }
     case "render": {
+      const renderOut = typeof options.get("out") === "string" ? (options.get("out") as string) : undefined;
+      assertWithinCwd(renderOut, "--out");
       const out = await renderProject({
         projectDir: dir,
         fps: options.has("fps") ? Number(options.get("fps")) : undefined,
         crf: options.has("crf") ? Number(options.get("crf")) : undefined,
-        out: typeof options.get("out") === "string" ? (options.get("out") as string) : undefined,
+        out: renderOut,
         draft: options.get("draft") === true,
       });
-      console.log(out);
+      reportResult("render", { outputs: [out] }, [out]);
       return;
     }
     case "preview": {
       const port = options.has("port") ? Number(options.get("port")) : 0;
       const handle = await serveProject(dir, port);
       console.log(`preview: ${handle.url}?sf-preview`);
-      console.log("press ctrl-c to stop");
+      console.error("press ctrl-c to stop");
       return; // server keeps the process alive
     }
     case "inspect": {
       const model = positional[0];
       if (!model) throw new Error("usage: stereoframe inspect <model.glb> [--json]");
-      await inspectModel({ model, json: options.get("json") === true });
+      await inspectModel({ model, json: WANT_JSON });
       return;
     }
     case "stage": {
@@ -234,12 +319,13 @@ async function main(): Promise<void> {
       if (!model) throw new Error('usage: stereoframe stage <model.glb> [--preset reveal|hero-orbit|turntable]');
       const preset = (typeof options.get("preset") === "string" ? options.get("preset") : "reveal") as Preset;
       if (!PRESETS.includes(preset)) {
-        throw new Error(`unknown preset: ${preset}\n\npresets: ${PRESETS.join(", ")}`);
+        throw new CliError(`unknown preset: ${preset}`, "unknown_preset", `presets: ${PRESETS.join(", ")}`);
       }
       const stem = basename(model).replace(/\.(glb|gltf)$/i, "");
       const outDir =
         typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${stem}-${preset}`;
-      await runStage({
+      assertWithinCwd(outDir, "--dir");
+      const staged = await runStage({
         model,
         outDir,
         preset,
@@ -247,7 +333,9 @@ async function main(): Promise<void> {
         background: typeof options.get("bg") === "string" ? (options.get("bg") as string) : undefined,
         title: typeof options.get("title") === "string" ? (options.get("title") as string) : undefined,
       });
-      console.log(`next: cd ${outDir} && stereoframe render`);
+      reportResult("stage", { outputs: [staged], preset, next: `cd ${outDir} && stereoframe render` }, [
+        `next: cd ${outDir} && stereoframe render`,
+      ]);
       return;
     }
     case "storyboard": {
@@ -272,13 +360,18 @@ async function main(): Promise<void> {
           .replace(/^-|-$/g, "")
           .slice(0, 40) || "film";
       const outDir = typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${slug}-film`;
+      assertWithinCwd(outDir, "--dir");
       const { dir: built, duration } = await buildStoryboard({ plan, planDir, outDir });
-      console.log(`compiled ${plan.shots.length} shot(s), ${duration.toFixed(1)}s → ${built}`);
+      console.error(`compiled ${plan.shots.length} shot(s), ${duration.toFixed(1)}s → ${built}`);
       if (options.get("render") === true) {
         const out = await renderProject({ projectDir: built, draft: options.get("draft") === true });
-        console.log(out);
+        reportResult("storyboard", { outputs: [out], shots: plan.shots.length, durationSec: duration }, [out]);
       } else {
-        console.log(`next: cd ${outDir} && stereoframe render`);
+        reportResult(
+          "storyboard",
+          { outputs: [built], shots: plan.shots.length, durationSec: duration, next: `cd ${outDir} && stereoframe render` },
+          [`next: cd ${outDir} && stereoframe render`],
+        );
       }
       return;
     }
@@ -287,16 +380,19 @@ async function main(): Promise<void> {
       if (!m) throw new Error("usage: stereoframe segment <model.glb> [--min-faces N] [--dry-run]");
       const minFaces = options.has("min-faces") ? Number(options.get("min-faces")) : undefined;
       const report = await segmentModel({ model: m, minFaces, dryRun: true });
-      console.log(`mesh: ${report.meshTris} tris, ${report.weldedVerts} welded verts`);
-      console.log(`connected components (>= min-faces): ${report.components.length}  (dropped ${report.dropped} specks)`);
-      report.components.slice(0, 20).forEach((c, i) => {
-        const sz = c.size.map((n) => n.toFixed(2)).join("×");
-        const ctr = c.center.map((n) => n.toFixed(2)).join(" ");
-        console.log(`  #${i}  ${String(c.tris).padStart(7)} tris   size ${sz}   center ${ctr}`);
-      });
-      if (report.components.length <= 1) {
-        console.log("\n→ single welded component: this mesh can't be auto-split (use a multi-part source GLB for per-part features).");
-      }
+      const lines = [
+        `mesh: ${report.meshTris} tris, ${report.weldedVerts} welded verts`,
+        `connected components (>= min-faces): ${report.components.length}  (dropped ${report.dropped} specks)`,
+        ...report.components.slice(0, 20).map((c, i) => {
+          const sz = c.size.map((n) => n.toFixed(2)).join("×");
+          const ctr = c.center.map((n) => n.toFixed(2)).join(" ");
+          return `  #${i}  ${String(c.tris).padStart(7)} tris   size ${sz}   center ${ctr}`;
+        }),
+        ...(report.components.length <= 1
+          ? ["\n→ single welded component: this mesh can't be auto-split (use a multi-part source GLB for per-part features)."]
+          : []),
+      ];
+      reportResult("segment", { ...report }, lines);
       return;
     }
     case "brief": {
@@ -319,6 +415,7 @@ async function main(): Promise<void> {
         .replace(/^-|-$/g, "")
         .slice(0, 32) || "film";
       const outDir = typeof options.get("dir") === "string" ? (options.get("dir") as string) : `${slug}-film`;
+      assertWithinCwd(outDir, "--dir");
 
       let model: string;
       if (oneShot) {
@@ -375,6 +472,8 @@ async function main(): Promise<void> {
       const prompt = positional.join(" ").trim();
       const projectDir = typeof options.get("dir") === "string" ? (options.get("dir") as string) : ".";
       const out = typeof options.get("out") === "string" ? (options.get("out") as string) : undefined;
+      assertWithinCwd(projectDir, "--dir");
+      assertWithinCwd(out, "--out");
       const texture = options.get("no-texture") !== true;
       const polycount = options.has("polycount") ? Number(options.get("polycount")) : undefined;
       const key = typeof options.get("key") === "string" ? (options.get("key") as string) : undefined;
@@ -431,25 +530,30 @@ async function main(): Promise<void> {
       if (typeof stagePreset === "string") {
         const preset = stagePreset as Preset;
         if (!PRESETS.includes(preset)) {
-          throw new Error(`unknown preset: ${preset}\n\npresets: ${PRESETS.join(", ")}`);
+          throw new CliError(`unknown preset: ${preset}`, "unknown_preset", `presets: ${PRESETS.join(", ")}`);
         }
         const slug = (prompt || basename(glbPath).replace(/\.glb$/i, "")).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "gen";
-        const outDir =
+        const stageDir =
           typeof options.get("stage-dir") === "string" ? (options.get("stage-dir") as string) : `${slug}-${preset}`;
+        assertWithinCwd(stageDir, "--stage-dir");
         const created = await runStage({
           model: glbPath,
-          outDir,
+          outDir: stageDir,
           preset,
           duration: options.has("duration") ? Number(options.get("duration")) : undefined,
           background: typeof options.get("bg") === "string" ? (options.get("bg") as string) : undefined,
           title: typeof options.get("title") === "string" ? (options.get("title") as string) : undefined,
         });
         if (options.get("render") === true) {
-          const out = await renderProject({ projectDir: created, draft: options.get("draft") === true });
-          console.log(out);
+          const rout = await renderProject({ projectDir: created, draft: options.get("draft") === true });
+          reportResult("gen", { outputs: [rout], glb: glbPath, preset }, [rout]);
         } else {
-          console.log(`next: cd ${outDir} && stereoframe render`);
+          reportResult("gen", { outputs: [created], glb: glbPath, preset, next: `cd ${stageDir} && stereoframe render` }, [
+            `next: cd ${stageDir} && stereoframe render`,
+          ]);
         }
+      } else {
+        reportResult("gen", { outputs: [glbPath], provider: provider ?? "meshy" }, [glbPath]);
       }
       return;
     }
@@ -464,16 +568,45 @@ async function main(): Promise<void> {
       return;
     }
     case "update": {
-      console.log(`updated ${updateRuntime(dir)}`);
+      const updated = updateRuntime(dir);
+      reportResult("update", { outputs: [updated] }, [`updated ${updated}`]);
+      return;
+    }
+    case "schema": {
+      // Always JSON — this command exists for agents to read the spec from code
+      // (so it never drifts from the SKILL/docs).
+      const spec = {
+        commands: COMMANDS,
+        vocab: {
+          elements: ELEMENT_NAMES,
+          verbs: VERB_PARAMS,
+          commonVerbAttrs: COMMON_VERB_ATTRS,
+          eases: EASE_NAMES,
+          assetAttrs: ASSET_ATTRS,
+          geometry: GEOMETRY_KINDS,
+          materials: MATERIAL_KINDS,
+          finishAttrs: FINISH_ATTRS,
+          stagePresets: STAGE_PRESETS,
+          genProviders: GEN_PROVIDERS,
+        },
+      };
+      console.log(JSON.stringify(spec, null, 2));
       return;
     }
     case "help":
     case "--help":
+    case "-h":
     case undefined:
       console.log(HELP);
       return;
-    default:
-      throw new Error(`unknown command: ${command}\n\n${HELP}`);
+    default: {
+      const hint = suggestCommand(command);
+      throw new CliError(
+        `unknown command: ${command}`,
+        "unknown_command",
+        `${hint ? `did you mean "${hint}"? ` : ""}valid commands: ${COMMAND_NAMES.join(", ")}`,
+      );
+    }
   }
 }
 
@@ -494,6 +627,14 @@ function reportFindings(command: string, findings: Finding[], asJson: boolean): 
 }
 
 main().catch((err: unknown) => {
-  console.error(err instanceof Error ? err.message : String(err));
+  const code = err instanceof CliError ? err.code : "runtime_error";
+  const hint = err instanceof CliError ? err.hint : undefined;
+  const message = err instanceof Error ? err.message : String(err);
+  if (WANT_JSON) {
+    console.log(JSON.stringify({ ok: false, error: { code, message, ...(hint ? { hint } : {}) } }));
+  } else {
+    console.error(message);
+    if (hint) console.error(`  ${hint}`);
+  }
   process.exit(1);
 });

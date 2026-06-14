@@ -10,8 +10,10 @@ A monorepo (bun workspaces) for **stereoframe** — the auto-director for 3D mot
 graphics: declarative `<sf-*>` HTML → deterministic 3D video on three.js.
 
 - `packages/runtime/` — `stereoframe-runtime` → `dist/stereoframe.js` (three.js r184 bundled + the `<sf-*>` custom elements + the seek protocol).
-- `packages/cli/` — `stereoframe` → the `stereoframe` bin (stage/inspect/init/gen/lint/validate/render/preview/add/update; Puppeteer + ffmpeg).
+- `packages/cli/` — `stereoframe` → the `stereoframe` bin (schema/stage/inspect/init/gen/lint/validate/render/preview/add/update; Puppeteer + ffmpeg).
 - `examples/` — runnable compositions. `docs/format.md` — markup spec. `.claude/skills/stereoframe/SKILL.md` — the authoring guide.
+
+**Agent-facing CLI.** `stereoframe schema` prints the machine-readable spec — commands + the full `<sf-*>` authoring vocabulary (elements, verbs+params, eases, geometry/material kinds, finish attrs, presets) as JSON, sourced from code so it never drifts from the SKILL. Output is JSON when piped/non-TTY (or with `--json`) and prose on a TTY; results are `{ok:true,command,outputs,…}`, errors `{ok:false,error:{code,message,hint}}`; progress goes to stderr so stdout stays parseable.
 
 ## Setup, build, test
 

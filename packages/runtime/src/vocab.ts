@@ -50,3 +50,63 @@ export const VERB_NAMES = [
 
 /** sf-* attributes whose value is a local asset path the renderer fetches. */
 export const ASSET_ATTRS = ["src", "environment", "normals", "lut"] as const;
+
+// ── Declarative authoring spec (consumed by `lint` + the `schema` command) ──
+// Single source of truth so `stereoframe schema` never drifts from the code.
+
+/** `<sf-mesh>`/`<sf-shader>` geometry kinds + their ordered `args` labels. */
+export const GEOMETRY_KINDS = [
+  { name: "box", args: ["width", "height", "depth"] },
+  { name: "sphere", args: ["radius"] },
+  { name: "plane", args: ["width", "height", "widthSegments", "heightSegments"] },
+  { name: "cylinder", args: ["radiusTop", "radiusBottom", "height"] },
+  { name: "torus", args: ["radius", "tube"] },
+  { name: "icosahedron", args: ["radius", "detail"] },
+  { name: "rounded-box", args: ["width", "height", "depth", "cornerRadius"] },
+] as const;
+
+/** `<sf-mesh>`/`<sf-shader>` material kinds. */
+export const MATERIAL_KINDS = ["standard", "physical", "glass", "matcap"] as const;
+
+/** `<sf-scene>` finish / grade attributes (post-processing + lighting). */
+export const FINISH_ATTRS = [
+  "exposure", "tone-mapping", "samples", "msaa",
+  "environment", "env-blur", "background",
+  "bloom", "bloom-threshold", "bloom-radius",
+  "vignette", "contrast", "saturation", "chromatic-aberration", "grain",
+  "dof", "dof-focus", "lut", "lut-intensity", "light-sweep",
+  "ground", "ground-y", "ground-size", "ground-opacity", "ground-blur", "ground-darkness",
+] as const;
+
+/** Attributes every `<sf-animate>` verb honors. */
+export const COMMON_VERB_ATTRS = ["target", "start", "duration", "ease"] as const;
+
+/** Per-verb distinctive parameters (keys mirror VERB_NAMES). */
+export const VERB_PARAMS: Record<string, readonly string[]> = {
+  turntable: ["rpm", "axis", "part"],
+  orbit: ["around", "radius", "from", "to", "height"],
+  dolly: ["toward", "distance"],
+  zoom: ["from", "to"],
+  move: ["to", "from", "part"],
+  follow: ["subject", "offset"],
+  "crossfade-clip": ["from", "to"],
+  "camera-path": ["points", "look"],
+  "bounce-in": [],
+  "fade-in": ["rise"],
+  float: ["amplitude", "period", "part"],
+  sway: ["amount", "period", "part"],
+  path: ["points", "orient", "closed"],
+  morph: ["index", "from", "to"],
+  deform: ["amount", "frequency", "speed"],
+  explode: ["distance"],
+  isolate: ["part", "dim"],
+  variant: [],
+};
+
+/** `stereoframe stage --preset` values. */
+export const STAGE_PRESETS = [
+  "reveal", "hero-orbit", "turntable", "exploded-view", "spec", "teardown",
+] as const;
+
+/** `stereoframe gen --provider` backends. */
+export const GEN_PROVIDERS = ["meshy", "fal"] as const;

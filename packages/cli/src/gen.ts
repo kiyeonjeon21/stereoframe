@@ -103,15 +103,15 @@ async function pollTask(
     const status = task.status as string;
     const progress = Number(task.progress ?? 0);
     if (progress !== lastProgress) {
-      process.stdout.write(`\r  ${label}: ${status} ${progress}%   `);
+      process.stderr.write(`\r  ${label}: ${status} ${progress}%   `);
       lastProgress = progress;
     }
     if (status === "SUCCEEDED") {
-      process.stdout.write("\n");
+      process.stderr.write("\n");
       return task;
     }
     if (status === "FAILED" || status === "CANCELED") {
-      process.stdout.write("\n");
+      process.stderr.write("\n");
       throw new Error(`${label} ${status}: ${task.task_error?.message ?? "unknown error"}`);
     }
     await sleep(3000);
@@ -134,7 +134,7 @@ export async function genModel(opts: GenOptions): Promise<string> {
   }
   const { key, isTest } = resolveKey(projectDir, opts.key);
   if (isTest) {
-    console.log(
+    console.error(
       "⚠ no MESHY_API_KEY found — using Meshy test mode (returns a SAMPLE model, ignores the prompt).\n" +
         "  Set MESHY_API_KEY in your shell or project .env for real generations (https://www.meshy.ai/settings/api).",
     );
@@ -143,7 +143,7 @@ export async function genModel(opts: GenOptions): Promise<string> {
   const out = resolve(projectDir, opts.out ?? join("assets", `${slug(opts.prompt)}.glb`));
   mkdirSync(join(out, ".."), { recursive: true });
 
-  console.log(`generating "${opts.prompt}" → ${out}`);
+  console.error(`generating "${opts.prompt}" → ${out}`);
 
   // 1. Preview (untextured mesh).
   const preview = await meshy("/openapi/v2/text-to-3d", key, {
@@ -219,10 +219,10 @@ async function downloadAndWrite(
 
   const rel = out.startsWith(projectDir) ? out.slice(projectDir.length + 1) : out;
   const provRel = provenancePath.startsWith(projectDir) ? provenancePath.slice(projectDir.length + 1) : provenancePath;
-  console.log(`\n✓ saved ${rel}`);
-  console.log(`  recorded → ${provRel}`);
-  console.log(`  use it:  <sf-model src="${rel}" scale="1"></sf-model>`);
-  if (isTest) console.log("  (sample model — set MESHY_API_KEY to generate from your prompt)");
+  console.error(`\n✓ saved ${rel}`);
+  console.error(`  recorded → ${provRel}`);
+  console.error(`  use it:  <sf-model src="${rel}" scale="1"></sf-model>`);
+  if (isTest) console.error("  (sample model — set MESHY_API_KEY to generate from your prompt)");
   return out;
 }
 
@@ -282,7 +282,7 @@ export async function genFromImages(opts: ImageGenOptions): Promise<string> {
   const out = resolve(projectDir, opts.out ?? join("assets", `${slug(basename(labelSlug))}.glb`));
   mkdirSync(join(out, ".."), { recursive: true });
 
-  console.log(`${multi ? "multi-image" : "image"}-to-3D from ${imgs.length} image(s) → ${out}`);
+  console.error(`${multi ? "multi-image" : "image"}-to-3D from ${imgs.length} image(s) → ${out}`);
   const submit = await meshy(endpoint, key, {
     method: "POST",
     body: JSON.stringify({
@@ -331,7 +331,7 @@ export interface ViaImageOptions {
 export async function genViaImage(opts: ViaImageOptions): Promise<string> {
   const projectDir = resolve(opts.projectDir);
   const provider = getImageProvider(opts.imageProvider);
-  console.log(`generating reference image via ${provider.name}…`);
+  console.error(`generating reference image via ${provider.name}…`);
   const { data, mime } = await provider.generate(opts.prompt, {
     projectDir,
     key: opts.imageKey,
@@ -346,7 +346,7 @@ export async function genViaImage(opts: ViaImageOptions): Promise<string> {
   mkdirSync(join(imgPath, ".."), { recursive: true });
   writeFileSync(imgPath, data);
   const imgRel = imgPath.startsWith(projectDir) ? imgPath.slice(projectDir.length + 1) : imgPath;
-  console.log(`  reference image → ${imgRel}`);
+  console.error(`  reference image → ${imgRel}`);
   return genFromImages({
     images: [imgPath],
     projectDir,
@@ -423,17 +423,17 @@ async function falPoll(sub: FalSubmit, key: string, label: string): Promise<any>
     const j = (await res.json()) as any;
     const status = j.status as string;
     if (status !== last) {
-      process.stdout.write(`\r  ${label}: ${status}    `);
+      process.stderr.write(`\r  ${label}: ${status}    `);
       last = status;
     }
     if (status === "COMPLETED") {
-      process.stdout.write("\n");
+      process.stderr.write("\n");
       const r = await fetch(sub.responseUrl, { headers: auth });
       if (!r.ok) throw new Error(`fal result → ${r.status}: ${(await r.text()).slice(0, 200)}`);
       return r.json();
     }
     if (status === "FAILED" || status === "ERROR") {
-      process.stdout.write("\n");
+      process.stderr.write("\n");
       throw new Error(`fal ${label} ${status}: ${JSON.stringify(j).slice(0, 300)}`);
     }
     await sleep(3000);
@@ -528,7 +528,7 @@ export async function genViaFal(opts: FalGenOptions): Promise<string> {
         bytes = readFileSync(abs);
         fname = basename(abs);
       }
-      console.log(`  uploading ${fname} to fal storage…`);
+      console.error(`  uploading ${fname} to fal storage…`);
       urls.push(await falUpload(bytes, mime, fname, key));
     }
     if (urls.length > 1) input.image_urls ??= urls;
@@ -537,7 +537,7 @@ export async function genViaFal(opts: FalGenOptions): Promise<string> {
     input.prompt = opts.prompt;
   }
 
-  console.log(`generating via fal (${model}) → ${out}`);
+  console.error(`generating via fal (${model}) → ${out}`);
   const sub = await falSubmit(model, key, input);
   const result = await falPoll(sub, key, "fal");
   const glbUrl = findGlbUrl(result);

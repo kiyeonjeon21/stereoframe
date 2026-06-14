@@ -53,17 +53,17 @@ export async function bakeProject(opts: BakeOptions): Promise<string> {
 
     const frames = Math.max(1, Math.round(info.duration * fps));
     const buf = new Float32Array(frames * count * STRIDE);
-    process.stdout.write(`baking "${target}" — ${count} instances × ${frames} frames @ ${fps}fps\n`);
+    process.stderr.write(`baking "${target}" — ${count} instances × ${frames} frames @ ${fps}fps\n`);
     for (let f = 0; f < frames; f++) {
       await page.evaluate(`window.__stereoframe.seek(${f / fps})`);
       const arr = (await page.evaluate(find("Array.from(m.instanceMatrix.array)"))) as number[] | null;
       if (!arr) throw new Error(`bake target "${target}" vanished at frame ${f}`);
       buf.set(arr, f * count * STRIDE);
       if (f % Math.max(1, Math.floor(frames / 10)) === 0) {
-        process.stdout.write(`\r  ${Math.round((f / frames) * 100)}%`);
+        process.stderr.write(`\r  ${Math.round((f / frames) * 100)}%`);
       }
     }
-    process.stdout.write("\r  100%\n");
+    process.stderr.write("\r  100%\n");
 
     const assetsDir = join(projectDir, "assets");
     mkdirSync(assetsDir, { recursive: true });
