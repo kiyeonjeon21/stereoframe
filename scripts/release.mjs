@@ -1,24 +1,24 @@
 #!/usr/bin/env bun
 /**
- * Lock-step release: bump both packages to the same next version, pin the
- * CLI's runtime dependency to that exact version (so `npx stereoframe@X`
- * always ships runtime X), build, test, publish, then commit/tag/push.
+ * Lock-step release: gate on `bun run check`, bump both packages to the same next
+ * version, then commit/tag/push. **Publishing happens in CI** — the `release.yml`
+ * workflow re-runs `check` on the pushed `v*` tag and only then runs
+ * `scripts/publish.mjs`, so npm can never receive a version GitHub hasn't verified
+ * green. No NPM_TOKEN needed locally.
  *
  *   bun run release            # patch (default)
  *   bun run release minor      # breaking change
  *   bun run release major      # cut 1.0.0
  *
- * See VERSIONING.md for when to use which. Reads NPM_TOKEN from .env.
+ * See VERSIONING.md for when to use which.
  */
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-// Runtime first — the CLI depends on it at publish time.
 const PACKAGES = ["packages/runtime", "packages/cli"];
-const RUNTIME_DEP = "stereoframe-runtime";
 
 const bumpType = process.argv[2] ?? "patch";
 if (!["patch", "minor", "major"].includes(bumpType)) {
@@ -46,17 +46,6 @@ function bump([x, y, z], type) {
   return `${x}.${y}.${z + 1}`;
 }
 
-function loadNpmToken() {
-  const envPath = join(ROOT, ".env");
-  if (!existsSync(envPath)) throw new Error(".env not found — NPM_TOKEN required to publish");
-  const line = readFileSync(envPath, "utf8")
-    .split("\n")
-    .find((l) => l.startsWith("NPM_TOKEN="));
-  const token = line?.slice("NPM_TOKEN=".length).trim();
-  if (!token) throw new Error("NPM_TOKEN missing/empty in .env");
-  return token;
-}
-
 function run(cmd, opts = {}) {
   console.log(`$ ${cmd}`);
   execSync(cmd, { cwd: ROOT, stdio: "inherit", ...opts });
@@ -80,36 +69,13 @@ for (const dir of PACKAGES) {
 }
 run("bun install"); // sync the lockfile to the new versions
 
-// 4. Publish (runtime before CLI). Pin the CLI's runtime dep to the exact
-//    version only for the published artifact, then restore `workspace:*` —
-//    bun's workspace-protocol conversion has shipped stale versions before,
-//    so we write the exact version explicitly to guarantee `npx stereoframe@X`
-//    ships runtime X.
-const token = loadNpmToken();
-// Publish with `npm`, not `bun`: bun packs README.md into the tarball but does
-// not set the registry `readme` metadata field that npmjs.com renders, so the
-// package pages came up blank. npm sets it. Auth via the per-registry authToken
-// env key (npm reads npm_config_* env vars; no .npmrc file to write/clean up).
-const publishEnv = { ...process.env, "npm_config_//registry.npmjs.org/:_authToken": token };
-const cliDir = "packages/cli";
-const cliOriginal = readPkg(cliDir);
-
-run("npm publish --access public", { cwd: join(ROOT, "packages/runtime"), env: publishEnv });
-
-const cliPinned = structuredClone(cliOriginal);
-if (cliPinned.dependencies?.[RUNTIME_DEP]) cliPinned.dependencies[RUNTIME_DEP] = next;
-writePkg(cliDir, cliPinned);
-try {
-  run("npm publish --access public", { cwd: join(ROOT, cliDir), env: publishEnv });
-} finally {
-  writePkg(cliDir, cliOriginal); // restore workspace:* for the commit
-}
-
-// 5. Commit, tag, push.
+// 4. Commit, tag, push. The `release.yml` workflow takes over from the tag:
+//    it re-runs `check` and publishes to npm only if green (scripts/publish.mjs).
 run("git add -A");
 run(`git commit -m "release: v${next}"`);
 run(`git tag v${next}`);
 run("git push");
 run("git push --tags");
 
-console.log(`\n✓ released v${next}`);
+console.log(`\n✓ pushed v${next} — CI will publish to npm once the release workflow is green.`);
+console.log(`  watch: gh run watch --exit-status $(gh run list --workflow=release.yml -L1 --json databaseId -q '.[0].databaseId')`);
