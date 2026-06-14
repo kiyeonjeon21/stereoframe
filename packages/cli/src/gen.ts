@@ -586,6 +586,14 @@ export const FAL_MODEL_PRESETS = {
     multiImageField: "image_urls",
     outputKeys: ["model_glb_pbr", "model_glb", "model_mesh", "model"],
   },
+  "fal-ai/hyper3d/rodin/v2": {
+    task: "image-to-3d",
+    promptField: "prompt",
+    imageField: "input_image_urls",
+    imageFieldMode: "array",
+    multiImageField: "input_image_urls",
+    outputKeys: ["model_mesh", "model_meshes", "model_glb", "model"],
+  },
 } as const;
 
 const DEFAULT_FAL_TEXT_MODEL = "tripo3d/tripo/v2.5/text-to-3d";
@@ -758,8 +766,9 @@ export async function genViaFal(opts: FalGenOptions): Promise<string> {
     }
     const multiField = "multiImageField" in (preset ?? {}) ? preset.multiImageField : "image_urls";
     const imageField = "imageField" in (preset ?? {}) ? preset.imageField : "image_url";
+    const imageFieldMode = "imageFieldMode" in (preset ?? {}) ? preset.imageFieldMode : "string";
     if (urls.length > 1) input[multiField] ??= urls;
-    else input[imageField] ??= urls[0];
+    else input[imageField] ??= imageFieldMode === "array" ? [urls[0]] : urls[0];
   } else if (opts.prompt) {
     const promptField = "promptField" in (preset ?? {}) ? preset.promptField : "prompt";
     input[promptField] ??= opts.prompt;

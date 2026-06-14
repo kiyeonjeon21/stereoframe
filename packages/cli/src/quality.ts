@@ -8,7 +8,7 @@ export interface QualityWarning {
 }
 
 export interface QualityReport {
-  generatedBy: "stereoframe gen --quality-report";
+  generatedBy: "stereoframe gen --quality-report" | "stereoframe evaluate";
   model: string;
   metrics: {
     boundsSize: number[];

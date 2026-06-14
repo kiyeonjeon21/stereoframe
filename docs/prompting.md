@@ -16,8 +16,10 @@ When making a video with stereoframe, describe your **directorial intent**, not 
 
 **Lowest effort — hand the agent a GLB:** for "make my model look good", the agent reaches for `stage` (auto-frame + director preset) — you don't describe a scene at all.
 
-> "Make an Apple-ad-style reveal of this helmet GLB." → `stage helmet.glb --preset reveal`
+> "Make a standard preview of this helmet GLB after evaluation." → `evaluate helmet.glb --frames`, then `stage helmet.glb --preset reveal`
 > "Annotate the parts of this lamp as a spec sheet." → `inspect` then `stage --preset spec`
+
+> "Compare these generated GLBs and tell me which one is usable." → `evaluate a.glb b.glb --frames --render`, then inspect `REPORT.md`, `reports/summary.json`, and the captured frames.
 
 **High altitude — enough most of the time:**
 
@@ -57,11 +59,11 @@ Because the markup is declarative, a partial edit is a one-line diff, and becaus
 | particle count/seed, fine shot-length splits | brand colors (if any) |
 | glass/water material parameters | total length and intended use (social/presentation/demo) |
 
-**Asset rule**: for requests that need models or environment maps, you can (a) provide the GLB/HDRI files, (b) say "abstract with primitives", or (c) let the agent **generate** a model — `stereoframe gen "<prompt>"` (text-to-3D via Meshy), or **image-first** for better fidelity/orientation: `gen --image front.png`, `gen --images front,side,back` (multi-view), or `gen "<prompt>" --via-image` (text → image → 3D, with optional OpenAI image controls like `--image-quality`, `--image-format`, `--size`). Image-first is more art-directable since the 2D image pins the design before the 3D step. For a more premium model than Meshy's, route generation through **fal.ai** (pay-as-you-go, no minimum): `gen "<prompt>" --provider fal` (defaults to Tripo v2.5; override with `--fal-model <id>`, browse fal.ai/models?categories=3d) — needs `FAL_KEY`. Use `--dry-run --json` before paid calls and `--quality-report` after generation when bounds/aspect/triangle/single-mesh warnings matter. All these still output a single welded mesh (no separable parts). The agent won't use CDN assets at render time because remote fetches break determinism, but generation happens up front and the GLB is saved locally (CC0 sources for hand-picked assets: Poly Haven HDRIs, Khronos sample GLBs).
+**Asset rule**: for requests that need models or environment maps, you can (a) provide the GLB/HDRI files, (b) say "abstract with primitives", or (c) let the agent **generate a candidate** model — `stereoframe gen "<prompt>"` (text-to-3D via Meshy), or **image-first** for better fidelity/orientation: `gen --image front.png`, `gen --images front,side,back` (multi-view), or `gen "<prompt>" --via-image` (text → image → 3D, with optional OpenAI image controls like `--image-quality`, `--image-format`, `--size`). Image-first is more art-directable since the 2D image pins the design before the 3D step. For alternative engines, route generation through **fal.ai** (pay-as-you-go, no minimum): `gen "<prompt>" --provider fal` (defaults to Tripo v2.5; override with `--fal-model <id>`, browse fal.ai/models?categories=3d) — needs `FAL_KEY`. Use `--dry-run --json` before paid calls, and evaluate generated assets with `stereoframe evaluate a.glb b.glb --frames --render` before treating them as final hero assets. All these still often output a single welded mesh (no separable parts). The agent won't use CDN assets at render time because remote fetches break determinism, but generation happens up front and the GLB is saved locally (CC0 sources for hand-picked assets: Poly Haven HDRIs, Khronos sample GLBs).
 
 ## What's in range of the current vocabulary
 
-**Works in one pass** — auto-directing a GLB (`stage`: reveal/hero-orbit/turntable/exploded-view/spec/teardown/cinematic), compiling a shot list into a multi-shot film (`storyboard`), turntable/orbit/dolly/spline-flythrough cameras, character clip transitions (idle→run) with a follow camera, paper-swarm typography, glass panels (transmission), ocean/sky (golden hour), particles (fountain/snow/dust), metaball goo, material colorway switching (variant), multi-shot cuts/crossfades, DOM titles/captions.
+**Works in one pass** — evaluating GLBs (`evaluate`: reports/frames/standard preview), auto-directing an accepted GLB (`stage`: reveal/hero-orbit/turntable/exploded-view/spec/teardown/cinematic), compiling a shot list into a multi-shot film (`storyboard`), turntable/orbit/dolly/spline-flythrough cameras, character clip transitions (idle→run) with a follow camera, paper-swarm typography, glass panels (transmission), ocean/sky (golden hour), particles (fountain/snow/dust), metaball goo, material colorway switching (variant), multi-shot cuts/crossfades, DOM titles/captions.
 
 **Not yet** — the agent will try the escape hatch or tell you the limit: physics simulation (collapse/collision), photorealistic humans, audio, depth of field, motion blur, wipe/shader transitions, 3D text meshes (captions are DOM overlays).
 
@@ -76,7 +78,7 @@ Starting from a proven example (`examples/`) and stating only the difference giv
 | reference example | style |
 |---|---|
 | `storyboard-camera` | directed multi-shot spot from a JSON shot list (the `storyboard` compiler) |
-| `product-teardown` | annotated product film (inspect + isolate + tracked callouts) |
+| `product-teardown` | annotated teardown/explainer (inspect + isolate + tracked callouts) |
 | `product-turntable` | product video (HDRI studio + turntable + orbit) |
 | `character-run-standalone` | character shot (clip transition + follow cam + particles) |
 | `ocean-flythrough` | nature flythrough (sky/ocean + camera path) |

@@ -2,14 +2,14 @@
 
 [![npm](https://img.shields.io/npm/v/stereoframe?logo=npm)](https://www.npmjs.com/package/stereoframe) [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/kiyeonjeon21/stereoframe/blob/main/LICENSE)
 
-**The auto-director for 3D motion graphics — drop in a GLB, get a cinematic reveal.**
+**CI for generated 3D assets — inspect, score, compare, and render GLBs as reproducible evidence.**
 
 ```bash
-npx stereoframe stage product.glb --preset spec --title "Product"
-cd product-spec && npx stereoframe render   # → a grounded, annotated product film, zero hand-tuning
+npx stereoframe evaluate meshy.glb rodin.glb tripo.glb --frames --render
+# → quality reports, comparison frames, a standardized MP4, and REPORT.md
 ```
 
-Asset generation (Meshy/Tripo/Rodin) is a solved, crowded space. The underserved layer is **directing** a model — camera, lighting, timing, easing, staging. stereoframe auto-frames any GLB and applies a director preset, all deterministic (every frame is a pure function of `t`, frame-hash-identical across runs) and agent-drivable. Underneath it's a full declarative 3D-video framework: describe a three.js scene in plain HTML custom elements and render it frame-perfectly to MP4.
+AI 3D generation is useful, but output quality varies wildly. stereoframe treats generated GLBs as **candidate assets to evaluate**, not guaranteed finished products: inspect geometry, flag defects, compare providers/models under one rig, capture evidence frames, and render reproducible previews. Once an asset is accepted, the same deterministic runtime can stage it into spec sheets, teardown explainers, or custom 3D video.
 
 ```html
 <sf-scene environment="room" background="#0b0f17" ground="contact-shadow" light-sweep="0.1">
@@ -25,9 +25,10 @@ Asset generation (Meshy/Tripo/Rodin) is a solved, crowded space. The underserved
 ## Commands
 
 ```bash
-stereoframe stage <model.glb> --preset <name>   # auto-direct a GLB into a film
+stereoframe evaluate <a.glb> [b.glb…]           # quality reports + comparison scene/frames/video
+stereoframe stage <model.glb> --preset <name>   # stage an accepted GLB into a preview/film
 stereoframe inspect <model.glb>                 # segment + tag a GLB's parts (name/material/where/size)
-stereoframe gen "<prompt>"                       # text/image-to-3D → textured GLB (Meshy, or --provider fal)
+stereoframe gen "<prompt>"                       # labs: text/image-to-3D candidate GLB
 stereoframe init <name>                          # scaffold a project
 stereoframe lint | validate                      # static + headless verification
 stereoframe render [--draft]                     # → renders/render_<ts>.mp4
@@ -35,13 +36,15 @@ stereoframe frame --t <s>                         # one frame → PNG (inspect a
 stereoframe preview                              # looping playback in the browser
 ```
 
-**Generate assets** with `gen`: text-to-3D, `--image`/`--images` for image-to-3D, or `--via-image` (text → reference image → 3D). Defaults to [Meshy](https://www.meshy.ai) (free test mode; set `MESHY_API_KEY` for real generations); `--provider fal` routes any [fal.ai](https://fal.ai/models?categories=3d) 3D model instead (Tripo, Hyper3D/Rodin, Hunyuan3D…) via `FAL_KEY` + `--fal-model`.
+**Evaluate candidates** with `evaluate`: one or more generated/production GLBs → `reports/summary.json`, per-asset `*.quality.json`, `REPORT.md`, a standardized `index.html`, optional `frames/`, and optional `renders/evaluation.mp4`.
 
-**Presets:** `reveal` (dramatic spiral-in), `hero-orbit` (clean studio orbit), `turntable` (pedestal), `exploded-view` (parts fly apart), **`spec`** (grounded film with auto-placed material callouts), **`teardown`** (exploded breakdown with a tracked label on each part), **`cinematic`** (multi-shot reveal/macro/hero film). `stage` auto-frames the model, so a fixed preset frames any GLB correctly — then hand-edit the generated `index.html` to taste.
+**Generate candidate assets** with `gen`: text-to-3D, `--image`/`--images` for image-to-3D, or `--via-image` (text → reference image → 3D). Defaults to [Meshy](https://www.meshy.ai) (free test mode; set `MESHY_API_KEY` for real generations); `--provider fal` routes any [fal.ai](https://fal.ai/models?categories=3d) 3D model instead (Tripo, Hyper3D/Rodin, Hunyuan3D…) via `FAL_KEY` + `--fal-model`. Generated GLBs should be inspected/evaluated before you rely on them.
+
+**Presets:** `reveal` (dramatic spiral-in), `hero-orbit` (clean studio orbit), `turntable` (pedestal), `exploded-view` (parts fly apart), **`spec`** (grounded preview with auto-placed material callouts), **`teardown`** (exploded breakdown with a tracked label on each part), **`cinematic`** (multi-shot reveal/macro/hero preview). `stage` auto-frames the model, so a fixed preset frames any accepted GLB consistently — then hand-edit the generated `index.html` to taste.
 
 ## How it works
 
-Every frame is a pure function of `t = frame / fps`: the CLI drives `window.__stereoframe.seek(t)` in headless Chrome and screenshots each frame into ffmpeg. No wall clock, no accumulated state — random-access seekable and reproducible. `inspect` reads a GLB through the real runtime so reported part names/indices match exactly what `isolate`/`explode`/`sf-callout` target.
+Every frame is a pure function of `t = frame / fps`: the CLI drives `window.__stereoframe.seek(t)` in headless Chrome and screenshots each frame into ffmpeg. No wall clock, no accumulated state — random-access seekable within a render. `inspect` reads a GLB through the real runtime so reported part names/indices match exactly what `isolate`/`explode`/`sf-callout` target.
 
 Requires Node ≥ 20 and ffmpeg.
 

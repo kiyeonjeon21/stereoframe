@@ -6,11 +6,12 @@ references it, and Codex reads this file directly.
 
 ## What this is
 
-A monorepo (bun workspaces) for **stereoframe** — the auto-director for 3D motion
-graphics: declarative `<sf-*>` HTML → deterministic 3D video on three.js.
+A monorepo (bun workspaces) for **stereoframe** — deterministic GLB evaluation
+and 3D video on three.js: generated/production assets → inspectable evidence,
+declarative `<sf-*>` HTML, and seekable renders.
 
 - `packages/runtime/` — `stereoframe-runtime` → `dist/stereoframe.js` (three.js r184 bundled + the `<sf-*>` custom elements + the seek protocol).
-- `packages/cli/` — `stereoframe` → the `stereoframe` bin (schema/stage/inspect/init/gen/lint/validate/render/preview/add/update; Puppeteer + ffmpeg).
+- `packages/cli/` — `stereoframe` → the `stereoframe` bin (schema/evaluate/stage/inspect/init/gen/lint/validate/render/preview/add/update; Puppeteer + ffmpeg).
 - `examples/` — runnable compositions. `docs/format.md` — markup spec. `.claude/skills/stereoframe/SKILL.md` — the authoring guide.
 
 **Agent-facing CLI.** `stereoframe schema` prints the machine-readable spec — commands + the full `<sf-*>` authoring vocabulary (elements, verbs+params, eases, geometry/material kinds, finish attrs, presets) as JSON, sourced from code so it never drifts from the SKILL. Output is JSON when piped/non-TTY (or with `--json`) and prose on a TTY; results are `{ok:true,command,outputs,…}`, errors `{ok:false,error:{code,message,hint}}`; progress goes to stderr so stdout stays parseable.
@@ -33,6 +34,12 @@ finish attributes, recipes, determinism rules), use the authoring guide:
 `.claude/skills/stereoframe/SKILL.md` (also discoverable by Codex through
 `.agents/skills/stereoframe`; also the markup spec in `docs/format.md`). Don't
 duplicate that here — read it before authoring `sf-*` markup.
+
+For generated or third-party GLBs, prefer the evaluation path first:
+`stereoframe evaluate <a.glb> [b.glb…] --frames --render` writes quality reports,
+a standardized comparison composition, optional frames/video, and a summary
+report. Treat AI 3D generation as a Labs/input-source path; generated GLBs are
+candidates to inspect and compare, not guaranteed final production assets.
 
 ## Conventions (important)
 

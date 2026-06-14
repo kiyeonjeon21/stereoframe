@@ -195,6 +195,8 @@ describe("gen dry-run helpers", () => {
   });
   test("fal presets and GLB finder prefer known output keys", () => {
     expect(FAL_MODEL_PRESETS["tripo3d/tripo/v2.5/image-to-3d"].imageField).toBe("image_url");
+    expect(FAL_MODEL_PRESETS["fal-ai/hyper3d/rodin/v2"].imageField).toBe("input_image_urls");
+    expect(FAL_MODEL_PRESETS["fal-ai/hyper3d/rodin/v2"].imageFieldMode).toBe("array");
     expect(findGlbUrl({ model_glb_pbr: { url: "https://cdn.example/model.glb" } })).toBe("https://cdn.example/model.glb");
     expect(findGlbUrl({ nested: { file: "https://cdn.example/scan.glb?x=1" } })).toBe("https://cdn.example/scan.glb?x=1");
   });

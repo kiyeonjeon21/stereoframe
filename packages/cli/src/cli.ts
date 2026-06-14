@@ -47,6 +47,7 @@ import { captureFrame } from "./frame";
 import { scaffoldProject, updateRuntime } from "./scaffold";
 import { serveProject } from "./serve";
 import { validateProject } from "./validate";
+import { evaluateModels } from "./evaluate";
 
 interface Flags {
   positional: string[];
@@ -94,7 +95,7 @@ function reportResult(command: string, payload: Record<string, unknown>, lines: 
   }
 }
 
-const HELP = `stereoframe — declarative, deterministic 3D video on three.js
+const HELP = `stereoframe — deterministic GLB evaluation and 3D video on three.js
 
 USAGE
   stereoframe init <name>              scaffold a new composition project
@@ -114,9 +115,14 @@ USAGE
       --fps <n>        bake frame rate (default 30)
   stereoframe preview [dir]            serve with looping wall-clock playback
       --port <n>       fixed port (default: random)
-  stereoframe stage <model.glb>        auto-direct a GLB into a cinematic motion graphic
+  stereoframe evaluate <a.glb> [b.glb…]   inspect, score, compare, and stage GLBs as evidence
+      --dir <dir>      output evaluation suite (default: glb-evaluation)
+      --title "<text>" report/comparison title
+      --frames [list]  capture standard frames (default list: 0,2,4,6; or pass 0,1.5,3)
+      --render         render standardized comparison mp4 (--draft for fast)
+  stereoframe stage <model.glb>        stage an accepted GLB into a deterministic preview/film
       --preset <name>  reveal | hero-orbit | turntable | exploded-view | spec | teardown | cinematic (default reveal)
-                       spec     = auto-annotated product film (inspects the GLB, places named callouts)
+                       spec     = auto-annotated asset preview (inspects the GLB, places named callouts)
                        teardown = exploded view with a labelled callout tracking each separated part
       --dir <dir>      output project dir (default: <model name>)
       --duration <s>   seconds (default 8; cinematic default 11.5)
@@ -138,7 +144,7 @@ USAGE
   stereoframe segment <model.glb>      report a mesh's separable connected components
       --min-faces <n>  ignore components smaller than n triangles (default 50)
                        (AI text/image-to-3D output is one welded mesh → not separable)
-  stereoframe gen "<prompt>"           generate a 3D model (GLB) via Meshy
+  stereoframe gen "<prompt>"           labs: generate a candidate GLB via Meshy/fal.ai
       --image <png>    image-to-3D from one local image (instead of text)
       --images a,b,c   multi-image-to-3D from 1-4 views (front/side/back…)
       --via-image      text → image (OpenAI gpt-image-2) → image-to-3D, more art-directable
@@ -175,14 +181,15 @@ const COMMANDS = [
   { name: "frame", summary: "render a single frame to PNG for visual inspection", flags: ["t", "out", "json"] },
   { name: "bake", summary: "freeze a forward-mode sim into a seekable cache", flags: ["target", "fps", "out"] },
   { name: "preview", summary: "serve with looping wall-clock playback", flags: ["port"] },
-  { name: "stage", summary: "auto-direct a GLB into a cinematic motion graphic", args: ["model.glb"], flags: ["preset", "dir", "duration", "title", "bg", "json"] },
+  { name: "stage", summary: "stage an accepted GLB into a deterministic preview or film", args: ["model.glb"], flags: ["preset", "dir", "duration", "title", "bg", "json"] },
+  { name: "evaluate", summary: "inspect, score, compare, and stage GLBs as evidence", args: ["model.glb..."], flags: ["dir", "title", "frames", "render", "draft", "json"] },
   { name: "brief", summary: "natural-language directing → a plan.json (via an LLM)", flags: ["model", "gen", "dir", "render", "llm-provider", "vertical", "square"] },
   { name: "storyboard", summary: "compile a shot plan (JSON) into a multi-shot film", args: ["plan.json"], flags: ["dir", "render", "vertical", "square", "json"] },
   { name: "inspect", summary: "segment + tag a GLB: list its parts", args: ["model.glb"], flags: ["json"] },
   { name: "segment", summary: "report a mesh's separable connected components", args: ["model.glb"], flags: ["min-faces", "json"] },
   {
     name: "gen",
-    summary: "generate a 3D model (GLB) via Meshy or fal.ai",
+    summary: "labs: generate a candidate 3D model (GLB) via Meshy or fal.ai",
     args: ["prompt"],
     flags: [
       "image",
@@ -323,6 +330,19 @@ function imageOptionsFromFlags(options: Map<string, string | boolean>): OpenAIIm
   };
 }
 
+function framesOpt(options: Map<string, string | boolean>): number[] | undefined {
+  if (!options.has("frames")) return undefined;
+  const raw = options.get("frames");
+  if (raw === true) return [0, 2, 4, 6];
+  if (typeof raw !== "string") return undefined;
+  const frames = raw
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isFinite(n));
+  if (frames.length === 0) throw new CliError("--frames must be a comma-separated list of seconds", "invalid_flag");
+  return frames;
+}
+
 async function maybeWriteQualityReport(glbPath: string, enabled: boolean): Promise<{ path: string; report: QualityReport } | undefined> {
   if (!enabled) return undefined;
   console.error(`inspecting ${glbPath} for quality report…`);
@@ -454,6 +474,52 @@ async function main(): Promise<void> {
       reportResult("stage", { outputs: [staged], preset, next: `cd ${outDir} && stereoframe render` }, [
         `next: cd ${outDir} && stereoframe render`,
       ]);
+      return;
+    }
+    case "evaluate": {
+      if (positional.length === 0) {
+        throw new Error("usage: stereoframe evaluate <a.glb> [b.glb…] [--dir out] [--frames 0,2,4] [--render]");
+      }
+      const defaultDir =
+        positional.length === 1
+          ? `${basename(positional[0]!).replace(/\.(glb|gltf)$/i, "")}-evaluation`
+          : "glb-evaluation";
+      const result = await evaluateModels({
+        models: positional,
+        outDir: stringOpt(options, "dir") ?? defaultDir,
+        title: stringOpt(options, "title"),
+        frames: framesOpt(options),
+        render: options.get("render") === true,
+        draft: options.get("draft") === true,
+      });
+      const outputs = [
+        result.index,
+        result.report,
+        result.summary,
+        ...result.assets.map((asset) => join(result.dir, asset.report)),
+        ...result.frames.map((frame) => frame.out),
+        ...(result.render ? [result.render] : []),
+      ];
+      reportResult(
+        "evaluate",
+        {
+          outputs,
+          dir: result.dir,
+          assets: result.assets.map((asset) => ({
+            label: asset.label,
+            score: asset.score,
+            warnings: asset.quality.warnings.map((w) => w.code),
+            report: join(result.dir, asset.report),
+          })),
+          frames: result.frames.map((frame) => frame.out),
+          ...(result.render ? { render: result.render } : {}),
+        },
+        [
+          `evaluation → ${result.dir}`,
+          `report → ${result.report}`,
+          ...(result.render ? [`render → ${result.render}`] : []),
+        ],
+      );
       return;
     }
     case "storyboard": {

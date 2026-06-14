@@ -1,12 +1,12 @@
 /**
- * `stereoframe stage <model.glb> --preset <name>` — drop in any GLB, get a
- * directed cinematic motion graphic. The model is auto-framed (the runtime
+ * `stereoframe stage <model.glb> --preset <name>` — after a GLB has been
+ * accepted, stage it as a deterministic preview/explainer/film. The model is auto-framed (the runtime
  * normalizes its size + center via `fit`), so a fixed director preset
  * (camera move + lighting rig + timing + finish) frames it perfectly
  * regardless of the model's original scale/origin.
  *
- * This is stereoframe's core value: not generating the asset, but directing
- * it — the layer motion designers actually spend their time on.
+ * This remains useful after evaluation: not generating the asset, but making
+ * it inspectable, presentable, and reproducible.
  */
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
@@ -432,7 +432,7 @@ export function calloutMarkup(callouts: CalloutSpec[] | undefined): string {
 }
 
 /**
- * `spec` — the annotated product film. The model rests grounded and still
+ * `spec` — the annotated asset preview. The model rests grounded and still
  * (so tracked labels stay readable) while the camera makes a slow arc; the
  * top parts get named spec callouts that draw on in sequence. Auto-populated
  * by `stage` from the segment manifest.

@@ -2,23 +2,23 @@
 
 [![stereoframe on npm](https://img.shields.io/npm/v/stereoframe?label=stereoframe&logo=npm)](https://www.npmjs.com/package/stereoframe) [![stereoframe-runtime on npm](https://img.shields.io/npm/v/stereoframe-runtime?label=stereoframe-runtime&logo=npm)](https://www.npmjs.com/package/stereoframe-runtime) [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**The auto-director for 3D motion graphics — drop in a GLB, get a cinematic reveal.**
+**CI for generated 3D assets — inspect, score, compare, and render GLBs as reproducible evidence.**
 
 ![stereoframe showcase — six example renders](docs/media/showcase.png)
 
 ```bash
-npx stereoframe stage product.glb --preset reveal --title "Product"
-cd product-reveal && npx stereoframe render   # → an Apple-ad-style reveal, zero hand-tuning
+npx stereoframe evaluate meshy.glb rodin.glb tripo.glb --frames --render
+# → quality reports, comparison frames, a standardized MP4, and REPORT.md
 ```
 
-Asset generation (Meshy/Tripo/Rodin) is a solved, crowded space. The underserved, higher-value layer is **directing** a model — camera, lighting, timing, easing, staging — which is where motion designers actually spend their time. stereoframe auto-frames any model and applies a director preset (reveal / hero-orbit / turntable / exploded-view / **spec** / **teardown** / **cinematic**); it can also `inspect` a GLB to segment and tag its parts, then auto-place tracked spec callouts that label each one. All deterministic and agent-drivable — and a full declarative 3D-video framework underneath (below).
+AI 3D generation is useful, but its output quality varies wildly. stereoframe treats generated GLBs as **candidate assets to evaluate**, not as guaranteed finished products. It gives teams a deterministic harness to inspect geometry, flag defects, compare providers/models under the same lighting/camera rig, capture evidence frames, and render reproducible preview videos. Once an asset is accepted, the same runtime can stage it into spec sheets, teardown explainers, or custom 3D video.
 
-Describe a three.js scene, camera, lighting, and motion in plain HTML custom elements; render it frame-perfectly to MP4 with the bundled CLI. The thesis (borrowed from [HyperFrames](https://github.com/heygen-com/hyperframes), which proved it for 2D): LLMs write HTML fluently, so HTML is the right authoring surface for AI-generated video — stereoframe applies it to 3D.
+Underneath is a declarative, agent-friendly three.js video runtime. Describe a scene, camera, lighting, and motion in plain HTML custom elements; render it frame-perfectly to MP4 with the bundled CLI. The contract is seekability: every frame is a pure function of `t`, so agents and CI can lint, validate, capture, and render without guessing.
 
 ```bash
 npx stereoframe init my-video && cd my-video
 npx stereoframe lint && npx stereoframe validate   # agent-grade verification
-npx stereoframe render      # → renders/render_<ts>.mp4, bit-identical across runs
+npx stereoframe render      # → renders/render_<ts>.mp4, seekable frame capture
 npx stereoframe preview     # looping playback in the browser
 ```
 
@@ -33,9 +33,31 @@ npx stereoframe preview     # looping playback in the browser
 </sf-scene>
 ```
 
-## Generate assets from text
+## Evaluate candidate GLBs
 
-Need a model you don't have? `stereoframe gen` turns a prompt into a textured GLB (via [Meshy](https://www.meshy.ai)) and drops it in `assets/`:
+Use `evaluate` when you have one or more GLBs from Meshy, Tripo, Rodin, Hunyuan, a DCC export, or a production asset library and need comparable evidence:
+
+```bash
+stereoframe evaluate candidate-a.glb candidate-b.glb \
+  --dir iphone-eval \
+  --title "iPhone provider comparison" \
+  --frames 0,2,4,6 \
+  --render --draft
+```
+
+The output directory contains:
+
+- `index.html` — a standardized side-by-side comparison scene.
+- `reports/summary.json` — machine-readable scores, metrics, warnings, and paths.
+- `reports/*.quality.json` — per-asset bounds/aspect/triangle/single-mesh/off-origin reports.
+- `REPORT.md` — a human-readable comparison table.
+- `frames/` and `renders/evaluation.mp4` when requested.
+
+Scores are evidence, not taste. A low score does not mean the asset is unusable, and a high score does not guarantee art direction quality. The point is to make generated/provided GLBs inspectable and comparable before investing in polish.
+
+## Labs: generate candidate assets
+
+Need a model you don't have? `stereoframe gen` can create candidate GLBs via Meshy or fal.ai. Treat this as an input source for evaluation, not the main product promise:
 
 ```bash
 stereoframe gen "a low-poly treasure chest"   # → assets/a-low-poly-treasure-chest.glb
@@ -50,7 +72,7 @@ stereoframe gen --images front.png,side.png,back.png  # multi-image-to-3D (1-4 v
 stereoframe gen "a matte-black headphone" --via-image # text → image (OpenAI) → 3D, one command
 ```
 
-`--via-image` generates a clean reference image (OpenAI `gpt-image-2` by default; override with `--image-model`, `--image-quality`, `--image-format`, `--image-compression`, `--size`) and saves it next to the GLB. Each generation also writes a `<name>.gen.json` provenance sidecar (prompt/source images, options, sanitized request payloads, task ids) — generation isn't reproducible, so keep the recipe. Add `--dry-run --json` before spending provider credits, and `--quality-report` after generation to write `<name>.quality.json` with bounds/aspect/triangle/single-mesh warnings.
+`--via-image` generates a clean reference image (OpenAI `gpt-image-2` by default; override with `--image-model`, `--image-quality`, `--image-format`, `--image-compression`, `--size`) and saves it next to the GLB. Each generation also writes a `<name>.gen.json` provenance sidecar (prompt/source images, options, sanitized request payloads, task ids) — generation isn't reproducible, so keep the recipe. Add `--dry-run --json` before spending provider credits, and evaluate the result with `stereoframe evaluate` or `--quality-report`.
 
 It runs with no setup using Meshy's free test mode (returns a sample model); set `MESHY_API_KEY` (shell env or project `.env`) for real prompt-driven generations.
 
@@ -63,30 +85,27 @@ stereoframe gen "a ribbed ceramic vase" --provider fal \
   --fal-model fal-ai/hunyuan-3d/v3.1 --input '{"guidance_scale":7.5}'        # --input passes model-specific fields
 ```
 
-## Direct a film — in natural language, or a JSON shot list
+## Stage accepted assets
 
-Generating a model is the commodity; **directing** it is the moat — and direction is
-natural-language too, the symmetric twin of the Meshy *gen* prompt:
+After a GLB passes evaluation, use `stage`, `spec`, `teardown`, or a custom storyboard to turn it into a deterministic preview, explainer, or film:
 
 ```bash
-# layer 1 — asset:     a prompt → a model
-stereoframe gen "a candy-red mid-engine hypercar"            # → assets/…glb (+ .gen.json)
-# layer 2 — direction: a brief → a cinematic film
-stereoframe brief "a dark neon showroom reveal, hard-cut ignition, flythrough, \
-  hero on 'APEX', ~24s, cyan/magenta, drifting dust" --model car.glb --render
+stereoframe stage accepted.glb --preset spec --title "Product"
+cd accepted-spec && stereoframe render
 ```
 
-`brief` sends your paragraph to an LLM that writes a rich, model-aware
-`plan.json` (it inspects the GLB), validates + critiques/repairs it, then compiles and renders
-— saving the brief as `brief.md` (provenance). LLM via `--llm-provider openai`
-(default) `| anthropic`; needs the matching API key.
+`spec` and `teardown` inspect the GLB and place tracked callouts on real parts when the asset is separable. Single welded AI meshes still render, but they will not explode or support per-part labels in a meaningful way.
 
-**One command, end to end** — generate the model *and* direct it from one invocation:
+## Direct a film — in natural language, or a JSON shot list
+
+For accepted assets that need a richer story, `brief` sends your paragraph to an LLM that writes a model-aware `plan.json`, validates + critiques/repairs it, then compiles and renders it:
+
+**One command, end to end** exists for experiments, but it is intentionally a Labs path: generated 3D should still be inspected before you trust it.
 
 ```bash
 stereoframe brief "a dark luxury reveal ending on the wordmark CHRONO, amber/steel, ~16s" \
   --gen "a luxury chronograph wristwatch, steel case, blue dial" --via-image --render
-# prompt → image (gpt-image-2) → 3D (Meshy) → directed plan (LLM) → MP4
+# prompt → image (gpt-image-2) → generated GLB → directed plan (LLM) → MP4
 ```
 
 Under the hood it's a **storyboard plan** — a JSON shot list (camera / lighting /
@@ -112,6 +131,7 @@ Camera types (`static`/`orbit`/`dolly`/`push-in`/`pull-back`/`path`/`hero`), 3-p
 
 ## How it works
 
+- **Evaluation compiles to evidence.** `evaluate` inspects every GLB, writes quality reports, builds a standardized comparison composition, and optionally captures frames/renders. Poor generated assets stay useful because their defects become comparable data.
 - **Directing compiles to markup.** `stage`, `storyboard`, `spec`/`teardown`, and `inspect` are *authors*, not a separate runtime: they emit the same deterministic `<sf-*>` HTML you could hand-write. `inspect` segments a GLB into named/tagged parts; `stage` auto-frames + finishes one; `storyboard` turns a JSON shot list into a multi-shot film with the timeline computed. The output is always editable markup — nothing is locked in a black box.
 - **Seek-driven rendering.** The CLI drives the runtime's protocol (`window.__stereoframe.seek(t)`, `t = frame / fps`) in headless Chrome and screenshots each frame into ffmpeg. Every frame is a pure function of `t`: verb writers → `AnimationMixer.setTime(t)` → `camera.lookAt` → `renderer.render`. No wall clock, no `requestAnimationFrame`, no accumulated state.
 - **Preload gate.** `__stereoframe.ready` only flips true after every GLB/HDRI is loaded and shaders are compiled — the renderer waits for it, so first frames are never half-loaded.
@@ -125,7 +145,7 @@ Camera types (`static`/`orbit`/`dolly`/`push-in`/`pull-back`/`path`/`hero`), 3-p
 
 ```
 packages/runtime/    stereoframe-runtime → dist/stereoframe.js (three.js r184 bundled)
-packages/cli/        stereoframe → `stereoframe` bin (stage/brief/storyboard/inspect/segment/init/gen/lint/validate/render/frame/bake/preview/add/update/schema)
+packages/cli/        stereoframe → `stereoframe` bin (evaluate/stage/brief/storyboard/inspect/segment/init/gen/lint/validate/render/frame/bake/preview/add/update/schema)
 examples/
   hello-standalone/        CLI-scaffolded starter (no HyperFrames)
   character-run-standalone/ Fox run cycle + follow cam + particles, own pipeline
@@ -163,12 +183,17 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 
 ## Status
 
-**v0 (Tier 3b+).** Determinism is scoped to seekability: every frame is a pure function of `t`, frame-hash-identical across runs — which leaves the visuals free.
+**v0 (Tier 3b+).** Determinism is scoped to seekability: every frame is a pure function of `t` within a render, which leaves the visuals free.
+
+**Evaluate generated and production GLBs**
+- `evaluate` — one or more GLBs → per-asset quality reports, heuristic scores, standardized comparison scene, optional frames, optional MP4, and `REPORT.md`.
+- Quality reports — bounds/aspect/flatness/triangle count/single-mesh/off-origin warnings so generated assets can fail visibly instead of being hidden by polish.
+- Provider comparison workflow — use `gen --provider ... --quality-report` to create candidates, then `evaluate` to compare them under the same deterministic rig.
 
 **Direct any GLB**
 - `brief` — natural-language directing: a paragraph → a model-aware, cinematic `plan.json` via an LLM (the directing twin of the `gen` prompt), validated + creatively critiqued/repaired, then compiled + rendered.
 - `storyboard` compiler — a JSON shot list (camera / lighting / grade / backdrop / atmosphere / secondary-motion / crossfade per beat) → a multi-shot film, timeline computed so crossfades never gap.
-- `stage` auto-director — auto-framing + presets: reveal, hero-orbit, turntable, exploded-view, **spec** (annotated product film), **teardown** (per-part exploded breakdown), **cinematic** (multi-shot reveal/macro/hero film).
+- `stage` auto-director — auto-framing + presets: reveal, hero-orbit, turntable, exploded-view, **spec** (annotated asset preview), **teardown** (per-part exploded breakdown), **cinematic** (multi-shot reveal/macro/hero preview).
 - `inspect` segment + tag pipeline — reads a GLB's parts (name, material character, position, size) so they can be targeted by name.
 - `sf-callout` tracked spec labels — leader lines that follow a 3D part as the camera moves; auto-placed by `spec`/`teardown`.
 - Product-film finish — contact-shadow grounding, environment light-sweep, feature-isolate spotlight.
@@ -187,7 +212,7 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 - **`stereoframe bake` + `<sf-baked>`** — freeze a forward sim into a per-frame cache and replay it as a pure function of `t`, so it's fully seekable again and drops into multi-shot. (forward-trails → baked-flock.)
 
 **Pipeline & verification**
-- CLI — init / gen / inspect / lint / validate / render / frame / preview / add / update / schema (Puppeteer + ffmpeg).
+- CLI — evaluate / init / gen / inspect / lint / validate / render / frame / preview / add / update / schema (Puppeteer + ffmpeg).
 - Text/image-to-3D — `stereoframe gen` → textured GLB via Meshy (default, free test mode) **or any fal.ai 3D model** (`--provider fal`: Tripo, Hyper3D/Rodin, Hunyuan3D, Trellis…), incl. `--via-image` (text → reference image → 3D).
 - `lint` — markup / asset / time-purity static checks. `validate` — headless probes for lighting, framing, static screen-space motion, black frames, and seek idempotency (the determinism contract, machine-checked).
 
