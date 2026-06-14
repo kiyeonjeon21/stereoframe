@@ -40,4 +40,5 @@ The script (`scripts/release.mjs`) runs the full check suite, bumps both
 package.json versions in lock-step, commits the version bump, tags (`vX.Y.Z`),
 and pushes. The `release.yml` workflow then re-runs the full check suite on the
 tagged commit, publishes both packages to npm, and creates a GitHub Release with
-generated release notes. `NPM_TOKEN` lives in GitHub Actions secrets.
+grouped release notes generated from conventional commit prefixes. `NPM_TOKEN`
+lives in GitHub Actions secrets.

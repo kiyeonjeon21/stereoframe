@@ -41,22 +41,7 @@ jobs:
 
       - name: Build GitHub Release notes
         run: |
-          set -euo pipefail
-          prev_tag="$(git tag --sort=-version:refname | grep -v "^${GITHUB_REF_NAME}$" | head -n 1 || true)"
-
-          {
-            echo "## Changes"
-            echo
-            if [ -n "$prev_tag" ]; then
-              git log --reverse --pretty=format:'- %s (%h)' "$prev_tag..$GITHUB_REF_NAME" | grep -v '^- release: v' || true
-              echo
-              echo
-              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...${GITHUB_REF_NAME}"
-            else
-              git log --reverse --pretty=format:'- %s (%h)' "$GITHUB_REF_NAME" | grep -v '^- release: v' || true
-            fi
-          } > release-notes.md
-
+          bun scripts/release-notes.mjs "$GITHUB_REF_NAME" > release-notes.md
           cat release-notes.md
 
       - name: Create GitHub Release
