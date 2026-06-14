@@ -8,15 +8,82 @@
  * Antialiasing is supersampling (scene.ts renders the canvas at Nx and the
  * capture downsamples) — handled outside this chain.
  */
-import { HalfFloatType, RGBAFormat, Vector2, Vector3, WebGLRenderTarget } from "three";
+import {
+  DepthFormat,
+  DepthTexture,
+  HalfFloatType,
+  NearestFilter,
+  RGBAFormat,
+  UnsignedIntType,
+  Vector2,
+  Vector3,
+  WebGLRenderTarget,
+} from "three";
 import type { Camera, Data3DTexture, PerspectiveCamera, Scene, WebGLRenderer } from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { TexturePass } from "three/addons/postprocessing/TexturePass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { LUTPass } from "three/addons/postprocessing/LUTPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+
+// Depth of field — a self-contained depth-texture pass. Reads the scene color +
+// a populated depth texture and blurs by circle-of-confusion. Unlike three's
+// BokehPass it does NOT re-render the scene with an override material (which on
+// `Points` particles leaves gl_PointSize undefined → non-deterministic depth).
+// Stateless + a pure function of (uv, color, depth) → seek-idempotent.
+const DofShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    tDepth: { value: null },
+    cameraNear: { value: 0.1 },
+    cameraFar: { value: 200.0 },
+    focusDistance: { value: 5.0 },
+    focusRange: { value: 2.0 },
+    maxBlur: { value: 0.015 },
+    texelSize: { value: new Vector2(1 / 1920, 1 / 1080) },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform sampler2D tDepth;
+    uniform float cameraNear, cameraFar, focusDistance, focusRange, maxBlur;
+    uniform vec2 texelSize;
+    varying vec2 vUv;
+    // perspective depth (0..1) → positive view-space distance from camera
+    float viewDist(float d){
+      float z = d * 2.0 - 1.0;
+      return (2.0 * cameraNear * cameraFar) / (cameraFar + cameraNear - z * (cameraFar - cameraNear));
+    }
+    float coc(float dist){ return clamp(abs(dist - focusDistance) / max(focusRange, 1e-3), 0.0, 1.0); }
+    void main(){
+      vec4 base = texture2D(tDiffuse, vUv);
+      float radius = coc(viewDist(texture2D(tDepth, vUv).x)) * maxBlur;
+      if (radius < texelSize.x * 0.75) { gl_FragColor = base; return; }
+      const int TAPS = 24;
+      const float GA = 2.39996323; // golden angle
+      float ratio = texelSize.y / texelSize.x; // keep the disk circular on a wide buffer
+      vec4 sum = base;
+      float wsum = 1.0;
+      for (int i = 0; i < TAPS; i++){
+        float fi = float(i) + 0.5;
+        float r = sqrt(fi / float(TAPS)) * radius;
+        float a = fi * GA;
+        vec2 suv = clamp(vUv + vec2(cos(a), sin(a) * ratio) * r, vec2(0.0), vec2(1.0));
+        // depth-aware weight: out-of-focus samples contribute, sharp ones don't —
+        // stops the in-focus subject bleeding outward.
+        float w = coc(viewDist(texture2D(tDepth, suv).x));
+        sum += texture2D(tDiffuse, suv) * w;
+        wsum += w;
+      }
+      gl_FragColor = sum / wsum;
+    }
+  `,
+};
 
 const VignetteGradeShader = {
   uniforms: {
@@ -157,23 +224,40 @@ export function buildPostFX(
   });
   const composer = new EffectComposer(renderer, target);
   composer.setSize(opts.width, opts.height);
-  const renderPass = new RenderPass(scene, camera);
-  renderPass.clearAlpha = 0;
-  composer.addPass(renderPass);
 
-  // Depth of field — added right after the scene render so it has fresh depth.
-  // `dof` (0..1) maps to aperture + max blur; focus distance is set per-frame in
-  // render(t) from the camera→subject distance (so the subject stays sharp).
-  let bokehPass: BokehPass | null = null;
+  // Depth of field needs a sampleable depth texture, which the override-material
+  // BokehPass approach can't deliver deterministically (it corrupts particle
+  // depth). Instead, for DOF we render the scene ONCE into our own RT (with a
+  // depth texture) and feed it to the composer via TexturePass; the DOF pass then
+  // reads that known-populated depth. Non-DOF keeps the normal RenderPass chain.
   const dofFocus = new Vector3(...(opts.dofFocus ?? [0, 0, 0]));
+  let sceneRT: WebGLRenderTarget | null = null;
+  let dofPass: ShaderPass | null = null;
   if (wantDof) {
     const d = opts.dof ?? 0;
-    bokehPass = new BokehPass(scene, camera, {
-      focus: 5.0,
-      aperture: d * 0.03, // shallower depth-of-field as dof→1
-      maxblur: 0.006 + d * 0.022, // max circle-of-confusion radius (fraction of screen)
+    sceneRT = new WebGLRenderTarget(opts.width, opts.height, {
+      type: HalfFloatType,
+      format: RGBAFormat,
+      samples: 0, // a sampleable depth texture can't come from an MSAA target
     });
-    composer.addPass(bokehPass);
+    const depthTex = new DepthTexture(opts.width, opts.height);
+    depthTex.format = DepthFormat;
+    depthTex.type = UnsignedIntType;
+    depthTex.minFilter = NearestFilter;
+    depthTex.magFilter = NearestFilter;
+    sceneRT.depthTexture = depthTex;
+
+    composer.addPass(new TexturePass(sceneRT.texture)); // scene color → composer buffer
+    dofPass = new ShaderPass(DofShader);
+    dofPass.uniforms.tDepth.value = sceneRT.depthTexture;
+    dofPass.uniforms.maxBlur.value = 0.006 + d * 0.022;
+    dofPass.uniforms.focusRange.value = 2.0 - d * 1.5; // shallower band as dof→1
+    dofPass.uniforms.texelSize.value = new Vector2(1 / opts.width, 1 / opts.height);
+    composer.addPass(dofPass);
+  } else {
+    const renderPass = new RenderPass(scene, camera);
+    renderPass.clearAlpha = 0;
+    composer.addPass(renderPass);
   }
 
   if (wantBloom) {
@@ -221,10 +305,27 @@ export function buildPostFX(
   return {
     render: (t: number) => {
       if (grainPass) grainPass.uniforms.uTime.value = t;
-      if (bokehPass) bokehPass.uniforms["focus"].value = cam.position.distanceTo(dofFocus);
+      if (sceneRT && dofPass) {
+        // Single full-scene render into our depth-texture RT (replaces RenderPass
+        // AND BokehPass's depth render). Then the composer's TexturePass + DOF run.
+        renderer.setRenderTarget(sceneRT);
+        renderer.setClearColor(0x000000, 0); // keep transparent scenes transparent
+        renderer.clear();
+        renderer.render(scene, camera);
+        renderer.setRenderTarget(null);
+        dofPass.uniforms.focusDistance.value = cam.position.distanceTo(dofFocus);
+        dofPass.uniforms.cameraNear.value = cam.near;
+        dofPass.uniforms.cameraFar.value = cam.far;
+      }
       composer.render(0); // explicit delta — never reads the wall clock
     },
-    setSize: (w, h) => composer.setSize(w, h),
+    setSize: (w, h) => {
+      composer.setSize(w, h);
+      if (sceneRT) {
+        sceneRT.setSize(w, h);
+        if (dofPass) dofPass.uniforms.texelSize.value = new Vector2(1 / w, 1 / h);
+      }
+    },
     setLUT: (texture, intensity) => {
       if (!lutPass) return;
       lutPass.lut = texture;
