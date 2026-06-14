@@ -15,6 +15,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -37,39 +38,43 @@ function npmToken() {
 }
 
 const version = readPkg("packages/cli").version;
-const token = npmToken();
 
-// Auth via a per-package-dir `.npmrc` (npm reads cwd/.npmrc), NOT an env var:
-// the per-registry key `//registry.npmjs.org/:_authToken` is not a valid POSIX
-// env-var name, so passing it via env is dropped on Linux CI (ENEEDAUTH). npm
-// excludes .npmrc from the tarball, and we delete it after, so it never leaks.
-function publishPkg(dir) {
-  const rc = join(ROOT, dir, ".npmrc");
-  writeFileSync(rc, `//registry.npmjs.org/:_authToken=${token}\n`);
-  try {
-    console.log(`$ npm publish --access public${DRY}  (in ${dir})`);
-    execSync(`npm publish --access public${DRY}`, { cwd: join(ROOT, dir), stdio: "inherit" });
-  } finally {
-    rmSync(rc, { force: true });
-  }
-}
+// Auth via the USER ~/.npmrc. npm IGNORES a workspace package's local .npmrc
+// ("ignoring workspace config"), and the per-registry token key isn't a valid
+// POSIX env-var name (so the env approach is dropped on Linux CI → ENEEDAUTH).
+// The user npmrc is always read. Back up + restore so a local run never clobbers
+// an existing one. (Token is written to a file, never logged.)
+const userRc = join(homedir(), ".npmrc");
+const userRcBackup = existsSync(userRc) ? readFileSync(userRc, "utf8") : null;
+writeFileSync(userRc, `${userRcBackup ?? ""}\n//registry.npmjs.org/:_authToken=${npmToken()}\n`);
 
-console.log(`publishing v${version}${DRY ? " (dry-run)" : ""}`);
+const publishPkg = (dir) => {
+  console.log(`$ npm publish --access public${DRY}  (in ${dir})`);
+  execSync(`npm publish --access public${DRY}`, { cwd: join(ROOT, dir), stdio: "inherit" });
+};
 
-// 1. runtime first (the CLI depends on it at install time).
-publishPkg("packages/runtime");
-
-// 2. CLI with its runtime dep pinned to the exact version for the published
-//    artifact, then restore workspace:* so a local run leaves the tree clean.
-const cliDir = "packages/cli";
-const cliOriginal = readPkg(cliDir);
-const cliPinned = structuredClone(cliOriginal);
-if (cliPinned.dependencies?.[RUNTIME_DEP]) cliPinned.dependencies[RUNTIME_DEP] = version;
-writePkg(cliDir, cliPinned);
 try {
-  publishPkg(cliDir);
-} finally {
-  writePkg(cliDir, cliOriginal);
-}
+  console.log(`publishing v${version}${DRY ? " (dry-run)" : ""}`);
 
-console.log(`\n✓ published v${version}${DRY ? " (dry-run)" : ""}`);
+  // 1. runtime first (the CLI depends on it at install time).
+  publishPkg("packages/runtime");
+
+  // 2. CLI with its runtime dep pinned to the exact version for the published
+  //    artifact, then restore workspace:* so a local run leaves the tree clean.
+  const cliDir = "packages/cli";
+  const cliOriginal = readPkg(cliDir);
+  const cliPinned = structuredClone(cliOriginal);
+  if (cliPinned.dependencies?.[RUNTIME_DEP]) cliPinned.dependencies[RUNTIME_DEP] = version;
+  writePkg(cliDir, cliPinned);
+  try {
+    publishPkg(cliDir);
+  } finally {
+    writePkg(cliDir, cliOriginal);
+  }
+
+  console.log(`\n✓ published v${version}${DRY ? " (dry-run)" : ""}`);
+} finally {
+  // restore the user npmrc (or remove the one we created)
+  if (userRcBackup !== null) writeFileSync(userRc, userRcBackup);
+  else rmSync(userRc, { force: true });
+}
