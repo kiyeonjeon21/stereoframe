@@ -9,6 +9,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Skip the auto-generated "release: vX" commit — release.yml already runs the
+    # exact same `check` on that commit (via its tag) before publishing, so this
+    # would just be a redundant parallel run. (PRs always run.)
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release:') }}
     steps:
       - uses: actions/checkout@v4
 
