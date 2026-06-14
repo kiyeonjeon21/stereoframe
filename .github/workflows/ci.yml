@@ -3,7 +3,17 @@ name: ci
 on:
   push:
     branches: [main]
+    # Docs-only changes can't break the build/tests/render — skip the heavy
+    # `check` for them. (They still ride to npm in the next real release's tarball.)
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
 
 jobs:
   test:
