@@ -16,6 +16,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
 
@@ -37,6 +39,26 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: bun scripts/publish.mjs
 
+      - name: Build GitHub Release notes
+        run: |
+          set -euo pipefail
+          prev_tag="$(git tag --sort=-version:refname | grep -v "^${GITHUB_REF_NAME}$" | head -n 1 || true)"
+
+          {
+            echo "## Changes"
+            echo
+            if [ -n "$prev_tag" ]; then
+              git log --reverse --pretty=format:'- %s (%h)' "$prev_tag..$GITHUB_REF_NAME" | grep -v '^- release: v' || true
+              echo
+              echo
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...${GITHUB_REF_NAME}"
+            else
+              git log --reverse --pretty=format:'- %s (%h)' "$GITHUB_REF_NAME" | grep -v '^- release: v' || true
+            fi
+          } > release-notes.md
+
+          cat release-notes.md
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -48,5 +70,5 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --title "$GITHUB_REF_NAME" \
-              --generate-notes
+              --notes-file release-notes.md
           fi
