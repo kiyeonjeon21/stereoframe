@@ -34,6 +34,7 @@ import { segmentModel } from "./segment";
 import { buildAutoCallouts, explodeTiming, PRESETS, stageModel, type Preset } from "./stage";
 import { lintHtml, type Finding } from "./lint";
 import { renderProject } from "./render";
+import { captureFrame } from "./frame";
 import { scaffoldProject, updateRuntime } from "./scaffold";
 import { serveProject } from "./serve";
 import { validateProject } from "./validate";
@@ -96,6 +97,9 @@ USAGE
       --out <path>     output file (default renders/render_<timestamp>.mp4)
       --crf <n>        x264 quality, lower = better (default 18)
       --draft          fast low-quality render for iteration
+  stereoframe frame [dir]              render a single frame to PNG (look at your scene without a full render)
+      --t <seconds>    time to capture (default 0, clamped to duration)
+      --out <path>     output file (default frames/frame_<t>s.png)
   stereoframe bake [dir]               freeze a forward-mode sim into a seekable cache for <sf-baked>
       --target <id>    the InstancedMesh element id to bake (required)
       --fps <n>        bake frame rate (default 30)
@@ -156,6 +160,7 @@ const COMMANDS = [
   { name: "lint", summary: "static checks (markup, assets, time purity)", flags: ["json"] },
   { name: "validate", summary: "headless run: errors, lighting, framing, seek-idempotency", flags: ["json"] },
   { name: "render", summary: "render index.html to mp4", flags: ["fps", "out", "crf", "draft", "json"] },
+  { name: "frame", summary: "render a single frame to PNG for visual inspection", flags: ["t", "out", "json"] },
   { name: "bake", summary: "freeze a forward-mode sim into a seekable cache", flags: ["target", "fps", "out"] },
   { name: "preview", summary: "serve with looping wall-clock playback", flags: ["port"] },
   { name: "stage", summary: "auto-direct a GLB into a cinematic motion graphic", args: ["model.glb"], flags: ["preset", "dir", "duration", "title", "bg", "json"] },
@@ -285,6 +290,20 @@ async function main(): Promise<void> {
         draft: options.get("draft") === true,
       });
       reportResult("render", { outputs: [out] }, [out]);
+      return;
+    }
+    case "frame": {
+      const frameOut = typeof options.get("out") === "string" ? (options.get("out") as string) : undefined;
+      const t = options.has("t") ? Number(options.get("t")) : 0;
+      if (Number.isNaN(t)) {
+        throw new CliError("--t must be a number of seconds", "bad_argument", "e.g. --t 1.5");
+      }
+      const r = await captureFrame({ projectDir: dir, t, out: frameOut });
+      reportResult(
+        "frame",
+        { outputs: [r.out], t: r.t, durationSec: r.duration, width: r.width, height: r.height },
+        [r.out],
+      );
       return;
     }
     case "preview": {

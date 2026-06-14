@@ -49,6 +49,7 @@ cd my-video
 # edit index.html (markup below)
 stereoframe lint               # static checks: markup, assets, time purity
 stereoframe validate           # headless run: errors, lighting, framing, seek idempotency
+stereoframe frame --t 2        # one frame → frames/*.png — LOOK at it (Read the PNG) instead of authoring blind
 stereoframe render --draft     # fast iteration render → renders/*.mp4
 stereoframe render             # quality render (crf 18)
 stereoframe preview            # browser playback at http://127.0.0.1:<port>/?sf-preview
