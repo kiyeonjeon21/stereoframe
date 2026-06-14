@@ -51,4 +51,29 @@ describe("schema ↔ source drift guards", () => {
     expect(names.length).toBeGreaterThan(10);
     for (const n of names) expect(cliSrc).toContain(`stereoframe ${n}`);
   });
+
+  test("gen schema advertises implemented generation flags", () => {
+    for (const flag of [
+      "input",
+      "key",
+      "polycount",
+      "image-provider",
+      "image-model",
+      "image-key",
+      "image-quality",
+      "image-format",
+      "image-compression",
+      "image-background",
+      "image-moderation",
+      "size",
+      "quality-report",
+      "stage-dir",
+      "duration",
+      "bg",
+      "title",
+      "draft",
+    ]) {
+      expect(cliSrc).toContain(`"${flag}"`);
+    }
+  });
 });

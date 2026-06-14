@@ -50,7 +50,7 @@ stereoframe gen --images front.png,side.png,back.png  # multi-image-to-3D (1-4 v
 stereoframe gen "a matte-black headphone" --via-image # text → image (OpenAI) → 3D, one command
 ```
 
-`--via-image` generates a clean reference image (OpenAI `gpt-image-2` by default; override with `--image-model`, provider is swappable) and saves it next to the GLB. Each generation also writes a `<name>.gen.json` provenance sidecar (prompt/source images, options, task ids) — generation isn't reproducible, so keep the recipe.
+`--via-image` generates a clean reference image (OpenAI `gpt-image-2` by default; override with `--image-model`, `--image-quality`, `--image-format`, `--image-compression`, `--size`) and saves it next to the GLB. Each generation also writes a `<name>.gen.json` provenance sidecar (prompt/source images, options, sanitized request payloads, task ids) — generation isn't reproducible, so keep the recipe. Add `--dry-run --json` before spending provider credits, and `--quality-report` after generation to write `<name>.quality.json` with bounds/aspect/triangle/single-mesh warnings.
 
 It runs with no setup using Meshy's free test mode (returns a sample model); set `MESHY_API_KEY` (shell env or project `.env`) for real prompt-driven generations.
 

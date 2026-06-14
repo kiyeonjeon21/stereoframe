@@ -25,8 +25,17 @@ import {
   GEN_PROVIDERS,
 } from "stereoframe-runtime/vocab";
 import { addBlock, listBlocks } from "./blocks";
-import { genModel, genFromImages, genViaImage, slug as genSlug, resolveEnvKey } from "./gen";
+import {
+  buildGenDryRunPlan,
+  genModel,
+  genFromImages,
+  genViaImage,
+  validateImageInputs,
+  type GenDryRunPlan,
+} from "./gen";
+import { validateOpenAIImageOptions, type OpenAIImageOptions } from "./imagegen";
 import { inspectModel } from "./inspect";
+import { writeQualityReport, type QualityReport } from "./quality";
 import { bakeProject } from "./bake";
 import { buildStoryboard, readStoryboard, validateStoryboard } from "./storyboard";
 import { runBrief } from "./brief";
@@ -134,6 +143,8 @@ USAGE
       --images a,b,c   multi-image-to-3D from 1-4 views (front/side/back…)
       --via-image      text → image (OpenAI gpt-image-2) → image-to-3D, more art-directable
       --image-provider openai (default)  --image-model <id>  --size <wxh>  --image-key <key>
+      --image-quality low|medium|high|auto  --image-format png|jpeg|webp
+      --image-compression <0-100>  --image-background auto|opaque  --image-moderation auto|low
       --provider fal   generate via fal.ai (premium, pay-as-you-go) instead of Meshy
       --fal-model <id>   fal model, e.g. tripo3d/tripo/v2.5/text-to-3d  (browse fal.ai/models?categories=3d)
       --input '<json>'   model-specific fal input fields (merged into the request)
@@ -143,6 +154,7 @@ USAGE
       --polycount <n>  target polygon count
       --key <key>      Meshy API key (else MESHY_API_KEY / .env / test mode)
       --dry-run        resolve the plan (mode, provider, output path, key presence) without spending
+      --quality-report inspect the generated GLB and write <name>.quality.json
       --stage <preset> one-shot: generate then stage into a film (reveal|hero-orbit|turntable|exploded-view|spec|teardown)
       --render         with --stage, also render the result to mp4 (--draft for fast)
   stereoframe add <block> [dir]        install a visual block's assets + print usage
@@ -168,7 +180,43 @@ const COMMANDS = [
   { name: "storyboard", summary: "compile a shot plan (JSON) into a multi-shot film", args: ["plan.json"], flags: ["dir", "render", "vertical", "square", "json"] },
   { name: "inspect", summary: "segment + tag a GLB: list its parts", args: ["model.glb"], flags: ["json"] },
   { name: "segment", summary: "report a mesh's separable connected components", args: ["model.glb"], flags: ["min-faces", "json"] },
-  { name: "gen", summary: "generate a 3D model (GLB) via Meshy or fal.ai", args: ["prompt"], flags: ["image", "images", "via-image", "provider", "fal-model", "dir", "out", "no-texture", "dry-run", "stage", "render", "json"] },
+  {
+    name: "gen",
+    summary: "generate a 3D model (GLB) via Meshy or fal.ai",
+    args: ["prompt"],
+    flags: [
+      "image",
+      "images",
+      "via-image",
+      "image-provider",
+      "image-model",
+      "image-key",
+      "image-quality",
+      "image-format",
+      "image-compression",
+      "image-background",
+      "image-moderation",
+      "size",
+      "provider",
+      "fal-model",
+      "input",
+      "dir",
+      "out",
+      "no-texture",
+      "polycount",
+      "key",
+      "dry-run",
+      "quality-report",
+      "stage",
+      "stage-dir",
+      "duration",
+      "bg",
+      "title",
+      "render",
+      "draft",
+      "json",
+    ],
+  },
   { name: "add", summary: "install a visual block's assets + print usage", args: ["block"] },
   { name: "blocks", summary: "list available blocks" },
   { name: "update", summary: "refresh assets/stereoframe.js", flags: ["json"] },
@@ -233,6 +281,72 @@ async function runStage(opts: {
   });
   console.error(`staged ${model} (${preset}) → ${created}`);
   return created;
+}
+
+function stringOpt(options: Map<string, string | boolean>, name: string): string | undefined {
+  const v = options.get(name);
+  return typeof v === "string" ? v : undefined;
+}
+
+function numberOpt(options: Map<string, string | boolean>, name: string): number | undefined {
+  if (!options.has(name)) return undefined;
+  const raw = options.get(name);
+  const n = typeof raw === "string" ? Number(raw) : NaN;
+  if (!Number.isFinite(n)) throw new CliError(`--${name} must be a number`, "invalid_flag");
+  return n;
+}
+
+function integerOpt(options: Map<string, string | boolean>, name: string): number | undefined {
+  const n = numberOpt(options, name);
+  if (n !== undefined && !Number.isInteger(n)) throw new CliError(`--${name} must be an integer`, "invalid_flag");
+  return n;
+}
+
+function parseJsonObject(raw: string | undefined, flag: string): Record<string, unknown> | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+    return parsed as Record<string, unknown>;
+  } catch {
+    throw new CliError(`--${flag} must be a valid JSON object`, "invalid_flag");
+  }
+}
+
+function imageOptionsFromFlags(options: Map<string, string | boolean>): OpenAIImageOptions {
+  return {
+    quality: stringOpt(options, "image-quality") as OpenAIImageOptions["quality"],
+    format: stringOpt(options, "image-format") as OpenAIImageOptions["format"],
+    compression: integerOpt(options, "image-compression"),
+    background: stringOpt(options, "image-background") as OpenAIImageOptions["background"],
+    moderation: stringOpt(options, "image-moderation") as OpenAIImageOptions["moderation"],
+  };
+}
+
+async function maybeWriteQualityReport(glbPath: string, enabled: boolean): Promise<{ path: string; report: QualityReport } | undefined> {
+  if (!enabled) return undefined;
+  console.error(`inspecting ${glbPath} for quality report…`);
+  const manifest = await inspectModel({ model: glbPath, silent: true, write: false });
+  const quality = writeQualityReport(glbPath, manifest);
+  const warningCount = quality.report.warnings.length;
+  console.error(`  quality report → ${quality.path}${warningCount ? ` (${warningCount} warning${warningCount === 1 ? "" : "s"})` : ""}`);
+  return quality;
+}
+
+function qualityPayload(quality: { path: string; report: QualityReport } | undefined): Record<string, unknown> {
+  if (!quality) return {};
+  return {
+    qualityReport: quality.path,
+    qualityWarnings: quality.report.warnings.map((w) => w.code),
+  };
+}
+
+function dryRunLines(plan: GenDryRunPlan): string[] {
+  const lines = [`dry-run: ${plan.mode} via ${plan.provider} -> ${plan.output}`];
+  for (const [key, present] of Object.entries(plan.keys)) lines.push(`  ${key}: ${present ? "present" : "MISSING"}`);
+  if (plan.sourceImageOutput) lines.push(`  source image: ${plan.sourceImageOutput}`);
+  for (const note of plan.notes) lines.push(`  note: ${note}`);
+  return lines;
 }
 
 async function main(): Promise<void> {
@@ -426,8 +540,8 @@ async function main(): Promise<void> {
           projectDir: outDir,
           out: "assets/model.glb",
           texture: options.get("no-texture") !== true,
-          polycount: options.has("polycount") ? Number(options.get("polycount")) : undefined,
-          key: typeof options.get("key") === "string" ? (options.get("key") as string) : undefined, // Meshy
+          polycount: integerOpt(options, "polycount"),
+          key: stringOpt(options, "key"), // Meshy
         };
         if (typeof imagesOpt === "string" || typeof imageOpt === "string") {
           const images =
@@ -436,13 +550,21 @@ async function main(): Promise<void> {
               : [imageOpt as string];
           model = await genFromImages({ images, ...gopts });
         } else if (options.has("via-image")) {
+          const imageOptions = imageOptionsFromFlags(options);
+          const imageErrors = validateOpenAIImageOptions({
+            ...imageOptions,
+            model: stringOpt(options, "image-model"),
+            size: stringOpt(options, "size"),
+          });
+          if (imageErrors.length) throw new CliError(imageErrors.join("; "), "invalid_gen_options");
           model = await genViaImage({
             prompt: genPrompt!,
             ...gopts,
-            imageKey: typeof options.get("image-key") === "string" ? (options.get("image-key") as string) : undefined,
-            imageProvider: typeof options.get("image-provider") === "string" ? (options.get("image-provider") as string) : undefined,
-            imageModel: typeof options.get("image-model") === "string" ? (options.get("image-model") as string) : undefined,
-            imageSize: typeof options.get("size") === "string" ? (options.get("size") as string) : undefined,
+            imageKey: stringOpt(options, "image-key"),
+            imageProvider: stringOpt(options, "image-provider"),
+            imageModel: stringOpt(options, "image-model"),
+            imageSize: stringOpt(options, "size"),
+            imageOptions,
           });
         } else {
           model = await genModel({ prompt: genPrompt!, ...gopts });
@@ -472,71 +594,82 @@ async function main(): Promise<void> {
     }
     case "gen": {
       const prompt = positional.join(" ").trim();
-      const projectDir = typeof options.get("dir") === "string" ? (options.get("dir") as string) : ".";
-      const out = typeof options.get("out") === "string" ? (options.get("out") as string) : undefined;
+      const projectDir = stringOpt(options, "dir") ?? ".";
+      const out = stringOpt(options, "out");
       const texture = options.get("no-texture") !== true;
-      const polycount = options.has("polycount") ? Number(options.get("polycount")) : undefined;
-      const key = typeof options.get("key") === "string" ? (options.get("key") as string) : undefined;
-      const imageOpt = options.get("image");
-      const imagesOpt = options.get("images");
+      const polycount = integerOpt(options, "polycount");
+      const key = stringOpt(options, "key");
+      const imageOpt = stringOpt(options, "image");
+      const imagesOpt = stringOpt(options, "images");
+      if (options.has("image") && !imageOpt) throw new CliError("--image requires a path", "invalid_flag");
+      if (options.has("images") && !imagesOpt) throw new CliError("--images requires a comma-separated list", "invalid_flag");
+      const images =
+        imagesOpt !== undefined
+          ? imagesOpt.split(",").map((s) => s.trim()).filter(Boolean)
+          : imageOpt !== undefined
+            ? [imageOpt]
+            : [];
       // fal.ai generation gateway: `--provider fal --fal-model <id>` (premium, PAYG).
-      const provider = options.get("provider") === "fal" ? ("fal" as const) : undefined;
-      const falModel = typeof options.get("fal-model") === "string" ? (options.get("fal-model") as string) : undefined;
-      let falInput: Record<string, unknown> | undefined;
-      if (typeof options.get("input") === "string") {
-        try {
-          falInput = JSON.parse(options.get("input") as string);
-        } catch {
-          throw new Error("--input must be valid JSON (model-specific fal input fields)");
-        }
+      const providerFlag = stringOpt(options, "provider");
+      if (providerFlag && providerFlag !== "meshy" && providerFlag !== "fal") {
+        throw new CliError(`unknown provider: ${providerFlag}`, "invalid_flag", "providers: meshy, fal");
       }
+      const provider = providerFlag === "fal" ? ("fal" as const) : undefined;
+      const falModel = stringOpt(options, "fal-model");
+      const falInput = parseJsonObject(stringOpt(options, "input"), "input");
       const falOpts = { provider, falModel, falInput };
+      const imageOptions = imageOptionsFromFlags(options);
+      const imageProvider = stringOpt(options, "image-provider");
+      const imageModel = stringOpt(options, "image-model");
+      const imageSize = stringOpt(options, "size");
+      const imageKey = stringOpt(options, "image-key");
+      const viaPrompt = prompt || (typeof options.get("via-image") === "string" ? (options.get("via-image") as string) : "");
 
       // --dry-run: resolve the plan (mode, provider, output path, key presence)
       // WITHOUT calling any paid API or writing files. Generation costs real money
       // (Meshy/fal/OpenAI) — let an agent verify before spending.
       if (options.has("dry-run")) {
-        const isImg = typeof imagesOpt === "string" || typeof imageOpt === "string";
-        const viaImg = options.has("via-image");
-        const label = isImg
-          ? basename(typeof imagesOpt === "string" ? imagesOpt.split(",")[0]! : (imageOpt as string)).replace(/\.(png|jpe?g|webp)$/i, "")
-          : prompt || (typeof options.get("via-image") === "string" ? (options.get("via-image") as string) : "");
-        const outPath = out ?? join("assets", `${genSlug(label || "model")}.glb`);
-        const prov = provider ?? "meshy";
-        const keyVar = prov === "fal" ? "FAL_KEY" : "MESHY_API_KEY";
-        const hasKey = !!resolveEnvKey(keyVar, projectDir, key);
-        const hasOpenai = viaImg ? !!resolveEnvKey("OPENAI_API_KEY", projectDir, undefined) : undefined;
-        const notes: string[] = [];
-        if (prov === "meshy" && !hasKey) notes.push("no MESHY_API_KEY → would use test mode (sample model, ignores prompt)");
-        if (prov === "fal" && !hasKey) notes.push("no FAL_KEY → generation would fail");
-        if (viaImg && !hasOpenai) notes.push("no OPENAI_API_KEY → the --via-image image step would fail");
-        const mode = isImg ? "image-to-3d" : viaImg ? "via-image" : "text-to-3d";
+        const plan = buildGenDryRunPlan({
+          prompt: viaPrompt || prompt,
+          projectDir,
+          out,
+          texture,
+          polycount,
+          key,
+          images,
+          viaImage: options.has("via-image"),
+          imageKey,
+          imageProvider,
+          imageModel,
+          imageSize,
+          imageOptions,
+          ...falOpts,
+          qualityReport: options.get("quality-report") === true,
+        });
+        if (plan.errors.length) {
+          throw new CliError(`gen dry-run failed validation: ${plan.errors.join("; ")}`, "invalid_gen_options");
+        }
         reportResult(
           "gen",
-          { dryRun: true, mode, provider: prov, output: join(resolve(projectDir), outPath), [keyVar]: hasKey, ...(viaImg ? { OPENAI_API_KEY: hasOpenai } : {}), ...(notes.length ? { notes } : {}) },
-          [
-            `dry-run: ${mode} via ${prov} → ${outPath}`,
-            `  ${keyVar}: ${hasKey ? "present" : "MISSING"}`,
-            ...(viaImg ? [`  OPENAI_API_KEY: ${hasOpenai ? "present" : "MISSING"}`] : []),
-            ...notes.map((n) => `  note: ${n}`),
-          ],
+          { ...plan, ...(plan.notes.length ? { notes: plan.notes } : {}) },
+          dryRunLines(plan),
         );
         return;
       }
 
       let glbPath: string;
-      if (typeof imagesOpt === "string" || typeof imageOpt === "string") {
+      if (images.length > 0) {
+        if (options.has("via-image")) throw new CliError("choose either --image/--images or --via-image, not both", "invalid_gen_options");
+        const inputErrors = validateImageInputs({ projectDir, images, provider: provider ?? "meshy" });
+        if (inputErrors.length) throw new CliError(inputErrors.join("; "), "invalid_gen_options");
         // image-to-3D / multi-image-to-3D from local image(s)
-        const images =
-          typeof imagesOpt === "string"
-            ? imagesOpt.split(",").map((s) => s.trim()).filter(Boolean)
-            : [imageOpt as string];
         glbPath = await genFromImages({ images, projectDir, out, texture, polycount, key, ...falOpts });
       } else if (options.has("via-image")) {
         // text → reference image → image-to-3D. (Tolerate `gen --via-image "prompt"`
         // where the prompt is captured as the flag's value.)
-        const viaPrompt = prompt || (typeof options.get("via-image") === "string" ? (options.get("via-image") as string) : "");
         if (!viaPrompt) throw new Error('usage: stereoframe gen "<prompt>" --via-image');
+        const imageErrors = validateOpenAIImageOptions({ ...imageOptions, model: imageModel, size: imageSize });
+        if (imageErrors.length) throw new CliError(imageErrors.join("; "), "invalid_gen_options");
         glbPath = await genViaImage({
           prompt: viaPrompt,
           projectDir,
@@ -544,10 +677,11 @@ async function main(): Promise<void> {
           texture,
           polycount,
           key,
-          imageKey: typeof options.get("image-key") === "string" ? (options.get("image-key") as string) : undefined,
-          imageProvider: typeof options.get("image-provider") === "string" ? (options.get("image-provider") as string) : undefined,
-          imageModel: typeof options.get("image-model") === "string" ? (options.get("image-model") as string) : undefined,
-          imageSize: typeof options.get("size") === "string" ? (options.get("size") as string) : undefined,
+          imageKey,
+          imageProvider,
+          imageModel,
+          imageSize,
+          imageOptions,
           ...falOpts,
         });
       } else {
@@ -556,6 +690,7 @@ async function main(): Promise<void> {
         }
         glbPath = await genModel({ prompt, projectDir, out, texture, polycount, key, ...falOpts });
       }
+      const quality = await maybeWriteQualityReport(glbPath, options.get("quality-report") === true);
 
       // One-shot: model → directed film (→ optional render).
       const stagePreset = options.get("stage");
@@ -571,20 +706,20 @@ async function main(): Promise<void> {
           model: glbPath,
           outDir: stageDir,
           preset,
-          duration: options.has("duration") ? Number(options.get("duration")) : undefined,
-          background: typeof options.get("bg") === "string" ? (options.get("bg") as string) : undefined,
-          title: typeof options.get("title") === "string" ? (options.get("title") as string) : undefined,
+          duration: numberOpt(options, "duration"),
+          background: stringOpt(options, "bg"),
+          title: stringOpt(options, "title"),
         });
         if (options.get("render") === true) {
           const rout = await renderProject({ projectDir: created, draft: options.get("draft") === true });
-          reportResult("gen", { outputs: [rout], glb: glbPath, preset }, [rout]);
+          reportResult("gen", { outputs: [rout, ...(quality ? [quality.path] : [])], glb: glbPath, preset, ...qualityPayload(quality) }, [rout]);
         } else {
-          reportResult("gen", { outputs: [created], glb: glbPath, preset, next: `cd ${stageDir} && stereoframe render` }, [
+          reportResult("gen", { outputs: [created, ...(quality ? [quality.path] : [])], glb: glbPath, preset, next: `cd ${stageDir} && stereoframe render`, ...qualityPayload(quality) }, [
             `next: cd ${stageDir} && stereoframe render`,
           ]);
         }
       } else {
-        reportResult("gen", { outputs: [glbPath], provider: provider ?? "meshy" }, [glbPath]);
+        reportResult("gen", { outputs: [glbPath, ...(quality ? [quality.path] : [])], provider: provider ?? "meshy", ...qualityPayload(quality) }, [glbPath]);
       }
       return;
     }
