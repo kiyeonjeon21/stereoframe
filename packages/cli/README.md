@@ -27,12 +27,15 @@ Asset generation (Meshy/Tripo/Rodin) is a solved, crowded space. The underserved
 ```bash
 stereoframe stage <model.glb> --preset <name>   # auto-direct a GLB into a film
 stereoframe inspect <model.glb>                 # segment + tag a GLB's parts (name/material/where/size)
-stereoframe gen "<prompt>"                       # text-to-3D → textured GLB (via Meshy)
+stereoframe gen "<prompt>"                       # text/image-to-3D → textured GLB (Meshy, or --provider fal)
 stereoframe init <name>                          # scaffold a project
 stereoframe lint | validate                      # static + headless verification
 stereoframe render [--draft]                     # → renders/render_<ts>.mp4
+stereoframe frame --t <s>                         # one frame → PNG (inspect a moment without a full render)
 stereoframe preview                              # looping playback in the browser
 ```
+
+**Generate assets** with `gen`: text-to-3D, `--image`/`--images` for image-to-3D, or `--via-image` (text → reference image → 3D). Defaults to [Meshy](https://www.meshy.ai) (free test mode; set `MESHY_API_KEY` for real generations); `--provider fal` routes any [fal.ai](https://fal.ai/models?categories=3d) 3D model instead (Tripo, Hyper3D/Rodin, Hunyuan3D…) via `FAL_KEY` + `--fal-model`.
 
 **Presets:** `reveal` (dramatic spiral-in), `hero-orbit` (clean studio orbit), `turntable` (pedestal), `exploded-view` (parts fly apart), **`spec`** (grounded film with auto-placed material callouts), **`teardown`** (exploded breakdown with a tracked label on each part). `stage` auto-frames the model, so a fixed preset frames any GLB correctly — then hand-edit the generated `index.html` to taste.
 

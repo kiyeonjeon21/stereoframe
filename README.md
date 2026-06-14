@@ -54,6 +54,15 @@ stereoframe gen "a matte-black headphone" --via-image # text → image (OpenAI) 
 
 It runs with no setup using Meshy's free test mode (returns a sample model); set `MESHY_API_KEY` (shell env or project `.env`) for real prompt-driven generations.
 
+**Premium / alternative engines via fal.ai.** `--provider fal` routes the same `gen` flows (text-to-3D, image-to-3D, `--via-image`) through any [fal.ai](https://fal.ai/models?categories=3d) 3D model instead of Meshy — Tripo v2.5 (the default), Hyper3D/Rodin, Hunyuan3D, Trellis, and more. Set `FAL_KEY` and pick the model with `--fal-model`:
+
+```bash
+stereoframe gen "a candy-red hypercar" --provider fal                       # Tripo v2.5 text-to-3D (default)
+stereoframe gen --image car.png --provider fal --fal-model fal-ai/hyper3d/rodin
+stereoframe gen "a ribbed ceramic vase" --provider fal \
+  --fal-model fal-ai/hunyuan-3d/v3.1 --input '{"guidance_scale":7.5}'        # --input passes model-specific fields
+```
+
 ## Direct a film — in natural language, or a JSON shot list
 
 Generating a model is the commodity; **directing** it is the moat — and direction is
@@ -116,7 +125,7 @@ Camera types (`static`/`orbit`/`dolly`/`push-in`/`pull-back`/`path`/`hero`), 3-p
 
 ```
 packages/runtime/    stereoframe-runtime → dist/stereoframe.js (three.js r184 bundled)
-packages/cli/        stereoframe → `stereoframe` bin (stage/brief/storyboard/inspect/segment/init/gen/lint/validate/render/bake/preview/add/update)
+packages/cli/        stereoframe → `stereoframe` bin (stage/brief/storyboard/inspect/segment/init/gen/lint/validate/render/frame/bake/preview/add/update/schema)
 examples/
   hello-standalone/        CLI-scaffolded starter (no HyperFrames)
   character-run-standalone/ Fox run cycle + follow cam + particles, own pipeline
@@ -178,8 +187,8 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 - **`stereoframe bake` + `<sf-baked>`** — freeze a forward sim into a per-frame cache and replay it as a pure function of `t`, so it's fully seekable again and drops into multi-shot. (forward-trails → baked-flock.)
 
 **Pipeline & verification**
-- CLI — init / gen / inspect / lint / validate / render / preview / add / update (Puppeteer + ffmpeg).
-- Text-to-3D — `stereoframe gen` → textured GLB via Meshy.
+- CLI — init / gen / inspect / lint / validate / render / frame / preview / add / update / schema (Puppeteer + ffmpeg).
+- Text/image-to-3D — `stereoframe gen` → textured GLB via Meshy (default, free test mode) **or any fal.ai 3D model** (`--provider fal`: Tripo, Hyper3D/Rodin, Hunyuan3D, Trellis…), incl. `--via-image` (text → reference image → 3D).
 - `lint` — markup / asset / time-purity static checks. `validate` — headless probes for lighting, framing, black frames, and seek idempotency (the determinism contract, machine-checked).
 
 HyperFrames embed mode retained. **Roadmap:** depth of field + motion blur, audio mux, alpha output, Docker bit-parity CI.
