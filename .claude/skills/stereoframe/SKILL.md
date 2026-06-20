@@ -108,7 +108,7 @@ Non-interactive, plain-text output, exit code 1 on failure — safe to run in ag
 
 Elements: `sf-scene` (duration, width/height, background, environment HDRI, exposure) · `sf-camera` (fov, far, position, look-at, look-at-offset) · `sf-model` (GLB; `clip="Name"` picks the initial animation clip) · `sf-mesh` (box/sphere/plane/cylinder/torus/icosahedron/rounded-box; `material="glass"` for transmission panels; emissive/env-map-intensity knobs) · `sf-light` (preset studio/soft/sunset, or single light — multiple allowed) · `sf-particles` (preset fountain/snow/dust, count, seed, color, area) · `sf-sky` (atmosphere dome) · `sf-ocean` (animated water, needs `stereoframe add ocean`) · `sf-swarm` (paper scraps gathering into typography: text with `|` line breaks, count, seed, palette, stagger) · `sf-shader` (author a fragment shader directly — `fullscreen` for a generative background, or geometry-bound; auto-wires uTime/uResolution/vUv + a noise toolkit) · `sf-animate`.
 
-Verbs (`start`/`duration` in seconds, `ease` = GSAP-compatible names like `power2.inOut`, `back.out`, `sine.inOut`):
+Verbs (`start`/`duration` in seconds, `ease` = GSAP-compatible names like `power2.inOut`, `back.out`, `sine.inOut` — or a custom curve `cubic-bezier(x1,y1,x2,y2)` / `spring(stiffness?,damping?)`):
 
 | verb | params | use for |
 |---|---|---|

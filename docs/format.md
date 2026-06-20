@@ -313,6 +313,17 @@ material to `variant`; transform to `tween`.
 
 `linear` `none`, `power1–4.in/.out/.inOut`, `sine.*`, `expo.*`, `circ.*`, `back.*`, `elastic.out`, `bounce.out`. Default is `power1.out` (`back.out` for bounce-in).
 
+**Easing as data (custom curves).** Beyond the named eases, `ease` also accepts two
+function forms (still plain serializable strings, deterministic):
+- `ease="cubic-bezier(x1,y1,x2,y2)"` — a CSS/GSAP-style Bézier curve (the control x's are
+  clamped to [0,1]; y may overshoot). `cubic-bezier(0,0,1,1)` = linear.
+- `ease="spring"` or `ease="spring(stiffness, damping)"` — a damped spring that overshoots
+  then settles exactly on the target (defaults `stiffness=4`, `damping=0.5`; lower damping =
+  bouncier). Both args optional.
+
+Malformed forms fall back to the default ease. `lint` flags genuinely-unknown eases (and a
+`cubic-bezier(...)` with the wrong number of args).
+
 ### `<sf-callout>` — spec-callout labels that track a 3D point
 
 A thin leader line from a feature to a floating typographic label — the signature product-film annotation ("48MP · Main camera"). The tracked point is `Vector3.project()`ed against the final camera each seek and a real DOM label + SVG leader are positioned over the canvas, so the type stays crisp and seekable (it never affects the WebGL determinism check — the validator fingerprints the canvas, not the overlay). Lives inside `<sf-scene>`. Standalone mode only (in embed mode, annotations belong to HyperFrames).

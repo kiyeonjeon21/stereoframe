@@ -93,13 +93,104 @@ const EASES: Record<string, EaseFn> = {
   },
 };
 
-/** Resolves an ease name; unknown names fall back to the given default. */
+// ── Easing-as-data: function-form eases (still pure p→value, serializable strings) ──
+
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+/** CSS/GSAP-style `cubic-bezier(x1,y1,x2,y2)`. Endpoints are fixed at (0,0)/(1,1), so
+ *  e(0)=0 and e(1)=1 exactly. Solves Bx(t)=p by Newton-Raphson (bisection fallback),
+ *  then returns By(t). Control x's are clamped to [0,1]; y may overshoot. */
+function cubicBezier(x1: number, y1: number, x2: number, y2: number): EaseFn {
+  x1 = clamp01(x1);
+  x2 = clamp01(x2);
+  const cx = 3 * x1;
+  const bx = 3 * (x2 - x1) - cx;
+  const ax = 1 - cx - bx;
+  const cy = 3 * y1;
+  const by = 3 * (y2 - y1) - cy;
+  const ay = 1 - cy - by;
+  const sampleX = (t: number) => ((ax * t + bx) * t + cx) * t;
+  const sampleY = (t: number) => ((ay * t + by) * t + cy) * t;
+  const sampleDX = (t: number) => (3 * ax * t + 2 * bx) * t + cx;
+  const solveX = (x: number): number => {
+    let t = x;
+    for (let i = 0; i < 8; i++) {
+      const err = sampleX(t) - x;
+      if (Math.abs(err) < 1e-7) return t;
+      const d = sampleDX(t);
+      if (Math.abs(d) < 1e-7) break;
+      t -= err / d;
+    }
+    let lo = 0;
+    let hi = 1;
+    t = x;
+    for (let i = 0; i < 32; i++) {
+      const err = sampleX(t) - x;
+      if (Math.abs(err) < 1e-7) return t;
+      if (err > 0) hi = t;
+      else lo = t;
+      t = (lo + hi) / 2;
+    }
+    return t;
+  };
+  return (p) => (p <= 0 ? 0 : p >= 1 ? 1 : sampleY(solveX(p)));
+}
+
+/** `spring(stiffness?, damping?)` — closed-form damped oscillator (deterministic, pure
+ *  f(p)): overshoots past 1 then settles. The raw oscillator only approaches 1 at p=1
+ *  (like elastic), so the endpoint is LOCKED — `e'(p)=raw(p)+p*(1-raw(1))` — giving
+ *  e(0)=0 and e(1)=1 exactly so a windowed tween settles precisely on `to`. */
+function springEase(stiffness = 4, damping = 0.5): EaseFn {
+  const k = Math.max(0.1, stiffness);
+  const z = clamp01(damping);
+  const omega = Math.sqrt(k) * 2 * Math.PI;
+  const decay = 2 + z * 6;
+  const raw = (p: number) => 1 - Math.exp(-decay * p) * Math.cos(omega * (1 - z) * p);
+  const e1 = raw(1);
+  return (p) => (p <= 0 ? 0 : p >= 1 ? 1 : raw(p) + p * (1 - e1));
+}
+
+const EASE_FN = /^([a-z-]+)\(([^)]*)\)$/i;
+
+function parseArgs(raw: string): number[] {
+  return raw
+    .split(",")
+    .map((a) => a.trim())
+    .filter((a) => a !== "")
+    .map(Number);
+}
+
+/** Parse a function-form ease string → EaseFn, or null if not a (valid) function form. */
+function parseEaseFn(s: string): EaseFn | null {
+  if (s === "spring") return springEase();
+  const m = EASE_FN.exec(s);
+  if (!m) return null;
+  const fn = m[1]!.toLowerCase();
+  const args = parseArgs(m[2]!);
+  if (args.some(Number.isNaN)) return null;
+  if (fn === "cubic-bezier") return args.length === 4 ? cubicBezier(args[0]!, args[1]!, args[2]!, args[3]!) : null;
+  if (fn === "spring") return args.length <= 2 ? springEase(args[0], args[1]) : null;
+  return null;
+}
+
+/** Resolves an ease string (named OR `cubic-bezier(...)`/`spring(...)`); unknown or
+ *  malformed → the given default. */
 export function getEase(name: string | null, fallback = "power1.out"): EaseFn {
   if (name) {
-    const fn = EASES[name.trim()];
+    const s = name.trim();
+    const named = EASES[s];
+    if (named) return named;
+    const fn = parseEaseFn(s);
     if (fn) return fn;
   }
   return EASES[fallback] ?? EASES["linear"]!;
 }
 
 export const EASE_NAMES = Object.keys(EASES);
+
+/** True if `s` is a known ease name or a well-formed `cubic-bezier(...)`/`spring(...)`
+ *  function form. Used by lint (single source of truth with `getEase`). */
+export function isValidEase(s: string): boolean {
+  const t = s.trim();
+  return t in EASES || parseEaseFn(t) !== null;
+}

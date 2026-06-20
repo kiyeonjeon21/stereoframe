@@ -885,6 +885,7 @@ async function main(): Promise<void> {
           verbs: VERB_PARAMS,
           commonVerbAttrs: COMMON_VERB_ATTRS,
           eases: EASE_NAMES,
+          easeForms: ["<name>", "cubic-bezier(x1,y1,x2,y2)", "spring(stiffness?,damping?)"],
           assetAttrs: ASSET_ATTRS,
           geometry: GEOMETRY_KINDS,
           materials: MATERIAL_KINDS,

@@ -7,9 +7,9 @@
  */
 import {
   ASSET_ATTRS,
-  EASE_NAMES,
   ELEMENT_NAMES,
   IR_VERB_CHANNEL,
+  isValidEase,
   VERB_DEFAULT_DURATION,
   VERB_NAMES,
   VERB_REF_ATTR,
@@ -164,7 +164,6 @@ export function lintHtml(html: string, opts: LintOptions): Finding[] {
 
   // sf-animate rules
   const knownVerbs = new Set<string>(VERB_NAMES);
-  const knownEases = new Set<string>(EASE_NAMES);
   const animates = tags.filter((t) => t.name === "sf-animate");
   for (const el of animates) {
     const verb = (readAttr(el.attrs, "verb") ?? "").toLowerCase();
@@ -177,12 +176,12 @@ export function lintHtml(html: string, opts: LintOptions): Finding[] {
       });
     }
     const ease = readAttr(el.attrs, "ease");
-    if (ease && !knownEases.has(ease.trim())) {
+    if (ease && !isValidEase(ease)) {
       findings.push({
         rule: "unknown_ease",
         severity: "warning",
-        message: `ease="${ease}" is not a known easing name — it will fall back to the default.`,
-        fixHint: "Use GSAP-style names like power2.inOut, back.out, sine.inOut, linear.",
+        message: `ease="${ease}" is not a known easing name or function form — it will fall back to the default.`,
+        fixHint: "Use a GSAP-style name (power2.inOut, back.out…), cubic-bezier(x1,y1,x2,y2), or spring(stiffness?,damping?).",
       });
     }
     const target = readAttr(el.attrs, "target");

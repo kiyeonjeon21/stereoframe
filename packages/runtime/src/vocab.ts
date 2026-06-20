@@ -5,7 +5,7 @@
  *
  * Keep in sync with: scene.ts tag handling, animate.ts verb dispatch.
  */
-export { EASE_NAMES } from "./ease";
+export { EASE_NAMES, isValidEase } from "./ease";
 
 export const ELEMENT_NAMES = [
   "sf-scene",

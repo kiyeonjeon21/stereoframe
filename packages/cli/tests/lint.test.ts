@@ -155,6 +155,23 @@ describe("lint", () => {
     expect(r).toContain("unknown_ease");
   });
 
+  test("function-form eases (cubic-bezier/spring) are accepted; bad arity warns", () => {
+    const ok = `
+      <sf-scene duration="5">
+        <sf-mesh id="x" geometry="box"></sf-mesh>
+        <sf-animate target="#x" verb="bounce-in" ease="cubic-bezier(.17,.67,.83,.67)"></sf-animate>
+        <sf-animate target="#x" verb="move" to="0 1 0" ease="spring"></sf-animate>
+        <sf-animate target="#x" verb="move" to="0 2 0" ease="spring(6,0.3)"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(ok)).not.toContain("unknown_ease");
+    const bad = `
+      <sf-scene duration="5">
+        <sf-mesh id="x" geometry="box"></sf-mesh>
+        <sf-animate target="#x" verb="move" to="0 1 0" ease="cubic-bezier(1,2)"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(bad)).toContain("unknown_ease"); // wrong arg count
+  });
+
   test("verb_target_missing", () => {
     const html = `
       <sf-scene duration="5">
