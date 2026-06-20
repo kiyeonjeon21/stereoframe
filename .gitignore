@@ -9,6 +9,9 @@ renders/
 # user reference material (large videos, third-party content — never publish)
 refs/
 
+# confidential design doc (keep locally, never commit)
+docs/research/2026-06-20-core-ir-design.md
+
 # build artifact copies in example projects (regenerate: stereoframe update)
 examples/*/assets/stereoframe.js
 

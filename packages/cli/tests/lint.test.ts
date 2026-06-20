@@ -51,6 +51,69 @@ describe("lint", () => {
     expect(r).toContain("remote_asset");
   });
 
+  test("sf-group is a recognized element + grouped/animated content is clean", () => {
+    const html = `
+      <sf-scene duration="4">
+        <sf-camera look-at="#rig"></sf-camera>
+        <sf-group id="rig" position="0 0.5 0">
+          <sf-mesh id="a" geometry="box" position="-1.5 0 0"></sf-mesh>
+          <sf-mesh id="b" geometry="sphere" position="1.5 0 0"></sf-mesh>
+        </sf-group>
+        <sf-animate target="#rig" verb="turntable" rpm="20"></sf-animate>
+        <sf-animate target="#a" verb="turntable" rpm="60" axis="x"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(html)).toEqual([]);
+  });
+
+  test("ir_dangling_ref flags an orbit around a missing #id; valid ref is clean", () => {
+    const bad = `
+      <sf-scene duration="6">
+        <sf-mesh id="hero" geometry="box"></sf-mesh>
+        <sf-animate target="camera" verb="orbit" around="#heor" duration="6"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(bad)).toContain("ir_dangling_ref");
+    const good = bad.replace("#heor", "#hero");
+    expect(rules(good)).not.toContain("ir_dangling_ref");
+  });
+
+  test("ir_zero_duration flags a windowed verb with non-positive duration", () => {
+    const html = `
+      <sf-scene duration="6">
+        <sf-mesh id="hero" geometry="box"></sf-mesh>
+        <sf-animate target="#hero" verb="move" to="1 0 0" duration="0"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(html)).toContain("ir_zero_duration");
+  });
+
+  test("ir_unreachable flags a verb starting at/after the scene duration", () => {
+    const html = `
+      <sf-scene duration="5">
+        <sf-mesh id="hero" geometry="box"></sf-mesh>
+        <sf-animate target="#hero" verb="move" to="1 0 0" start="6" duration="1"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(html)).toContain("ir_unreachable");
+  });
+
+  test("ir_channel_conflict flags two same-start drivers on one channel", () => {
+    const html = `
+      <sf-scene duration="6">
+        <sf-mesh id="hero" geometry="box"></sf-mesh>
+        <sf-animate target="camera" verb="orbit" around="#hero" start="0" duration="6"></sf-animate>
+        <sf-animate target="camera" verb="dolly" toward="#hero" start="0" duration="2"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(html)).toContain("ir_channel_conflict");
+  });
+
+  test("sequential drivers on one channel (different starts) are NOT a conflict", () => {
+    const html = `
+      <sf-scene duration="6">
+        <sf-mesh id="hero" geometry="box"></sf-mesh>
+        <sf-animate target="camera" verb="dolly" toward="#hero" start="0" duration="2"></sf-animate>
+        <sf-animate target="camera" verb="orbit" around="#hero" start="2" duration="4"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(html)).not.toContain("ir_channel_conflict");
+  });
+
   test("time_impurity catches wall-clock and RNG in inline scripts", () => {
     const html = `${OK}<script type="stereoframe">sf.onSeek(() => Math.random());</script>`;
     expect(rules(html)).toContain("time_impurity");

@@ -243,7 +243,7 @@ function buildMesh(el: Element, specularAA: boolean, maxAniso: number): THREE.Me
   return mesh;
 }
 
-function buildLights(el: Element, scene: THREE.Scene): void {
+function buildLights(el: Element, scene: THREE.Object3D): void {
   const preset = (el.getAttribute("preset") ?? "").toLowerCase();
   if (preset === "studio") {
     scene.add(new THREE.AmbientLight(0xffffff, 0.35));
@@ -439,7 +439,10 @@ export function compileScene(host: HTMLElement): CompiledScene {
     );
   }
 
-  for (const el of Array.from(host.children)) {
+  // Build one element into `parent` (the scene, or an <sf-group> Group). Recursive
+  // so <sf-group> nests content; three.js composes world matrices (parent ∘ local),
+  // so animating a group carries its children. Closes over camera/objectsById/etc.
+  const addElement = (el: Element, parent: THREE.Object3D): void => {
     const tag = el.tagName.toLowerCase();
     if (tag === "sf-camera") {
       camera.fov = parseAngleDeg(el.getAttribute("fov"), 35);
@@ -452,14 +455,14 @@ export function compileScene(host: HTMLElement): CompiledScene {
       else if (la) lookAt = { point: parseVec3(la, [0, 0, 0]) };
     } else if (tag === "sf-mesh") {
       const mesh = buildMesh(el, specularAA, maxAniso);
-      scene.add(mesh);
+      parent.add(mesh);
       if (el.id) objectsById.set(el.id, mesh);
     } else if (tag === "sf-model") {
       const group = new THREE.Group();
       // Position/scale on the group (the handle verbs animate); the base pose
       // rotation goes on the inner gltf.scene below, before `fit` measures it.
       applyTransform(group, el, { rotation: false });
-      scene.add(group);
+      parent.add(group);
       if (el.id) objectsById.set(el.id, group);
       const src = el.getAttribute("src");
       const clipAttr = el.getAttribute("clip");
@@ -517,42 +520,42 @@ export function compileScene(host: HTMLElement): CompiledScene {
         );
       }
     } else if (tag === "sf-light") {
-      buildLights(el, scene);
+      buildLights(el, parent);
     } else if (tag === "sf-particles") {
       const { points, timeUniform } = buildParticles(el);
-      scene.add(points);
+      parent.add(points);
       if (el.id) objectsById.set(el.id, points);
       timeUniforms.push(timeUniform);
     } else if (tag === "sf-sky") {
       const { sky, sunDirection } = buildSky(el);
-      scene.add(sky);
+      parent.add(sky);
       if (el.id) objectsById.set(el.id, sky);
       skySunDirection = sunDirection;
     } else if (tag === "sf-ocean") {
       const ocean = buildOcean(el);
-      scene.add(ocean.water);
+      parent.add(ocean.water);
       if (el.id) objectsById.set(el.id, ocean.water);
       timeUniforms.push(ocean.timeProxy);
       pending.push(ocean.pending);
       oceans.push(ocean);
     } else if (tag === "sf-swarm") {
       const swarm = buildSwarm(el);
-      scene.add(swarm.mesh);
+      parent.add(swarm.mesh);
       if (el.id) objectsById.set(el.id, swarm.mesh);
       seekFns.push(swarm.writer);
     } else if (tag === "sf-metaball") {
       const metaball = buildMetaball(el, buildMeshMaterial(el));
-      scene.add(metaball.mesh);
+      parent.add(metaball.mesh);
       if (el.id) objectsById.set(el.id, metaball.mesh);
       seekFns.push(metaball.writer);
     } else if (tag === "sf-scatter") {
       const scatter = buildScatter(el, buildGeometry(el), buildMeshMaterial(el));
-      scene.add(scatter.mesh);
+      parent.add(scatter.mesh);
       if (el.id) objectsById.set(el.id, scatter.mesh);
       seekFns.push(scatter.writer);
     } else if (tag === "sf-baked") {
       const baked = buildBaked(el, buildGeometry(el), buildMeshMaterial(el));
-      scene.add(baked.group);
+      parent.add(baked.group);
       if (el.id) objectsById.set(el.id, baked.group);
       pending.push(baked.pending);
       seekFns.push(baked.writer);
@@ -561,11 +564,21 @@ export function compileScene(host: HTMLElement): CompiledScene {
       const geometry = fullscreen ? new THREE.PlaneGeometry(2, 2) : buildGeometry(el);
       const { mesh, timeUniform } = buildShader(el, { width, height, geometry, fullscreen });
       if (!fullscreen) applyTransform(mesh, el);
-      scene.add(mesh);
+      parent.add(mesh);
       if (el.id) objectsById.set(el.id, mesh);
       timeUniforms.push(timeUniform);
+    } else if (tag === "sf-group") {
+      // Declarative grouping: a transform container. Its content is parented under
+      // the Group, so a verb on the group's id moves/rotates the whole subtree.
+      const group = new THREE.Group();
+      applyTransform(group, el);
+      parent.add(group);
+      if (el.id) objectsById.set(el.id, group);
+      for (const child of Array.from(el.children)) addElement(child, group);
     }
-  }
+  };
+
+  for (const el of Array.from(host.children)) addElement(el, scene);
 
   // An <sf-sky> sun drives <sf-ocean> specular highlights automatically.
   if (skySunDirection) {

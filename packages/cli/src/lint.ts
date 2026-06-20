@@ -5,7 +5,15 @@
  * free; `lintHtml` is pure (filesystem access injected) so every rule is
  * unit-testable against fixture strings.
  */
-import { ASSET_ATTRS, EASE_NAMES, ELEMENT_NAMES, VERB_NAMES } from "stereoframe-runtime/vocab";
+import {
+  ASSET_ATTRS,
+  EASE_NAMES,
+  ELEMENT_NAMES,
+  IR_VERB_CHANNEL,
+  VERB_DEFAULT_DURATION,
+  VERB_NAMES,
+  VERB_REF_ATTR,
+} from "stereoframe-runtime/vocab";
 
 export interface Finding {
   rule: string;
@@ -248,6 +256,81 @@ export function lintHtml(html: string, opts: LintOptions): Finding[] {
         message: `shot ${i + 1} crossfades until t=${(shot.start + shot.transitionDuration).toFixed(2)} but the previous shot ends at t=${priorEnd.toFixed(2)} — the fade will show the page background.`,
         fixHint: "Extend the previous shot's duration to cover start + transition-duration.",
       });
+    }
+  }
+
+  // ── IR structural/temporal checks (the core="ir" model; render-free) ──
+  // Built from the shared IR verb tables, scoped per shot, so they hold for any
+  // composition. These catch authoring mistakes a render would only reveal late.
+  for (const block of sceneBlocks) {
+    const sceneAttrs = block.match(/<sf-scene\b([^>]*)>/i)?.[1] ?? "";
+    const durAttr = readAttr(sceneAttrs, "duration");
+    const sceneDur = durAttr != null ? Number(durAttr) : null;
+    const channelStarts = new Map<string, number[]>(); // "target.channel" → starts
+
+    for (const el of sfTags(block).filter((t) => t.name === "sf-animate")) {
+      const verb = (readAttr(el.attrs, "verb") ?? "").toLowerCase();
+      const target = readAttr(el.attrs, "target");
+      const start = Number(readAttr(el.attrs, "start") ?? 0) || 0;
+      const durationAttr = readAttr(el.attrs, "duration");
+
+      // ir_dangling_ref — around/toward/subject pointing at a missing #id.
+      const refAttr = VERB_REF_ATTR[verb];
+      if (refAttr) {
+        const ref = readAttr(el.attrs, refAttr);
+        if (ref?.startsWith("#") && !new RegExp(`\\bid\\s*=\\s*"${ref.slice(1)}"`).test(html)) {
+          findings.push({
+            rule: "ir_dangling_ref",
+            severity: "warning",
+            message: `sf-animate verb="${verb}" ${refAttr}="${ref}" references no element id — it resolves to the origin.`,
+            fixHint: `Point ${refAttr} at an existing #id, or use explicit "x y z" coordinates.`,
+          });
+        }
+      }
+
+      // ir_zero_duration — a windowed verb given a non-positive duration snaps.
+      const windowed = verb in VERB_DEFAULT_DURATION;
+      if (windowed && durationAttr != null && Number(durationAttr) <= 0) {
+        findings.push({
+          rule: "ir_zero_duration",
+          severity: "warning",
+          message: `sf-animate verb="${verb}" duration="${durationAttr}" is not positive — it snaps instantly.`,
+          fixHint: "Give the windowed verb a positive duration (seconds).",
+        });
+      }
+
+      // ir_unreachable — a verb that starts at/after the shot ends never runs.
+      if (sceneDur != null && sceneDur > 0 && start >= sceneDur) {
+        findings.push({
+          rule: "ir_unreachable",
+          severity: "warning",
+          message: `sf-animate verb="${verb}" start="${start}" is at/after the scene duration (${sceneDur}s) — it never runs.`,
+          fixHint: "Lower start, or extend the sf-scene duration.",
+        });
+      }
+
+      const channel = IR_VERB_CHANNEL[verb];
+      if (channel && target) {
+        const key = `${target}.${channel}`;
+        const list = channelStarts.get(key);
+        if (list) list.push(start);
+        else channelStarts.set(key, [start]);
+      }
+    }
+
+    // ir_channel_conflict — two drivers starting together on one channel are
+    // order-ambiguous (the later-declared one silently wins each frame).
+    for (const [key, starts] of channelStarts) {
+      const seen = new Set<number>();
+      const clash = starts.some((s) => (seen.has(s) ? true : (seen.add(s), false)));
+      if (clash) {
+        findings.push({
+          rule: "ir_channel_conflict",
+          severity: "warning",
+          message: `two sf-animate drivers start at the same time on ${key} — their order is ambiguous.`,
+          fixHint: "Stagger the starts, or target different channels/nodes.",
+        });
+      }
     }
   }
 
