@@ -19,7 +19,7 @@ import { installHfGate, installSeekListener, isStandalone, startPreviewLoop } fr
 const STYLES = `
 sf-scene { display: block; line-height: 0; }
 sf-scene > canvas { display: block; }
-sf-camera, sf-group, sf-model, sf-mesh, sf-light, sf-env, sf-animate, sf-particles, sf-sky, sf-ocean, sf-swarm, sf-metaball, sf-scatter, sf-baked, sf-shader, sf-callout { display: none; }
+sf-camera, sf-group, sf-state, sf-set, sf-model, sf-mesh, sf-light, sf-env, sf-animate, sf-particles, sf-sky, sf-ocean, sf-swarm, sf-metaball, sf-scatter, sf-baked, sf-shader, sf-callout { display: none; }
 `;
 
 function injectStyles(): void {

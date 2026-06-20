@@ -334,5 +334,38 @@ export function lintHtml(html: string, opts: LintOptions): Finding[] {
     }
   }
 
+  // ── IR named-state checks ──
+  const stateNames = new Set<string>();
+  for (const m of markup.matchAll(/<sf-state\b([^>]*)>/gi)) {
+    const name = readAttr(m[1] ?? "", "name");
+    if (name) stateNames.add(name);
+  }
+  // ir_state_requires_core — <sf-state> is inert unless the scene opts into core="ir".
+  for (const block of sceneBlocks) {
+    if (!/<sf-state\b/i.test(block)) continue;
+    const sceneAttrs = block.match(/<sf-scene\b([^>]*)>/i)?.[1] ?? "";
+    if (readAttr(sceneAttrs, "core") !== "ir") {
+      findings.push({
+        rule: "ir_state_requires_core",
+        severity: "warning",
+        message: '<sf-state> is ignored by the legacy path — its <sf-scene> needs core="ir".',
+        fixHint: 'Add core="ir" to the <sf-scene>.',
+      });
+    }
+  }
+  // ir_unknown_state — `to` targeting a state that was never declared.
+  for (const el of animates) {
+    if ((readAttr(el.attrs, "verb") ?? "").toLowerCase() !== "to") continue;
+    const state = readAttr(el.attrs, "state");
+    if (state && !stateNames.has(state)) {
+      findings.push({
+        rule: "ir_unknown_state",
+        severity: "warning",
+        message: `sf-animate verb="to" state="${state}" has no matching <sf-state name="${state}">.`,
+        fixHint: "Define the state, or fix the name.",
+      });
+    }
+  }
+
   return findings;
 }

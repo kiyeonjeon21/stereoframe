@@ -15,9 +15,27 @@
 
 export type Vec3 = [number, number, number];
 
-/** The transform channel a driver writes. One driver may own more than one
- *  (a path with orient writes both position and rotation). */
-export type Channel = "position" | "rotation" | "scale" | "fov";
+/** The channel a driver writes. Transform channels (position/rotation/scale/fov)
+ *  feed node transforms; opacity/material feed FrameState.materials. One driver
+ *  may own more than one (a path with orient writes position + rotation). */
+export type Channel = "position" | "rotation" | "scale" | "fov" | "opacity" | "material";
+
+/** A variant's material endpoint — only the props it changes are set. */
+export interface MaterialState {
+  color?: string;
+  roughness?: number;
+  metalness?: number;
+}
+
+/** A named state's sparse per-node override (transform + material). */
+export interface StateOverride {
+  position?: Vec3;
+  rotation?: Vec3;
+  scale?: Vec3;
+  color?: string;
+  roughness?: number;
+  metalness?: number;
+}
 
 /** A node's rest pose + identity in the spatial graph.
  *  rotation is Euler radians; orientation tweens (path aim) are converted to a
@@ -41,6 +59,11 @@ export type Driver =
   | { kind: "dolly"; target: string; toward: string | Vec3; distance: number }
   | { kind: "zoom"; target: string; from: number; to: number }
   | { kind: "bounce-in"; target: string }
+  | { kind: "fade-in"; target: string; rise?: number }
+  /** Generic transform tween (used by named-state transitions). */
+  | { kind: "tween"; target: string; channel: "position" | "rotation" | "scale"; from: Vec3; to: Vec3 }
+  /** One link of a variant chain (sorted by start; from = previous link's to). */
+  | { kind: "variant"; target: string; materialName?: string; from: MaterialState; to: MaterialState }
   | { kind: "follow"; target: string; subject: string; offset: Vec3 }
   | { kind: "path"; target: string; points: Vec3[]; closed: boolean; orient: "ahead" | "none" };
 
@@ -99,13 +122,19 @@ export interface CompiledIR {
   beatTimes: Map<string, Span>;
 }
 
-/** The transform channels a driver writes (registered under each at compile). */
+/** The channels a driver writes (registered under each at compile). */
 export function driverChannels(driver: Driver): Channel[] {
   switch (driver.kind) {
     case "zoom":
       return ["fov"];
     case "bounce-in":
       return ["scale"];
+    case "fade-in":
+      return ["opacity"];
+    case "variant":
+      return ["material"];
+    case "tween":
+      return [driver.channel];
     case "path":
       return driver.orient === "ahead" ? ["position", "rotation"] : ["position"];
     default:
@@ -118,6 +147,12 @@ export function isReferenceDriver(driver: Driver): boolean {
   return driver.kind === "orbit" || driver.kind === "dolly" || driver.kind === "follow";
 }
 
+/** Entrance drivers hold their `from`-state before their window (scale 0 / opacity
+ *  0), unlike a mid-timeline tween which rests until it starts. */
+export function isEntranceDriver(driver: Driver): boolean {
+  return driver.kind === "bounce-in" || driver.kind === "fade-in";
+}
+
 // ── evaluated form ───────────────────────────────────────────────────────────
 
 export interface NodeTransform {
@@ -126,9 +161,22 @@ export interface NodeTransform {
   scale: Vec3;
 }
 
+/** Per-node material state at `t`. Color is left as from/to/mix so the backend
+ *  lerps with THREE.Color (byte-identical to legacy); scalars are pre-lerped. */
+export interface MaterialFrame {
+  /** Fade factor 0..1 (fade-in) applied to every material's opacity under the node. */
+  opacity?: number;
+  /** Restrict variant writes to this material name (else all). */
+  materialName?: string;
+  roughness?: number;
+  metalness?: number;
+  color?: { from: string; to: string; mix: number };
+}
+
 /** The frame at time `t` — a pure function of `t`. The backend applies this to
  *  three.js objects (`nodes` by id) + the camera, then composes world matrices. */
 export interface FrameState {
   nodes: Map<string, NodeTransform>;
   camera: { position?: Vec3; fov?: number };
+  materials: Map<string, MaterialFrame>;
 }

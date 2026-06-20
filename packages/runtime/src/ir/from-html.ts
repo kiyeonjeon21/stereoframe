@@ -10,12 +10,28 @@
  * Phase 1 covers the verbs the de-risk example needs: turntable/float/sway
  * (behaviors) and orbit/move/dolly/zoom (timeline drivers), incl. per-part spin.
  */
-import { Box3, Vector3, type Object3D } from "three";
+import { Box3, Mesh, MeshStandardMaterial, Vector3, type Object3D } from "three";
 import { collectParts, resolvePartIndex } from "../animate";
-import { parseAngleDeg, parseNumber, parseSeconds, parseVec3 } from "../parse";
+import { parseAngleDeg, parseColorString, parseNumber, parseRotationRad, parseScale, parseSeconds, parseVec3 } from "../parse";
 import type { CompiledScene } from "../scene";
 import { VERB_DEFAULT_DURATION } from "../vocab";
-import type { Behavior, Driver, NodeBase, SceneIR, TimelineIR, Vec3 } from "./types";
+import type { Behavior, Driver, MaterialState, NodeBase, SceneIR, StateOverride, TimelineIR, Vec3 } from "./types";
+
+/** First standard material under an object → its base color/roughness/metalness. */
+function baseMaterialOf(obj: Object3D, nameFilter?: string): MaterialState | undefined {
+  let found: MeshStandardMaterial | undefined;
+  obj.traverse((child) => {
+    if (found) return;
+    const m = (child as Mesh).material;
+    for (const mat of Array.isArray(m) ? m : m ? [m] : []) {
+      if (mat instanceof MeshStandardMaterial && (!nameFilter || mat.name === nameFilter)) {
+        found = mat;
+        break;
+      }
+    }
+  });
+  return found ? { color: `#${found.color.getHexString()}`, roughness: found.roughness, metalness: found.metalness } : undefined;
+}
 
 /** Window duration: the `duration` attr, else the verb's shared default. */
 function durOf(el: Element, verb: string): number {
@@ -72,6 +88,7 @@ export function lowerScene(compiled: CompiledScene): Lowered {
 
   const behaviors: Behavior[] = [];
   const clips: TimelineIR[] = [];
+  const variantEls: Element[] = [];
   let partCounter = 0;
 
   for (const el of Array.from(compiled.host.querySelectorAll("sf-animate"))) {
@@ -206,6 +223,20 @@ export function lowerScene(compiled: CompiledScene): Lowered {
         clips.push(placeAt(start, { kind: "clip", driver, duration, ease }));
         break;
       }
+      case "bounce-in": {
+        // Scale-in entrance (whole object). Default ease back.out, like legacy.
+        const ease2 = el.getAttribute("ease") ?? "back.out";
+        clips.push(placeAt(start, { kind: "clip", driver: { kind: "bounce-in", target: targetId }, duration: durOf(el, verb), ease: ease2 }));
+        break;
+      }
+      case "fade-in": {
+        // Opacity 0→1 entrance on a 3D object (DOM-target fade-in stays in legacy).
+        clips.push(placeAt(start, { kind: "clip", driver: { kind: "fade-in", target: targetId }, duration: durOf(el, verb), ease }));
+        break;
+      }
+      case "variant":
+        variantEls.push(el); // chained after the loop (from = previous link's to)
+        break;
       case "follow": {
         const subjSpec = el.getAttribute("subject");
         if (!subjSpec || !subjSpec.startsWith("#")) break;
@@ -226,6 +257,130 @@ export function lowerScene(compiled: CompiledScene): Lowered {
       }
       default:
         break; // bounce-in / path / material+clip verbs lower in Phase 2b
+    }
+  }
+
+  // Variant chains: group by target + material filter, capture the base material
+  // from three.js, then thread links so each one's `from` is the previous `to`
+  // (continuous configurator transitions). The held model gives "latest active
+  // wins, base before the first" for free.
+  const variantGroups = new Map<string, Element[]>();
+  for (const el of variantEls) {
+    const key = `${el.getAttribute("target") ?? ""}|${el.getAttribute("material") ?? "*"}`;
+    const list = variantGroups.get(key);
+    if (list) list.push(el);
+    else variantGroups.set(key, [el]);
+  }
+  for (const els of variantGroups.values()) {
+    const targetSpec = els[0]!.getAttribute("target");
+    if (!targetSpec || !targetSpec.startsWith("#")) continue;
+    const targetId = targetSpec.slice(1);
+    const obj = compiled.objectsById.get(targetId);
+    if (!obj) continue;
+    const nameFilter = els[0]!.getAttribute("material") ?? undefined;
+    let baseMat: MeshStandardMaterial | undefined;
+    obj.traverse((child) => {
+      if (baseMat) return;
+      const m = (child as Mesh).material;
+      for (const mat of Array.isArray(m) ? m : m ? [m] : []) {
+        if (mat instanceof MeshStandardMaterial && (!nameFilter || mat.name === nameFilter)) {
+          baseMat = mat;
+          break;
+        }
+      }
+    });
+    if (!baseMat) continue;
+    let from: MaterialState = {
+      color: `#${baseMat.color.getHexString()}`,
+      roughness: baseMat.roughness,
+      metalness: baseMat.metalness,
+    };
+    const sorted = [...els].sort(
+      (a, b) => parseSeconds(a.getAttribute("start"), 0) - parseSeconds(b.getAttribute("start"), 0),
+    );
+    for (const el of sorted) {
+      const to: MaterialState = {
+        color: el.getAttribute("color") ? parseColorString(el.getAttribute("color"), "#ffffff") : from.color,
+        roughness: el.getAttribute("roughness") != null ? parseNumber(el.getAttribute("roughness"), 0.5) : from.roughness,
+        metalness: el.getAttribute("metalness") != null ? parseNumber(el.getAttribute("metalness"), 0) : from.metalness,
+      };
+      const driver: Driver = { kind: "variant", target: targetId, ...(nameFilter ? { materialName: nameFilter } : {}), from, to };
+      clips.push(
+        placeAt(parseSeconds(el.getAttribute("start"), 0), {
+          kind: "clip",
+          driver,
+          duration: durOf(el, "variant"),
+          ease: el.getAttribute("ease") ?? undefined,
+        }),
+      );
+      from = to;
+    }
+  }
+
+  // Named states: <sf-state name><sf-set target …/></sf-state> declare sparse
+  // per-node overrides; `initial` + each `to` transition chain (from = previous
+  // state's value), lowered to per-channel tween (transform) + variant (material)
+  // segments that the held model resolves ("latest active state wins").
+  const stateDefs = new Map<string, Map<string, StateOverride>>();
+  for (const stateEl of Array.from(compiled.host.querySelectorAll("sf-state"))) {
+    const name = stateEl.getAttribute("name");
+    if (!name) continue;
+    const overrides = new Map<string, StateOverride>();
+    for (const setEl of Array.from(stateEl.querySelectorAll("sf-set"))) {
+      const t = setEl.getAttribute("target");
+      if (!t || !t.startsWith("#")) continue;
+      const o: StateOverride = overrides.get(t.slice(1)) ?? {};
+      if (setEl.getAttribute("position")) o.position = parseVec3(setEl.getAttribute("position"), [0, 0, 0]);
+      if (setEl.getAttribute("rotation")) o.rotation = parseRotationRad(setEl.getAttribute("rotation"));
+      if (setEl.getAttribute("scale")) o.scale = parseScale(setEl.getAttribute("scale"));
+      if (setEl.getAttribute("color")) o.color = parseColorString(setEl.getAttribute("color"), "#ffffff");
+      if (setEl.getAttribute("roughness")) o.roughness = parseNumber(setEl.getAttribute("roughness"), 0.5);
+      if (setEl.getAttribute("metalness")) o.metalness = parseNumber(setEl.getAttribute("metalness"), 0);
+      overrides.set(t.slice(1), o);
+    }
+    stateDefs.set(name, overrides);
+  }
+
+  if (stateDefs.size) {
+    // Transition sequence: an instant set to `initial` at t=0 (if any), then each
+    // `to` transition sorted by start.
+    const transitions: Array<{ t: number; dur: number; ease?: string; state: string }> = [];
+    const initial = compiled.host.getAttribute("initial");
+    if (initial && stateDefs.has(initial)) transitions.push({ t: 0, dur: 0, state: initial });
+    for (const el of Array.from(compiled.host.querySelectorAll('sf-animate[verb="to"]'))) {
+      const state = el.getAttribute("state");
+      if (!state || !stateDefs.has(state)) continue;
+      transitions.push({ t: parseSeconds(el.getAttribute("start"), 0), dur: durOf(el, "to"), ease: el.getAttribute("ease") ?? undefined, state });
+    }
+    transitions.sort((a, b) => a.t - b.t);
+
+    // Per-node current value of each channel (rest until a state sets it).
+    const cur = new Map<string, StateOverride>();
+    for (const tr of transitions) {
+      const ov = stateDefs.get(tr.state)!;
+      for (const [id, o] of ov) {
+        const obj = objectMap.get(id);
+        if (!obj) continue;
+        const c = cur.get(id) ?? {};
+        const rest = trsOf(obj);
+        for (const ch of ["position", "rotation", "scale"] as const) {
+          const to = o[ch];
+          if (!to) continue;
+          const from = c[ch] ?? rest[ch];
+          clips.push(placeAt(tr.t, { kind: "clip", driver: { kind: "tween", target: id, channel: ch, from, to }, duration: tr.dur, ease: tr.ease }));
+          c[ch] = to;
+        }
+        if (o.color != null || o.roughness != null || o.metalness != null) {
+          const baseMat = baseMaterialOf(obj) ?? {};
+          const from: MaterialState = { color: c.color ?? baseMat.color, roughness: c.roughness ?? baseMat.roughness, metalness: c.metalness ?? baseMat.metalness };
+          const to: MaterialState = { color: o.color ?? from.color, roughness: o.roughness ?? from.roughness, metalness: o.metalness ?? from.metalness };
+          clips.push(placeAt(tr.t, { kind: "clip", driver: { kind: "variant", target: id, from, to }, duration: tr.dur, ease: tr.ease }));
+          c.color = to.color;
+          c.roughness = to.roughness;
+          c.metalness = to.metalness;
+        }
+        cur.set(id, c);
+      }
     }
   }
 

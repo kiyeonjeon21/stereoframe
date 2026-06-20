@@ -16,12 +16,14 @@
  */
 import { getEase } from "../ease";
 import {
+  isEntranceDriver,
   isReferenceDriver,
   type Behavior,
   type Channel,
   type CompiledIR,
   type Driver,
   type FrameState,
+  type MaterialFrame,
   type NodeBase,
   type NodeTransform,
   type Segment,
@@ -53,10 +55,26 @@ function held(list: Segment[], t: number): Segment | null {
   return found;
 }
 
+/** Held segment, or — before the first starts — the earliest segment if it's an
+ *  entrance (so it holds its `from`-state, e.g. scale 0 / opacity 0). */
+function heldOrEntrance(list: Segment[], t: number): Segment | null {
+  const h = held(list, t);
+  if (h) return h;
+  const first = list[0];
+  return first && isEntranceDriver(first.driver) ? first : null;
+}
+
 interface EvalCtx {
   nodes: Map<string, NodeBase>;
   transforms: Map<string, NodeTransform>;
+  materials: Map<string, MaterialFrame>;
   cameraFov: number | undefined;
+}
+
+function materialOf(ctx: EvalCtx, id: string): MaterialFrame {
+  let m = ctx.materials.get(id);
+  if (!m) ctx.materials.set(id, (m = {}));
+  return m;
 }
 
 /** Resolve an `around`/`toward`/`subject` reference to a point: a literal, or a
@@ -117,8 +135,49 @@ function applyDriver(driver: Driver, channel: Channel, t: number, seg: Segment, 
       tr.position[2] = s[2] + driver.offset[2];
       return;
     }
+    case "bounce-in": {
+      // Scale-in entrance: rest × eased progress (p clamps to 0 before the window).
+      if (!tr || channel !== "scale") return;
+      const base = ctx.nodes.get(driver.target)?.scale ?? [1, 1, 1];
+      tr.scale[0] = base[0] * p;
+      tr.scale[1] = base[1] * p;
+      tr.scale[2] = base[2] * p;
+      return;
+    }
+    case "fade-in": {
+      // Opacity factor 0→1 (entrance). Backend multiplies each base opacity by it.
+      if (channel !== "opacity") return;
+      materialOf(ctx, driver.target).opacity = p;
+      return;
+    }
+    case "variant": {
+      // Material colorway link: scalars pre-lerped here; color left as from/to/mix
+      // for the backend to lerp with THREE.Color (byte-identical to legacy).
+      if (channel !== "material") return;
+      const m = materialOf(ctx, driver.target);
+      if (driver.materialName != null) m.materialName = driver.materialName;
+      if (driver.to.color != null && driver.from.color != null) {
+        m.color = { from: driver.from.color, to: driver.to.color, mix: p };
+      }
+      if (driver.to.roughness != null && driver.from.roughness != null) {
+        m.roughness = driver.from.roughness + (driver.to.roughness - driver.from.roughness) * p;
+      }
+      if (driver.to.metalness != null && driver.from.metalness != null) {
+        m.metalness = driver.from.metalness + (driver.to.metalness - driver.from.metalness) * p;
+      }
+      return;
+    }
+    case "tween": {
+      // Generic transform tween (named-state transitions). Componentwise lerp.
+      if (!tr) return;
+      const v = tr[driver.channel];
+      v[0] = driver.from[0] + (driver.to[0] - driver.from[0]) * p;
+      v[1] = driver.from[1] + (driver.to[1] - driver.from[1]) * p;
+      v[2] = driver.from[2] + (driver.to[2] - driver.from[2]) * p;
+      return;
+    }
     default:
-      return; // bounce-in / path lower in Phase 2b
+      return; // path lowers in a later phase
   }
 }
 
@@ -177,16 +236,17 @@ export function evaluate(compiled: CompiledIR, t: number): FrameState {
   const time = Math.max(0, Number(t) || 0);
 
   const transforms = new Map<string, NodeTransform>();
+  const materials = new Map<string, MaterialFrame>();
   let cameraFov: number | undefined;
   for (const [id, n] of compiled.nodes) {
     transforms.set(id, transformFrom(n));
     if (n.kind === "camera") cameraFov = n.fov;
   }
-  const ctx: EvalCtx = { nodes: compiled.nodes, transforms, cameraFov };
+  const ctx: EvalCtx = { nodes: compiled.nodes, transforms, materials, cameraFov };
 
-  // Pass 1: independent drivers (held per channel) then additive behaviors.
+  // Pass 1: independent drivers (held/entrance per channel) then additive behaviors.
   for (const [key, list] of compiled.segments) {
-    const seg = held(list, time);
+    const seg = heldOrEntrance(list, time);
     if (!seg || isReferenceDriver(seg.driver)) continue;
     applyDriver(seg.driver, channelOf(key), time, seg, ctx);
   }
@@ -200,5 +260,9 @@ export function evaluate(compiled: CompiledIR, t: number): FrameState {
   }
 
   const cam = transforms.get("camera");
-  return { nodes: transforms, camera: { position: cam ? cam.position : undefined, fov: ctx.cameraFov } };
+  return {
+    nodes: transforms,
+    camera: { position: cam ? cam.position : undefined, fov: ctx.cameraFov },
+    materials,
+  };
 }
