@@ -187,7 +187,9 @@ export function lintHtml(html: string, opts: LintOptions): Finding[] {
     }
     const target = readAttr(el.attrs, "target");
     if (target?.startsWith("#")) {
-      const id = target.slice(1);
+      // `#model/part` paths: validate the model id (pre-`/`); the part name can't be
+      // checked render-free (it lives inside the GLB).
+      const id = target.slice(1).split("/")[0]!;
       if (!new RegExp(`\\bid\\s*=\\s*"${id}"`).test(html)) {
         findings.push({
           rule: "verb_target_missing",
@@ -278,7 +280,8 @@ export function lintHtml(html: string, opts: LintOptions): Finding[] {
       const refAttr = VERB_REF_ATTR[verb];
       if (refAttr) {
         const ref = readAttr(el.attrs, refAttr);
-        if (ref?.startsWith("#") && !new RegExp(`\\bid\\s*=\\s*"${ref.slice(1)}"`).test(html)) {
+        const refId = ref?.startsWith("#") ? ref.slice(1).split("/")[0]! : null;
+        if (refId && !new RegExp(`\\bid\\s*=\\s*"${refId}"`).test(html)) {
           findings.push({
             rule: "ir_dangling_ref",
             severity: "warning",

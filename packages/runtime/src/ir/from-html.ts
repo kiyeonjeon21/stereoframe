@@ -54,6 +54,18 @@ function trsOf(obj: Object3D): Pick<NodeBase, "position" | "rotation" | "scale">
   };
 }
 
+/** A part's spin pivot: its world-AABB center, expressed in parent-local space, so a
+ *  per-part turntable spins the part about its own hub even when the GLB author parented
+ *  it at the model origin. */
+function partPivot(obj: Object3D): Vec3 | undefined {
+  obj.updateWorldMatrix(true, true);
+  const box = new Box3().setFromObject(obj);
+  if (box.isEmpty()) return undefined;
+  const cw = box.getCenter(new Vector3());
+  if (obj.parent) obj.parent.worldToLocal(cw);
+  return [cw.x, cw.y, cw.z];
+}
+
 /** Center as concrete numbers (for computing orbit/dolly defaults). */
 function centerVec(spec: string | null, compiled: CompiledScene): Vec3 {
   if (spec && spec.startsWith("#")) {
@@ -95,7 +107,32 @@ export function lowerScene(compiled: CompiledScene): Lowered {
   const behaviors: Behavior[] = [];
   const clips: TimelineIR[] = [];
   const variantEls: Element[] = [];
-  let partCounter = 0;
+
+  // GLB part-lift: resolve a model child (by name or index, via the same resolver the
+  // legacy `part=` path uses) to a STABLE, deduped addressable node `${modelId}/${name}`
+  // (+ objectMap entry capturing its local rest pose). Both `target="#model/part"` and
+  // `part="…"` lower to the same lifted node, so two per-part verbs compose additively
+  // instead of clobbering (each used to mint its own synthetic node). Returns null when
+  // the model/part can't be resolved.
+  const liftedParts = new Map<string, string>(); // `${modelId}#${index}` → nodeId
+  function liftPart(modelId: string, partSpec: string | null): { id: string; obj: Object3D } | null {
+    const model = objectMap.get(modelId);
+    if (!model) return null;
+    const parts = collectParts(model);
+    const idx = resolvePartIndex(parts, partSpec, 0);
+    const partObj = parts[idx];
+    if (!partObj || partObj === model) return null;
+    const memoKey = `${modelId}#${idx}`;
+    const existing = liftedParts.get(memoKey);
+    if (existing) return { id: existing, obj: partObj };
+    const name = (partObj.name ?? "").trim().replace(/\s+/g, "_");
+    let id = `${modelId}/${name || `part${idx}`}`;
+    while (objectMap.has(id)) id = `${id}_${idx}`; // disambiguate same-named parts
+    nodes.push({ id, kind: "mesh", ...trsOf(partObj) });
+    objectMap.set(id, partObj);
+    liftedParts.set(memoKey, id);
+    return { id, obj: partObj };
+  }
 
   for (const el of Array.from(compiled.host.querySelectorAll("sf-animate"))) {
     const verb = (el.getAttribute("verb") ?? "").toLowerCase();
@@ -103,15 +140,27 @@ export function lowerScene(compiled: CompiledScene): Lowered {
 
     let targetId: string | null = null;
     let targetObj: Object3D | null = null;
+    let motionIsLiftedPart = false;
     if (targetSpec === "camera") {
       targetId = "camera";
       targetObj = compiled.camera;
     } else if (targetSpec && targetSpec.startsWith("#")) {
-      const id = targetSpec.slice(1);
-      const obj = compiled.objectsById.get(id);
-      if (obj) {
-        targetId = id;
-        targetObj = obj;
+      const path = targetSpec.slice(1);
+      const slash = path.indexOf("/");
+      if (slash >= 0) {
+        // Addressable GLB part path: `#model/part`.
+        const lifted = liftPart(path.slice(0, slash), path.slice(slash + 1));
+        if (lifted) {
+          targetId = lifted.id;
+          targetObj = lifted.obj;
+          motionIsLiftedPart = true;
+        }
+      } else {
+        const obj = compiled.objectsById.get(path);
+        if (obj) {
+          targetId = path;
+          targetObj = obj;
+        }
       }
     }
     if (!targetId || !targetObj) continue; // DOM-target verbs (titles) are Phase 2
@@ -119,29 +168,19 @@ export function lowerScene(compiled: CompiledScene): Lowered {
     const start = parseSeconds(el.getAttribute("start"), 0);
     const ease = el.getAttribute("ease") ?? undefined;
 
-    // Per-part: redirect motion to a synthetic node bound to a child object.
+    // Per-part via `part=` attr: redirect motion to the lifted child node. (Skip when
+    // the target is already a `#model/part` path.)
     let motionId = targetId;
-    let pivot: Vec3 | undefined;
     const partAttr = el.getAttribute("part");
-    if (partAttr !== null && (verb === "turntable" || verb === "sway" || verb === "float" || verb === "move")) {
-      const parts = collectParts(targetObj);
-      const partObj = parts[resolvePartIndex(parts, partAttr, 0)] ?? targetObj;
-      if (partObj !== targetObj) {
-        const pid = `${targetId}::part${partCounter++}`;
-        nodes.push({ id: pid, kind: "mesh", ...trsOf(partObj) });
-        objectMap.set(pid, partObj);
-        motionId = pid;
-        if (verb === "turntable") {
-          partObj.updateWorldMatrix(true, true);
-          const box = new Box3().setFromObject(partObj);
-          if (!box.isEmpty()) {
-            const cw = box.getCenter(new Vector3());
-            if (partObj.parent) partObj.parent.worldToLocal(cw);
-            pivot = [cw.x, cw.y, cw.z];
-          }
-        }
+    if (partAttr !== null && !motionIsLiftedPart && (verb === "turntable" || verb === "sway" || verb === "float" || verb === "move")) {
+      const lifted = liftPart(targetId, partAttr);
+      if (lifted) {
+        motionId = lifted.id;
+        motionIsLiftedPart = true;
       }
     }
+    // A per-part turntable spins about the part's own hub.
+    const pivot = verb === "turntable" && motionIsLiftedPart ? partPivot(objectMap.get(motionId)!) : undefined;
 
     switch (verb) {
       case "turntable":

@@ -163,6 +163,21 @@ describe("lint", () => {
     expect(rules(html)).toContain("verb_target_missing");
   });
 
+  test("#model/part path: validates the model id, not the part name", () => {
+    const ok = `
+      <sf-scene core="ir" duration="5">
+        <sf-model id="lamp" src="lamp.glb"></sf-model>
+        <sf-animate target="#lamp/Lamp_Glass" verb="turntable"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(ok)).not.toContain("verb_target_missing"); // part name can't be checked render-free
+    const bad = `
+      <sf-scene core="ir" duration="5">
+        <sf-model id="lamp" src="lamp.glb"></sf-model>
+        <sf-animate target="#typo/Lamp_Glass" verb="turntable"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(bad)).toContain("verb_target_missing"); // model id typo is caught
+  });
+
   test("camera_path_lookat_conflict", () => {
     const html = `
       <sf-scene duration="5">

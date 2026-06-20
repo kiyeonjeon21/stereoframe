@@ -271,6 +271,15 @@ etc.) is a single welded mesh — `stereoframe segment <glb>` reports whether a 
 separable components; if it's one welded mesh, per-part features need a genuinely multi-part
 source GLB (DCC/kitbash/CAD).
 
+**Addressable parts (`core="ir"`).** Under the IR core, a GLB part is a real addressable
+node: `target="#model/part"` (model id `/` part name-or-index) is equivalent to
+`target="#model" part="part"` and is the preferred form — introspection becomes addressing.
+e.g. `<sf-animate target="#car/wheel" verb="turntable" axis="x">`. One level deep
+(model→part); the part is matched by the same name/index resolver as `part=`. `lint` validates
+the model id; the part name (inside the GLB) isn't checked render-free. `part=` stays supported.
+(Part addressing in `around`/`toward`/`subject` refs is not yet supported — those need world
+positions; a part's IR transform is model-local.)
+
 ### Named states & transitions (`core="ir"`)
 
 `<sf-state name>` declares a set of sparse per-node overrides (via `<sf-set target="#id">`);

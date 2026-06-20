@@ -235,6 +235,20 @@ describe("evaluate — entrance + material channels", () => {
     expect(evaluate(c, 2).nodes.get("a")!.rotation[1]).toBeCloseTo(0); // back to initial
   });
 
+  test("node id with '/' (lifted GLB part) drives + segment key parses on last '.'", () => {
+    const part: NodeBase = { id: "car/wheel", kind: "mesh", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
+    const scene: SceneIR = {
+      nodes: [part],
+      behaviors: [{ kind: "turntable", target: "car/wheel", rpm: 60, axis: "x" }],
+      timeline: { kind: "clip", ease: "linear", duration: 1, driver: { kind: "tween", target: "car/wheel", channel: "scale", from: [1, 1, 1], to: [2, 2, 2] } },
+    };
+    const c = compile(scene);
+    expect(c.segments.has("car/wheel.scale")).toBe(true); // key splits on the last '.'
+    const fs = evaluate(c, 0.5);
+    expect(fs.nodes.get("car/wheel")!.scale[0]).toBeCloseTo(1.5); // tween
+    expect(fs.nodes.get("car/wheel")!.rotation[0]).toBeCloseTo(Math.PI); // turntable 60rpm @ t=0.5
+  });
+
   test("rotation tween slerps (shortest arc), not componentwise Euler lerp", () => {
     const node: NodeBase = { id: "a", kind: "mesh", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
     const to: Vec3 = [Math.PI / 2, Math.PI / 2, 0];

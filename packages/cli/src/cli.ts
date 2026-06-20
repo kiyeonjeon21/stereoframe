@@ -898,6 +898,7 @@ async function main(): Promise<void> {
           timelineKinds: IR_TIMELINE_KINDS,
           channels: IR_CHANNELS,
           verbChannel: IR_VERB_CHANNEL,
+          targetForms: ["camera", "#id", "#model/part (GLB part by name or index; core=\"ir\")"],
         },
       };
       console.log(JSON.stringify(spec, null, 2));
