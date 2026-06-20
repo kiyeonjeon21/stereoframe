@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+      body { font-family: ui-sans-serif, system-ui, sans-serif; }
+      sf-scene { position: absolute; inset: 0; }
+      .phase {
+        position: absolute; bottom: 100px; width: 100%; text-align: center;
+        font-size: 40px; font-weight: 700; letter-spacing: 0.22em;
+        text-transform: uppercase; color: #e4e4e7;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- core="ir" — named states (incl. light states) require the IR path -->
+    <sf-scene core="ir" initial="day" duration="8" width="1920" height="1080" background="#11151c">
+      <sf-camera fov="34" position="0 0.9 5.4" look-at="0 0 0"></sf-camera>
+
+      <!-- low constant fill + a dim cool rim so night still reads + the
+           addressable key light the day/night states drive -->
+      <sf-light type="ambient" intensity="0.3"></sf-light>
+      <sf-light type="directional" color="#3a5a9a" intensity="0.5" position="-4 2 -3"></sf-light>
+      <sf-light id="key" type="directional" color="#fff4e0" intensity="4.5" position="3 4 4"></sf-light>
+
+      <sf-mesh geometry="cylinder" args="1.9 2.1 0.1" color="#2a3340"
+               roughness="0.6" metalness="0.1" position="0 -1.15 0"></sf-mesh>
+      <sf-mesh id="hero" geometry="rounded-box" args="1.4 2.6 0.32 0.16"
+               color="#4f8ef7" metalness="0.1" roughness="0.45" position="0 0.2 0"></sf-mesh>
+
+      <sf-animate target="#hero" verb="turntable" rpm="3"></sf-animate>
+      <sf-animate target="camera" verb="orbit" around="0 0.2 0" radius="5.4"
+                  from="0deg" to="20deg" height="0.7" start="0" duration="8" ease="sine.inOut"></sf-animate>
+
+      <!-- light states: warm bright key (day) ↔ dim cool key (night) -->
+      <sf-state name="day">
+        <sf-set target="#key" intensity="4.5" color="#fff4e0"></sf-set>
+      </sf-state>
+      <sf-state name="night">
+        <sf-set target="#key" intensity="0.3" color="#2a4a8a"></sf-set>
+      </sf-state>
+
+      <!-- rest in `day`, transition to `night` at t=3 over 2s -->
+      <sf-animate verb="to" state="night" start="3" duration="2" ease="power2.inOut"></sf-animate>
+    </sf-scene>
+
+    <div class="phase clip" data-start="0.4" data-duration="3.0">Day</div>
+    <div class="phase clip" data-start="5.4">Night</div>
+
+    <script type="module">
+      import "./assets/stereoframe.js";
+    </script>
+  </body>
+</html>

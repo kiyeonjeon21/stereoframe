@@ -10,12 +10,12 @@
  * Phase 1 covers the verbs the de-risk example needs: turntable/float/sway
  * (behaviors) and orbit/move/dolly/zoom (timeline drivers), incl. per-part spin.
  */
-import { Box3, Mesh, MeshStandardMaterial, Vector3, type Object3D } from "three";
+import { Box3, Light, Mesh, MeshStandardMaterial, Vector3, type Object3D } from "three";
 import { collectParts, resolvePartIndex } from "../animate";
 import { parseAngleDeg, parseColorString, parseNumber, parseRotationRad, parseScale, parseSeconds, parseVec3 } from "../parse";
 import type { CompiledScene } from "../scene";
 import { VERB_DEFAULT_DURATION } from "../vocab";
-import type { Behavior, Driver, MaterialState, NodeBase, SceneIR, StateOverride, TimelineIR, Vec3 } from "./types";
+import type { Behavior, Driver, LightState, MaterialState, NodeBase, SceneIR, StateOverride, TimelineIR, Vec3 } from "./types";
 
 /** First standard material under an object → its base color/roughness/metalness. */
 function baseMaterialOf(obj: Object3D, nameFilter?: string): MaterialState | undefined {
@@ -31,6 +31,12 @@ function baseMaterialOf(obj: Object3D, nameFilter?: string): MaterialState | und
     }
   });
   return found ? { color: `#${found.color.getHexString()}`, roughness: found.roughness, metalness: found.metalness } : undefined;
+}
+
+/** A light's base intensity + color (for threading light-state `from`). */
+function baseLightOf(obj: Object3D): LightState | undefined {
+  if (!(obj instanceof Light)) return undefined;
+  return { intensity: obj.intensity, color: `#${obj.color.getHexString()}` };
 }
 
 /** Window duration: the `duration` attr, else the verb's shared default. */
@@ -336,6 +342,7 @@ export function lowerScene(compiled: CompiledScene): Lowered {
       if (setEl.getAttribute("color")) o.color = parseColorString(setEl.getAttribute("color"), "#ffffff");
       if (setEl.getAttribute("roughness")) o.roughness = parseNumber(setEl.getAttribute("roughness"), 0.5);
       if (setEl.getAttribute("metalness")) o.metalness = parseNumber(setEl.getAttribute("metalness"), 0);
+      if (setEl.getAttribute("intensity")) o.intensity = parseNumber(setEl.getAttribute("intensity"), 1);
       overrides.set(t.slice(1), o);
     }
     stateDefs.set(name, overrides);
@@ -370,7 +377,17 @@ export function lowerScene(compiled: CompiledScene): Lowered {
           clips.push(placeAt(tr.t, { kind: "clip", driver: { kind: "tween", target: id, channel: ch, from, to }, duration: tr.dur, ease: tr.ease }));
           c[ch] = to;
         }
-        if (o.color != null || o.roughness != null || o.metalness != null) {
+        if (obj instanceof Light) {
+          // Light state (intensity/color) → light-tween, chained via `cur`.
+          if (o.intensity != null || o.color != null) {
+            const base = baseLightOf(obj) ?? {};
+            const from: LightState = { intensity: c.intensity ?? base.intensity, color: c.color ?? base.color };
+            const to: LightState = { intensity: o.intensity ?? from.intensity, color: o.color ?? from.color };
+            clips.push(placeAt(tr.t, { kind: "clip", driver: { kind: "light-tween", target: id, from, to }, duration: tr.dur, ease: tr.ease }));
+            c.intensity = to.intensity;
+            c.color = to.color;
+          }
+        } else if (o.color != null || o.roughness != null || o.metalness != null) {
           const baseMat = baseMaterialOf(obj) ?? {};
           const from: MaterialState = { color: c.color ?? baseMat.color, roughness: c.roughness ?? baseMat.roughness, metalness: c.metalness ?? baseMat.metalness };
           const to: MaterialState = { color: o.color ?? from.color, roughness: o.roughness ?? from.roughness, metalness: o.metalness ?? from.metalness };

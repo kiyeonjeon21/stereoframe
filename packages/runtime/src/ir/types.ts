@@ -18,7 +18,7 @@ export type Vec3 = [number, number, number];
 /** The channel a driver writes. Transform channels (position/rotation/scale/fov)
  *  feed node transforms; opacity/material feed FrameState.materials. One driver
  *  may own more than one (a path with orient writes position + rotation). */
-export type Channel = "position" | "rotation" | "scale" | "fov" | "opacity" | "material";
+export type Channel = "position" | "rotation" | "scale" | "fov" | "opacity" | "material" | "light";
 
 /** A variant's material endpoint — only the props it changes are set. */
 export interface MaterialState {
@@ -27,7 +27,13 @@ export interface MaterialState {
   metalness?: number;
 }
 
-/** A named state's sparse per-node override (transform + material). */
+/** A light state endpoint (day↔night) — only the props it changes are set. */
+export interface LightState {
+  intensity?: number;
+  color?: string;
+}
+
+/** A named state's sparse per-node override (transform + material + light). */
 export interface StateOverride {
   position?: Vec3;
   rotation?: Vec3;
@@ -35,6 +41,7 @@ export interface StateOverride {
   color?: string;
   roughness?: number;
   metalness?: number;
+  intensity?: number;
 }
 
 /** A node's rest pose + identity in the spatial graph.
@@ -64,6 +71,8 @@ export type Driver =
   | { kind: "tween"; target: string; channel: "position" | "rotation" | "scale"; from: Vec3; to: Vec3 }
   /** One link of a variant chain (sorted by start; from = previous link's to). */
   | { kind: "variant"; target: string; materialName?: string; from: MaterialState; to: MaterialState }
+  /** Light state transition (intensity/color), chained like variant. */
+  | { kind: "light-tween"; target: string; from: LightState; to: LightState }
   | { kind: "follow"; target: string; subject: string; offset: Vec3 }
   | { kind: "path"; target: string; points: Vec3[]; closed: boolean; orient: "ahead" | "none" };
 
@@ -133,6 +142,8 @@ export function driverChannels(driver: Driver): Channel[] {
       return ["opacity"];
     case "variant":
       return ["material"];
+    case "light-tween":
+      return ["light"];
     case "tween":
       return [driver.channel];
     case "path":
@@ -173,10 +184,18 @@ export interface MaterialFrame {
   color?: { from: string; to: string; mix: number };
 }
 
+/** Per-light state at `t`. Intensity is pre-lerped; color is left as from/to/mix
+ *  so the backend lerps with THREE.Color (matches the material path). */
+export interface LightFrame {
+  intensity?: number;
+  color?: { from: string; to: string; mix: number };
+}
+
 /** The frame at time `t` — a pure function of `t`. The backend applies this to
  *  three.js objects (`nodes` by id) + the camera, then composes world matrices. */
 export interface FrameState {
   nodes: Map<string, NodeTransform>;
   camera: { position?: Vec3; fov?: number };
   materials: Map<string, MaterialFrame>;
+  lights: Map<string, LightFrame>;
 }

@@ -121,10 +121,10 @@ export const GEN_PROVIDERS = ["meshy", "fal"] as const;
 // lowering (ir/from-html.ts) and the render-free IR lint (cli/src/lint.ts), and
 // emitted by `stereoframe schema` so agents see the IR surface.
 
-export const IR_DRIVER_KINDS = ["orbit", "move", "dolly", "zoom", "bounce-in", "fade-in", "variant", "tween", "follow", "path"] as const;
+export const IR_DRIVER_KINDS = ["orbit", "move", "dolly", "zoom", "bounce-in", "fade-in", "variant", "light-tween", "tween", "follow", "path"] as const;
 export const IR_BEHAVIOR_KINDS = ["turntable", "float", "sway"] as const;
 export const IR_TIMELINE_KINDS = ["seq", "par", "stagger", "beat", "wait", "clip"] as const;
-export const IR_CHANNELS = ["position", "rotation", "scale", "fov", "opacity", "material"] as const;
+export const IR_CHANNELS = ["position", "rotation", "scale", "fov", "opacity", "material", "light"] as const;
 
 /** Verbs lowered to a continuous, additive IR behavior. */
 export const IR_BEHAVIOR_VERBS = ["turntable", "float", "sway"] as const;

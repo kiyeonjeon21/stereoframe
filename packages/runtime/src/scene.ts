@@ -243,7 +243,8 @@ function buildMesh(el: Element, specularAA: boolean, maxAniso: number): THREE.Me
   return mesh;
 }
 
-function buildLights(el: Element, scene: THREE.Object3D): void {
+/** Returns the explicit single light (for id registration), or null for presets. */
+function buildLights(el: Element, scene: THREE.Object3D): THREE.Light | null {
   const preset = (el.getAttribute("preset") ?? "").toLowerCase();
   if (preset === "studio") {
     scene.add(new THREE.AmbientLight(0xffffff, 0.35));
@@ -253,21 +254,21 @@ function buildLights(el: Element, scene: THREE.Object3D): void {
     const rim = new THREE.DirectionalLight(0xbfd4ff, 1.1);
     rim.position.set(-4, 2.5, -3);
     scene.add(rim);
-    return;
+    return null;
   }
   if (preset === "soft") {
     scene.add(new THREE.HemisphereLight(0xffffff, 0x33404f, 1.6));
     const fill = new THREE.DirectionalLight(0xffffff, 1.0);
     fill.position.set(2, 3, 4);
     scene.add(fill);
-    return;
+    return null;
   }
   if (preset === "sunset") {
     scene.add(new THREE.HemisphereLight(0xffd9b3, 0x2a2238, 1.0));
     const key = new THREE.DirectionalLight(0xffb070, 2.4);
     key.position.set(-5, 1.5, 3);
     scene.add(key);
-    return;
+    return null;
   }
   // Explicit single light
   const type = (el.getAttribute("type") ?? "directional").toLowerCase();
@@ -282,6 +283,7 @@ function buildLights(el: Element, scene: THREE.Object3D): void {
     light.position.set(...parseVec3(el.getAttribute("position"), [0, 1, 0]));
   }
   scene.add(light);
+  return light;
 }
 
 /** Enable PCF-soft shadow maps from the scene's brightest directional light. Only
@@ -520,7 +522,8 @@ export function compileScene(host: HTMLElement): CompiledScene {
         );
       }
     } else if (tag === "sf-light") {
-      buildLights(el, parent);
+      const light = buildLights(el, parent);
+      if (light && el.id) objectsById.set(el.id, light);
     } else if (tag === "sf-particles") {
       const { points, timeUniform } = buildParticles(el);
       parent.add(points);

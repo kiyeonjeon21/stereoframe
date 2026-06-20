@@ -31,6 +31,7 @@ const EXAMPLES = [
   "paper-swarm",
   "multi-shot",
   "variant-demo",
+  "day-night",
   "metaball",
 ];
 for (const d of EXAMPLES) {

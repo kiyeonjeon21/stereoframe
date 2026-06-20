@@ -127,6 +127,31 @@ Verbs (`start`/`duration` in seconds, `ease` = GSAP-compatible names like `power
 | `morph` | index, to, from | animate a GLB morph-target influence (needs morph targets) |
 | `deform` | amount, frequency, speed | continuous organic vertex ripple/undulation (sin-free GPU noise, MeshStandardMaterial) |
 | `variant` | color/roughness/metalness, material (name filter) | colorway switches (configurators); chain multiple at different starts |
+| `to` | state (a `<sf-state name>`) | transition to a named state (assembled↔exploded, day↔night); **needs `core="ir"`** |
+
+### Named states & transitions (`core="ir"` only)
+
+Declare named states as sparse per-node overrides, rest the scene in one with
+`initial`, then transition between them with `verb="to"`. States chain (latest active
+wins); each transition tweens current→target over its window. **Requires
+`<sf-scene core="ir">`** — `<sf-state>` is inert on the legacy path.
+
+```html
+<sf-scene core="ir" initial="day" duration="8">
+  <sf-light id="key" type="directional" color="#fff4e0" intensity="4.5" position="3 4 4"></sf-light>
+  <sf-mesh id="hero" geometry="rounded-box" args="1.4 2.6 0.32 0.16" color="#4f8ef7"></sf-mesh>
+
+  <sf-state name="day">   <sf-set target="#key" intensity="4.5" color="#fff4e0"></sf-set></sf-state>
+  <sf-state name="night"> <sf-set target="#key" intensity="0.3"  color="#2a4a8a"></sf-set></sf-state>
+
+  <sf-animate verb="to" state="night" start="3" duration="2" ease="power2.inOut"></sf-animate>
+</sf-scene>
+```
+
+`<sf-set target="#id">` override attrs: **transform** `position`/`rotation`/`scale`;
+**material** (mesh) `color`/`roughness`/`metalness`; **light** (`sf-light id`)
+`intensity`/`color` — day↔night dimming/warming. A light must have an `id` to be
+addressable. See `examples/day-night`.
 
 Blocks:
 - `sf-metaball` (count, seed, resolution, scale, speed + sf-mesh material attrs) — gooey blobs. Omit the scene `background` and place DOM typography BEFORE the sf-scene to get text occluded by the blobs (see examples/metaball).

@@ -23,6 +23,7 @@ import {
   type CompiledIR,
   type Driver,
   type FrameState,
+  type LightFrame,
   type MaterialFrame,
   type NodeBase,
   type NodeTransform,
@@ -68,6 +69,7 @@ interface EvalCtx {
   nodes: Map<string, NodeBase>;
   transforms: Map<string, NodeTransform>;
   materials: Map<string, MaterialFrame>;
+  lights: Map<string, LightFrame>;
   cameraFov: number | undefined;
 }
 
@@ -75,6 +77,12 @@ function materialOf(ctx: EvalCtx, id: string): MaterialFrame {
   let m = ctx.materials.get(id);
   if (!m) ctx.materials.set(id, (m = {}));
   return m;
+}
+
+function lightOf(ctx: EvalCtx, id: string): LightFrame {
+  let l = ctx.lights.get(id);
+  if (!l) ctx.lights.set(id, (l = {}));
+  return l;
 }
 
 /** Resolve an `around`/`toward`/`subject` reference to a point: a literal, or a
@@ -167,6 +175,19 @@ function applyDriver(driver: Driver, channel: Channel, t: number, seg: Segment, 
       }
       return;
     }
+    case "light-tween": {
+      // Light state link (day↔night): intensity pre-lerped; color left as
+      // from/to/mix for the backend to lerp with THREE.Color.
+      if (channel !== "light") return;
+      const l = lightOf(ctx, driver.target);
+      if (driver.to.intensity != null && driver.from.intensity != null) {
+        l.intensity = driver.from.intensity + (driver.to.intensity - driver.from.intensity) * p;
+      }
+      if (driver.to.color != null && driver.from.color != null) {
+        l.color = { from: driver.from.color, to: driver.to.color, mix: p };
+      }
+      return;
+    }
     case "tween": {
       // Generic transform tween (named-state transitions). Componentwise lerp.
       if (!tr) return;
@@ -237,12 +258,13 @@ export function evaluate(compiled: CompiledIR, t: number): FrameState {
 
   const transforms = new Map<string, NodeTransform>();
   const materials = new Map<string, MaterialFrame>();
+  const lights = new Map<string, LightFrame>();
   let cameraFov: number | undefined;
   for (const [id, n] of compiled.nodes) {
     transforms.set(id, transformFrom(n));
     if (n.kind === "camera") cameraFov = n.fov;
   }
-  const ctx: EvalCtx = { nodes: compiled.nodes, transforms, materials, cameraFov };
+  const ctx: EvalCtx = { nodes: compiled.nodes, transforms, materials, lights, cameraFov };
 
   // Pass 1: independent drivers (held/entrance per channel) then additive behaviors.
   for (const [key, list] of compiled.segments) {
@@ -264,5 +286,6 @@ export function evaluate(compiled: CompiledIR, t: number): FrameState {
     nodes: transforms,
     camera: { position: cam ? cam.position : undefined, fov: ctx.cameraFov },
     materials,
+    lights,
   };
 }

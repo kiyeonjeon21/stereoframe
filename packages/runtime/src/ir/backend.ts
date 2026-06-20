@@ -7,13 +7,13 @@
  * three.js objects. World matrices, camera look-at, post-fx, fingerprint,
  * diagnostics and the whole `window.__stereoframe` protocol are reused unchanged.
  */
-import { Color, type Material, Mesh, MeshStandardMaterial } from "three";
+import { Color, Light, type Material, Mesh, MeshStandardMaterial } from "three";
 import { compileAnimations } from "../animate";
 import type { CompiledScene } from "../scene";
 import { compile } from "./compile";
 import { evaluate } from "./evaluate";
 import { lowerScene } from "./from-html";
-import type { MaterialFrame } from "./types";
+import type { LightFrame, MaterialFrame } from "./types";
 
 /** Verbs the IR models for ANY target — legacy never builds them. */
 export const IR_VERBS = new Set(["turntable", "float", "sway", "orbit", "move", "dolly", "zoom", "follow", "variant", "to"]);
@@ -94,10 +94,42 @@ function buildMaterialAppliers(
   return appliers;
 }
 
+/** Build per-light appliers for nodes touched by a `light` channel. Captures base
+ *  intensity + color once and, every seek, resets to base then applies the frame's
+ *  light state — color lerped with THREE.Color (matches the material path). */
+function buildLightAppliers(
+  ir: ReturnType<typeof compile>,
+  objectMap: Map<string, import("three").Object3D>,
+): Map<string, (l: LightFrame | undefined) => void> {
+  const ids = new Set<string>();
+  for (const key of ir.segments.keys()) {
+    const ch = key.slice(key.lastIndexOf(".") + 1);
+    if (ch === "light") ids.add(key.slice(0, key.lastIndexOf(".")));
+  }
+
+  const appliers = new Map<string, (l: LightFrame | undefined) => void>();
+  const c1 = new Color();
+  const c2 = new Color();
+  for (const id of ids) {
+    const obj = objectMap.get(id);
+    if (!(obj instanceof Light)) continue;
+    const light = obj;
+    const baseIntensity = light.intensity;
+    const baseColor = light.color.clone();
+    appliers.set(id, (f) => {
+      light.intensity = f?.intensity != null ? f.intensity : baseIntensity;
+      if (f?.color) light.color.copy(c1.set(f.color.from)).lerp(c2.set(f.color.to), f.color.mix);
+      else light.color.copy(baseColor);
+    });
+  }
+  return appliers;
+}
+
 export function installIR(compiled: CompiledScene): void {
   const { scene, objectMap } = lowerScene(compiled);
   const ir = compile(scene);
   const materialAppliers = buildMaterialAppliers(ir, objectMap);
+  const lightAppliers = buildLightAppliers(ir, objectMap);
 
   // IR writer runs first (seekFns[0]); legacy long-tail writers are appended
   // after, so where they share a node/channel (e.g. DOM fades) legacy wins.
@@ -119,6 +151,7 @@ export function installIR(compiled: CompiledScene): void {
       compiled.camera.updateProjectionMatrix();
     }
     for (const [id, applier] of materialAppliers) applier(fs.materials.get(id));
+    for (const [id, applier] of lightAppliers) applier(fs.lights.get(id));
   });
 
   // Long-tail verbs the IR doesn't model yet (path/camera-path/explode/isolate/

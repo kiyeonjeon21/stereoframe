@@ -259,6 +259,7 @@ Common attributes: `target` (`camera` or `#id`), `verb`, `start` (seconds, defau
 | `explode` | `distance` (1.5) | exploded view — separate a model's parts outward from its center over the window. `distance` is a fraction of the model's radius (fit-invariant: `1` ≈ one model-radius of travel, regardless of the GLB's native scale). Needs a **multi-component** GLB (separate part meshes); single-mesh or rigged-character models have nothing to separate (no effect) |
 | `isolate` | `part` (index or name, required), `dim` (0.8) | feature spotlight — fade every *other* part's material toward black over the window so one component reads as the hero. `dim` is how far the rest darken (1 = fully). Needs a multi-component GLB; pair with a slow `dolly`/`orbit` toward the part. `part` accepts a name (`part="Glass"`) — run `stereoframe inspect <model>` to learn the names |
 | `variant` | `color`/`roughness`/`metalness` (target values), `material` (GLB material name filter), duration default 0.8 | material colorway transitions (configurators). Multiple variants on one target chain in start order — each one's from-state is the previous one's result (resolved at compile time, backward-seek safe) |
+| `to` | `state` (a `<sf-state name>`, required), duration default 1 | transition to a named state (**`core="ir"` only** — see Named states below). Chains in start order like `variant` |
 
 **Per-part motion.** `turntable`, `sway`, `float`, `move` also accept a `part` (index or
 name, like `isolate`) to animate **one component** of a multi-part model instead of the
@@ -269,6 +270,35 @@ you don't need to know how the GLB was rigged. Needs a **multi-component** GLB. 
 etc.) is a single welded mesh — `stereoframe segment <glb>` reports whether a model has
 separable components; if it's one welded mesh, per-part features need a genuinely multi-part
 source GLB (DCC/kitbash/CAD).
+
+### Named states & transitions (`core="ir"`)
+
+`<sf-state name>` declares a set of sparse per-node overrides (via `<sf-set target="#id">`);
+`<sf-scene initial="name">` rests the scene in one at t=0; `<sf-animate verb="to" state="name">`
+transitions current→state over its window. States chain (latest active wins, rest/initial
+before the first). **Requires `<sf-scene core="ir">`** — `<sf-state>` is inert on the legacy
+renderer (it builds no objects), so the IR core must be opted in.
+
+`<sf-set>` override attributes:
+
+| group | attributes | target |
+|---|---|---|
+| transform | `position`, `rotation`, `scale` | any `#id` |
+| material | `color`, `roughness`, `metalness` | a mesh `#id` |
+| light | `intensity`, `color` | an `sf-light` with an `id` (day↔night) |
+
+A light must carry an `id` to be addressable. Example: `examples/day-night` (a key light
+transitions warm-bright → dim-cool). Light overrides lower to a `light-tween` IR driver;
+material to `variant`; transform to `tween`.
+
+```html
+<sf-scene core="ir" initial="day" duration="8">
+  <sf-light id="key" type="directional" color="#fff4e0" intensity="4.5" position="3 4 4"></sf-light>
+  <sf-state name="day">   <sf-set target="#key" intensity="4.5" color="#fff4e0"></sf-set></sf-state>
+  <sf-state name="night"> <sf-set target="#key" intensity="0.3"  color="#2a4a8a"></sf-set></sf-state>
+  <sf-animate verb="to" state="night" start="3" duration="2" ease="power2.inOut"></sf-animate>
+</sf-scene>
+```
 
 ### Easing vocabulary (GSAP-compatible names)
 

@@ -232,6 +232,28 @@ describe("evaluate — entrance + material channels", () => {
     expect(evaluate(c, 1.5).nodes.get("a")!.rotation[1]).toBeCloseTo(Math.PI / 2);
     expect(evaluate(c, 2).nodes.get("a")!.rotation[1]).toBeCloseTo(0); // back to initial
   });
+
+  test("light-tween: intensity + color lerp resolved by the held model (day→night)", () => {
+    const key: NodeBase = { id: "key", kind: "light", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
+    const toNight: SceneIR["timeline"] = {
+      kind: "clip",
+      ease: "linear",
+      duration: 1,
+      driver: { kind: "light-tween", target: "key", from: { intensity: 2, color: "#ffffff" }, to: { intensity: 0.2, color: "#102040" } },
+    };
+    const scene: SceneIR = {
+      nodes: [key],
+      behaviors: [],
+      timeline: { kind: "seq", children: [{ kind: "wait", duration: 1 }, toNight] },
+    };
+    const c = compile(scene);
+    expect(evaluate(c, 0.5).lights.get("key")).toBeUndefined(); // before the transition (base light, no override)
+    const mid = evaluate(c, 1.5).lights.get("key")!;
+    expect(mid.intensity).toBeCloseTo(1.1); // halfway 2 → 0.2
+    expect(mid.color).toEqual({ from: "#ffffff", to: "#102040", mix: 0.5 });
+    expect(evaluate(c, 2).lights.get("key")!.intensity).toBeCloseTo(0.2); // night reached, held after
+    expect(evaluate(c, 5).lights.get("key")!.intensity).toBeCloseTo(0.2);
+  });
 });
 
 describe("evaluate — determinism", () => {
