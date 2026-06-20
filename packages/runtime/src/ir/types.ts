@@ -76,13 +76,21 @@ export type Driver =
   | { kind: "follow"; target: string; subject: string; offset: Vec3 }
   | { kind: "path"; target: string; points: Vec3[]; closed: boolean; orient: "ahead" | "none" };
 
-/** Continuous, additive motions (no window) — composed on top of the rest pose
- *  and any timeline drivers. `pivot` (a point in the target's parent space) spins
- *  the geometry about that point so an off-center part (a wheel) turns in place. */
+/** Continuous, additive motions — composed on top of the rest pose and any timeline
+ *  drivers. `pivot` (a point in the target's parent space) spins the geometry about
+ *  that point so an off-center part (a wheel) turns in place. Optional window:
+ *  `from`/`until` (seconds; default 0/∞) gate the behavior; `ramp` (seconds; default
+ *  0) eases its contribution in/out at the window edges (linear trapezoid). Defaults
+ *  reproduce the always-on math exactly. */
+export interface BehaviorWindow {
+  from?: number;
+  until?: number;
+  ramp?: number;
+}
 export type Behavior =
-  | { kind: "turntable"; target: string; rpm: number; axis: "x" | "y" | "z"; pivot?: Vec3 }
-  | { kind: "float"; target: string; amplitude: number; period: number }
-  | { kind: "sway"; target: string; amount: number; period: number };
+  | ({ kind: "turntable"; target: string; rpm: number; axis: "x" | "y" | "z"; pivot?: Vec3 } & BehaviorWindow)
+  | ({ kind: "float"; target: string; amplitude: number; period: number } & BehaviorWindow)
+  | ({ kind: "sway"; target: string; amount: number; period: number } & BehaviorWindow);
 
 /** Composable timeline. Leaves (`clip`/`wait`) carry duration; combinators
  *  (`seq`/`par`/`stagger`/`beat`) place them in time. Durations are inferred

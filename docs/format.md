@@ -271,6 +271,14 @@ etc.) is a single welded mesh — `stereoframe segment <glb>` reports whether a 
 separable components; if it's one welded mesh, per-part features need a genuinely multi-part
 source GLB (DCC/kitbash/CAD).
 
+**Behavior windows (`core="ir"`).** The continuous behaviors `turntable`/`float`/`sway` accept
+an optional window: `start` (begin, seconds — also honored by the legacy renderer), `until`
+(stop, seconds), and `ramp` (ease the motion in/out over N seconds at the window edges, linear).
+e.g. `<sf-animate target="#hero" verb="turntable" rpm="30" start="2" until="6" ramp="1">` spins
+only between 2s and 6s, accelerating in and decelerating out. A turntable **holds** its final
+angle after `until` (it doesn't unwind); `float`/`sway` fade their amplitude to rest. With no
+window the behavior is always-on (unchanged). All seekable/deterministic.
+
 **Addressable parts (`core="ir"`).** Under the IR core, a GLB part is a real addressable
 node: `target="#model/part"` (model id `/` part name-or-index) is equivalent to
 `target="#model" part="part"` and is the preferred form — introspection becomes addressing.

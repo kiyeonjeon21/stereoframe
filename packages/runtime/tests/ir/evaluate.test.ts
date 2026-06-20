@@ -110,6 +110,44 @@ describe("evaluate — behaviors", () => {
   });
 });
 
+describe("evaluate — behavior windows (start/until/ramp)", () => {
+  const node = (): NodeBase => ({ id: "a", kind: "mesh", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] });
+
+  test("turntable start: 0 before start; angle = legacy max(0,t-start) worth (parity)", () => {
+    const c = compile({ nodes: [node()], behaviors: [{ kind: "turntable", target: "a", rpm: 60, axis: "y", from: 2 }] });
+    expect(evaluate(c, 1).nodes.get("a")!.rotation[1]).toBe(0); // before start
+    // 60rpm = 1 rev/s = 2π/s; at t=3, active=1s → 2π. legacy activeTime(3)=max(0,3-2)=1.
+    expect(evaluate(c, 3).nodes.get("a")!.rotation[1]).toBeCloseTo(2 * Math.PI);
+  });
+
+  test("turntable until: angle freezes after the window (holds, never unwinds)", () => {
+    const c = compile({ nodes: [node()], behaviors: [{ kind: "turntable", target: "a", rpm: 60, axis: "y", until: 5 }] });
+    const atEnd = evaluate(c, 5).nodes.get("a")!.rotation[1]; // 5 revs → 10π
+    expect(atEnd).toBeCloseTo(10 * Math.PI);
+    expect(evaluate(c, 9).nodes.get("a")!.rotation[1]).toBeCloseTo(atEnd); // frozen
+  });
+
+  test("turntable ramp: ramped-in angle is less than the un-ramped angle", () => {
+    const plain = compile({ nodes: [node()], behaviors: [{ kind: "turntable", target: "a", rpm: 60, axis: "y" }] });
+    const ramped = compile({ nodes: [node()], behaviors: [{ kind: "turntable", target: "a", rpm: 60, axis: "y", ramp: 2 }] });
+    const p = evaluate(plain, 1).nodes.get("a")!.rotation[1];
+    const r = evaluate(ramped, 1).nodes.get("a")!.rotation[1];
+    expect(r).toBeGreaterThan(0);
+    expect(r).toBeLessThan(p); // velocity eased in → less accumulated angle at t=1
+  });
+
+  test("float until: contribution returns to base after the window", () => {
+    const c = compile({ nodes: [node()], behaviors: [{ kind: "float", target: "a", amplitude: 1, period: 4, until: 3 }] });
+    expect(evaluate(c, 1).nodes.get("a")!.position[1]).toBeCloseTo(1); // in window, peak
+    expect(evaluate(c, 5).nodes.get("a")!.position[1]).toBe(0); // past until → base
+  });
+
+  test("default (no window) is unchanged — always-on from t=0", () => {
+    const c = compile({ nodes: [node()], behaviors: [{ kind: "turntable", target: "a", rpm: 60, axis: "y" }] });
+    expect(evaluate(c, 0.5).nodes.get("a")!.rotation[1]).toBeCloseTo(Math.PI); // half rev — same as before windows
+  });
+});
+
 describe("evaluate — per-channel hold + dynamic refs", () => {
   const a: NodeBase = { id: "a", kind: "mesh", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
 

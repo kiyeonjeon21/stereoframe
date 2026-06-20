@@ -83,6 +83,19 @@ function centerRef(spec: string | null): string | Vec3 {
   return [v[0], v[1], v[2]];
 }
 
+/** Optional behavior window (continuous verbs): `start`→from, `until`, `ramp` (seconds).
+ *  Fields are omitted when absent so the evaluator's always-on defaults hold. */
+function behaviorWindow(el: Element): { from?: number; until?: number; ramp?: number } {
+  const w: { from?: number; until?: number; ramp?: number } = {};
+  const start = el.getAttribute("start");
+  const until = el.getAttribute("until");
+  const ramp = el.getAttribute("ramp");
+  if (start) w.from = parseSeconds(start, 0);
+  if (until) w.until = parseSeconds(until, Infinity);
+  if (ramp) w.ramp = parseSeconds(ramp, 0);
+  return w;
+}
+
 /** Place a windowed clip at its authored start: lead with a wait when start>0. */
 function placeAt(start: number, clip: TimelineIR): TimelineIR {
   return start > 0 ? { kind: "seq", children: [{ kind: "wait", duration: start }, clip] } : clip;
@@ -190,6 +203,7 @@ export function lowerScene(compiled: CompiledScene): Lowered {
           rpm: parseNumber(el.getAttribute("rpm"), 6),
           axis: (el.getAttribute("axis") ?? "y") as "x" | "y" | "z",
           pivot,
+          ...behaviorWindow(el),
         });
         break;
       case "float":
@@ -198,6 +212,7 @@ export function lowerScene(compiled: CompiledScene): Lowered {
           target: motionId,
           amplitude: parseNumber(el.getAttribute("amplitude"), 0.1),
           period: parseNumber(el.getAttribute("period"), 4),
+          ...behaviorWindow(el),
         });
         break;
       case "sway":
@@ -206,6 +221,7 @@ export function lowerScene(compiled: CompiledScene): Lowered {
           target: motionId,
           amount: (parseNumber(el.getAttribute("amount"), 6) * Math.PI) / 180,
           period: parseNumber(el.getAttribute("period"), 5),
+          ...behaviorWindow(el),
         });
         break;
       case "orbit": {

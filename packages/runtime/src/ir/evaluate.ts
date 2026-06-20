@@ -209,15 +209,47 @@ function applyDriver(driver: Driver, channel: Channel, t: number, seg: Segment, 
   }
 }
 
+/** Window envelope ∈[0,1] at `t` (linear trapezoid: 0 outside [from,until], ramping
+ *  0→1 over `ramp`s after `from` and 1→0 over `ramp`s before `until`). For amplitude
+ *  behaviors (float/sway). Defaults (from 0, until ∞, ramp 0) ⇒ 1 for t>0. */
+function behaviorEnv(t: number, from: number, until: number, ramp: number): number {
+  if (t <= from || t >= until) return 0;
+  const span = until - from;
+  const r = Math.min(ramp, span / 2);
+  if (r <= 0) return 1;
+  if (t < from + r) return (t - from) / r;
+  if (t > until - r) return (until - t) / r;
+  return 1;
+}
+
+/** ∫ of the window envelope from `from` to min(t,until) — the "effective active
+ *  seconds" for the accumulating turntable angle (so a ramped/windowed spin stays a
+ *  closed-form pure f(t); after `until` it caps → the spin holds its final angle).
+ *  Defaults (from 0, until ∞, ramp 0) ⇒ max(0,t), matching the legacy activeTime. */
+function behaviorIntegral(t: number, from: number, until: number, ramp: number): number {
+  const te = Math.min(t, until);
+  if (te <= from) return 0;
+  const x = te - from;
+  const span = until - from;
+  const r = Math.min(ramp, span / 2);
+  if (r <= 0) return x;
+  if (x <= r) return (x * x) / (2 * r);
+  if (x <= span - r) return r / 2 + (x - r);
+  return span - r - ((span - x) * (span - x)) / (2 * r);
+}
+
 function applyBehavior(b: Behavior, t: number, ctx: EvalCtx): void {
   const tr = ctx.transforms.get(b.target);
   if (!tr) return;
-  const at = Math.max(0, t);
+  const from = b.from ?? 0;
+  const until = b.until ?? Infinity;
+  const ramp = b.ramp ?? 0;
 
   switch (b.kind) {
     case "turntable": {
       const i = AXIS_INDEX[b.axis];
-      const ang = (b.rpm / 60) * TWO_PI * at;
+      // Angle integrates velocity × envelope (closed-form); holds after `until`.
+      const ang = (b.rpm / 60) * TWO_PI * behaviorIntegral(t, from, until, ramp);
       tr.rotation[i] += ang;
       if (b.pivot) {
         const c = b.pivot;
@@ -240,12 +272,18 @@ function applyBehavior(b: Behavior, t: number, ctx: EvalCtx): void {
       return;
     }
     case "float": {
-      tr.position[1] += b.amplitude * Math.sin((TWO_PI / Math.max(1e-4, b.period)) * at);
+      const env = behaviorEnv(t, from, until, ramp);
+      if (env === 0) return;
+      const at = t - from; // phase elapsed within the window (frozen at edges by env)
+      tr.position[1] += env * b.amplitude * Math.sin((TWO_PI / Math.max(1e-4, b.period)) * at);
       return;
     }
     case "sway": {
+      const env = behaviorEnv(t, from, until, ramp);
+      if (env === 0) return;
+      const at = t - from;
       const w = TWO_PI / Math.max(1e-4, b.period);
-      const a = b.amount;
+      const a = b.amount * env;
       tr.rotation[2] += a * Math.sin(w * at);
       tr.rotation[0] += a * 0.6 * Math.sin(w * 0.73 * at + 1.7);
       tr.rotation[1] += a * 0.4 * Math.sin(w * 0.51 * at + 0.4);

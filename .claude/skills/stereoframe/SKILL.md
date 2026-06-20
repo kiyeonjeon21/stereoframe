@@ -112,7 +112,7 @@ Verbs (`start`/`duration` in seconds, `ease` = GSAP-compatible names like `power
 
 | verb | params | use for |
 |---|---|---|
-| `turntable` | rpm, axis | product spins (continuous) |
+| `turntable` | rpm, axis (+ `start`/`until`/`ramp` window, core="ir") | product spins (continuous; windowable) |
 | `orbit` | around, radius, from/to (deg), height | camera arcs around a subject |
 | `dolly` | toward, distance | push-in / pull-back |
 | `zoom` | from/to (FOV deg) | lens zoom (camera-only); `dolly` + `zoom` opposite directions = dolly-zoom / vertigo |
@@ -121,7 +121,7 @@ Verbs (`start`/`duration` in seconds, `ease` = GSAP-compatible names like `power
 | `crossfade-clip` | from/to (clip names) | character clip transitions (idle → run) |
 | `bounce-in` | (ease defaults back.out) | scale-in entrance (3D or DOM) |
 | `fade-in` | rise (px, DOM only) | opacity entrance (3D materials or DOM) |
-| `float` | amplitude, period | gentle hover (continuous) |
+| `float` | amplitude, period (+ `start`/`until`/`ramp` window, core="ir") | gentle hover (continuous; windowable) |
 | `camera-path` | points ("x y z, x y z, …"), look (ahead\|none) | spline flythroughs/walkthroughs |
 | `path` | points, orient (none\|ahead), closed | move an OBJECT along a Catmull-Rom path (object cousin of camera-path) |
 | `morph` | index, to, from | animate a GLB morph-target influence (needs morph targets) |

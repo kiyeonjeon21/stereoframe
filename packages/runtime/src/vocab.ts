@@ -87,7 +87,7 @@ export const COMMON_VERB_ATTRS = ["target", "start", "duration", "ease"] as cons
 
 /** Per-verb distinctive parameters (keys mirror VERB_NAMES). */
 export const VERB_PARAMS: Record<string, readonly string[]> = {
-  turntable: ["rpm", "axis", "part"],
+  turntable: ["rpm", "axis", "part", "start", "until", "ramp"],
   orbit: ["around", "radius", "from", "to", "height"],
   dolly: ["toward", "distance"],
   zoom: ["from", "to"],
@@ -97,8 +97,8 @@ export const VERB_PARAMS: Record<string, readonly string[]> = {
   "camera-path": ["points", "look"],
   "bounce-in": [],
   "fade-in": ["rise"],
-  float: ["amplitude", "period", "part"],
-  sway: ["amount", "period", "part"],
+  float: ["amplitude", "period", "part", "start", "until", "ramp"],
+  sway: ["amount", "period", "part", "start", "until", "ramp"],
   path: ["points", "orient", "closed"],
   morph: ["index", "from", "to"],
   deform: ["amount", "frequency", "speed"],

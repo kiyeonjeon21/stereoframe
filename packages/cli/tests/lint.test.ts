@@ -155,6 +155,21 @@ describe("lint", () => {
     expect(r).toContain("unknown_ease");
   });
 
+  test("behavior_window fires when until <= start", () => {
+    const bad = `
+      <sf-scene duration="8">
+        <sf-mesh id="x" geometry="box"></sf-mesh>
+        <sf-animate target="#x" verb="turntable" start="5" until="3"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(bad)).toContain("behavior_window");
+    const ok = `
+      <sf-scene duration="8">
+        <sf-mesh id="x" geometry="box"></sf-mesh>
+        <sf-animate target="#x" verb="turntable" start="2" until="5" ramp="1"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(ok)).not.toContain("behavior_window");
+  });
+
   test("function-form eases (cubic-bezier/spring) are accepted; bad arity warns", () => {
     const ok = `
       <sf-scene duration="5">

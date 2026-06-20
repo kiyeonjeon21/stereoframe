@@ -184,6 +184,24 @@ export function lintHtml(html: string, opts: LintOptions): Finding[] {
         fixHint: "Use a GSAP-style name (power2.inOut, back.out…), cubic-bezier(x1,y1,x2,y2), or spring(stiffness?,damping?).",
       });
     }
+    // behavior_window — a continuous behavior with `until` at/under its `start` is an
+    // empty (or negative) window: the behavior never runs.
+    if (verb === "turntable" || verb === "float" || verb === "sway") {
+      const startAttr = readAttr(el.attrs, "start");
+      const untilAttr = readAttr(el.attrs, "until");
+      if (untilAttr != null) {
+        const start = Number(startAttr ?? "0");
+        const until = Number(untilAttr);
+        if (!Number.isNaN(start) && !Number.isNaN(until) && until <= start) {
+          findings.push({
+            rule: "behavior_window",
+            severity: "warning",
+            message: `sf-animate verb="${verb}" has until="${untilAttr}" ≤ start="${startAttr ?? "0"}" — the behavior never runs.`,
+            fixHint: "Set until greater than start, or drop until for an always-on behavior.",
+          });
+        }
+      }
+    }
     const target = readAttr(el.attrs, "target");
     if (target?.startsWith("#")) {
       // `#model/part` paths: validate the model id (pre-`/`); the part name can't be
