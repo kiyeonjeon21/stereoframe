@@ -26,6 +26,7 @@ AI 3D generation is useful, but output quality varies wildly. stereoframe treats
 
 ```bash
 stereoframe evaluate <a.glb> [b.glb…]           # quality reports + comparison scene/frames/video
+stereoframe evaluate <model.glb> --audit        # animated GLB audit report + parts evidence
 stereoframe stage <model.glb> --preset <name>   # stage an accepted GLB into a preview/film
 stereoframe inspect <model.glb>                 # segment + tag a GLB's parts (name/material/where/size)
 stereoframe gen "<prompt>"                       # labs: text/image-to-3D candidate GLB
@@ -36,7 +37,7 @@ stereoframe frame --t <s>                         # one frame → PNG (inspect a
 stereoframe preview                              # looping playback in the browser
 ```
 
-**Evaluate candidates** with `evaluate`: one or more generated/production GLBs → `reports/summary.json`, per-asset `*.quality.json`, `REPORT.md`, a standardized `index.html`, optional `frames/`, and optional `renders/evaluation.mp4`.
+**Evaluate candidates** with `evaluate`: one or more generated/production GLBs → `reports/summary.json`, per-asset `*.quality.json`, `REPORT.md`, a standardized `index.html`, optional `frames/`, and optional `renders/evaluation.mp4`. For one GLB, add `--audit` to generate `report.html`, `reports/parts.json`, part-isolation/exploded-view evidence when the asset is separable, evidence timestamps for selected-part thumbnails, honest single-mesh limitation warnings when it is not, and optional `renders/report.mp4`.
 
 **Generate candidate assets** with `gen`: text-to-3D, `--image`/`--images` for image-to-3D, or `--via-image` (text → reference image → 3D). Defaults to [Meshy](https://www.meshy.ai) (free test mode; set `MESHY_API_KEY` for real generations); `--provider fal` routes any [fal.ai](https://fal.ai/models?categories=3d) 3D model instead (Tripo, Hyper3D/Rodin, Hunyuan3D…) via `FAL_KEY` + `--fal-model`. Generated GLBs should be inspected/evaluated before you rely on them.
 

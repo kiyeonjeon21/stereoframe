@@ -52,7 +52,7 @@ import { captureFrame } from "./frame";
 import { scaffoldProject, updateRuntime } from "./scaffold";
 import { serveProject } from "./serve";
 import { validateProject } from "./validate";
-import { evaluateModels } from "./evaluate";
+import { auditModel, evaluateModels } from "./evaluate";
 
 interface Flags {
   positional: string[];
@@ -123,8 +123,9 @@ USAGE
   stereoframe evaluate <a.glb> [b.glb…]   inspect, score, compare, and stage GLBs as evidence
       --dir <dir>      output evaluation suite (default: glb-evaluation)
       --title "<text>" report/comparison title
-      --frames [list]  capture standard frames (default list: 0,2,4,6; or pass 0,1.5,3)
-      --render         render standardized comparison mp4 (--draft for fast)
+      --audit          one GLB -> animated audit report (report.html, parts.json, optional report.mp4)
+      --frames [list]  capture evidence frames (compare default: 0,2,4,6; audit default: overview/structure/parts)
+      --render         render standardized comparison/audit mp4 (--draft for fast)
   stereoframe stage <model.glb>        stage an accepted GLB into a deterministic preview/film
       --preset <name>  reveal | hero-orbit | turntable | exploded-view | spec | teardown | cinematic (default reveal)
                        spec     = auto-annotated asset preview (inspects the GLB, places named callouts)
@@ -187,7 +188,7 @@ const COMMANDS = [
   { name: "bake", summary: "freeze a forward-mode sim into a seekable cache", flags: ["target", "fps", "out"] },
   { name: "preview", summary: "serve with looping wall-clock playback", flags: ["port"] },
   { name: "stage", summary: "stage an accepted GLB into a deterministic preview or film", args: ["model.glb"], flags: ["preset", "dir", "duration", "title", "bg", "json"] },
-  { name: "evaluate", summary: "inspect, score, compare, and stage GLBs as evidence", args: ["model.glb..."], flags: ["dir", "title", "frames", "render", "draft", "json"] },
+  { name: "evaluate", summary: "inspect, score, compare, and stage GLBs as evidence", args: ["model.glb..."], flags: ["dir", "title", "audit", "frames", "render", "draft", "json"] },
   { name: "brief", summary: "natural-language directing → a plan.json (via an LLM)", flags: ["model", "gen", "dir", "render", "llm-provider", "vertical", "square"] },
   { name: "storyboard", summary: "compile a shot plan (JSON) into a multi-shot film", args: ["plan.json"], flags: ["dir", "render", "vertical", "square", "json"] },
   { name: "inspect", summary: "segment + tag a GLB: list its parts", args: ["model.glb"], flags: ["json"] },
@@ -348,6 +349,13 @@ function framesOpt(options: Map<string, string | boolean>): number[] | undefined
   return frames;
 }
 
+function auditFramesOpt(options: Map<string, string | boolean>): number[] | "default" | undefined {
+  if (!options.has("frames")) return undefined;
+  const raw = options.get("frames");
+  if (raw === true) return "default";
+  return framesOpt(options);
+}
+
 async function maybeWriteQualityReport(glbPath: string, enabled: boolean): Promise<{ path: string; report: QualityReport } | undefined> {
   if (!enabled) return undefined;
   console.error(`inspecting ${glbPath} for quality report…`);
@@ -483,12 +491,63 @@ async function main(): Promise<void> {
     }
     case "evaluate": {
       if (positional.length === 0) {
-        throw new Error("usage: stereoframe evaluate <a.glb> [b.glb…] [--dir out] [--frames 0,2,4] [--render]");
+        throw new Error("usage: stereoframe evaluate <a.glb> [b.glb…] [--dir out] [--audit] [--frames 0,2,4] [--render]");
+      }
+      const audit = options.get("audit") === true;
+      if (audit && positional.length !== 1) {
+        throw new CliError("--audit expects exactly one GLB", "invalid_flag", "run evaluate without --audit to compare multiple GLBs");
       }
       const defaultDir =
-        positional.length === 1
+        audit
+          ? `${basename(positional[0]!).replace(/\.(glb|gltf)$/i, "")}-audit`
+          : positional.length === 1
           ? `${basename(positional[0]!).replace(/\.(glb|gltf)$/i, "")}-evaluation`
           : "glb-evaluation";
+      if (audit) {
+        const result = await auditModel({
+          model: positional[0]!,
+          outDir: stringOpt(options, "dir") ?? defaultDir,
+          title: stringOpt(options, "title"),
+          frames: auditFramesOpt(options),
+          render: options.get("render") === true,
+          draft: options.get("draft") === true,
+        });
+        const outputs = [
+          result.reportHtml,
+          result.index,
+          result.report,
+          result.summary,
+          result.parts,
+          join(result.dir, result.asset.report),
+          ...result.frames.map((frame) => frame.out),
+          ...(result.render ? [result.render] : []),
+        ];
+        reportResult(
+          "evaluate",
+          {
+            outputs,
+            mode: "audit",
+            dir: result.dir,
+            asset: {
+              label: result.asset.label,
+              score: result.asset.score,
+              warnings: result.asset.quality.warnings.map((w) => w.code),
+              report: join(result.dir, result.asset.report),
+              separable: result.audit.asset.separable,
+              selectedPartCount: result.audit.asset.selectedPartCount,
+            },
+            frames: result.frames.map((frame) => frame.out),
+            ...(result.render ? { render: result.render } : {}),
+          },
+          [
+            `audit → ${result.dir}`,
+            `report → ${result.report}`,
+            `html → ${result.reportHtml}`,
+            ...(result.render ? [`render → ${result.render}`] : []),
+          ],
+        );
+        return;
+      }
       const result = await evaluateModels({
         models: positional,
         outDir: stringOpt(options, "dir") ?? defaultDir,

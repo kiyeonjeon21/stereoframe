@@ -38,8 +38,12 @@ duplicate that here — read it before authoring `sf-*` markup.
 For generated or third-party GLBs, prefer the evaluation path first:
 `stereoframe evaluate <a.glb> [b.glb…] --frames --render` writes quality reports,
 a standardized comparison composition, optional frames/video, and a summary
-report. Treat AI 3D generation as a Labs/input-source path; generated GLBs are
-candidates to inspect and compare, not guaranteed final production assets.
+report. For a deeper single-asset audit, use
+`stereoframe evaluate <model.glb> --audit --frames --render`; it writes
+`report.html`, `reports/parts.json`, part-level visual evidence and selected-part
+thumbnail times for separable GLBs, and honest single-mesh limitation warnings.
+Treat AI 3D generation as a Labs/input-source path; generated GLBs are candidates
+to inspect and compare, not guaranteed final production assets.
 
 ## Conventions (important)
 

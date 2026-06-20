@@ -55,6 +55,19 @@ The output directory contains:
 
 Scores are evidence, not taste. A low score does not mean the asset is unusable, and a high score does not guarantee art direction quality. The point is to make generated/provided GLBs inspectable and comparable before investing in polish.
 
+For a single GLB that needs a deeper visual audit, add `--audit`:
+
+```bash
+stereoframe evaluate candidate.glb \
+  --audit \
+  --dir candidate-audit \
+  --title "Candidate GLB audit" \
+  --frames 0,4.8,8.7 \
+  --render --draft
+```
+
+`--audit` writes `report.html`/`index.html`, `REPORT.md`, `reports/summary.json`, `reports/parts.json`, per-asset quality JSON, optional evidence frames, and optional `renders/report.mp4`. Multi-part GLBs get exploded/isolated part beats with tracked callouts, part metrics, and evidence timestamps for selected-part thumbnails. Single welded meshes get an honest fallback report that keeps whole-model evidence but flags that teardown, isolation, and per-part callouts are limited. Captured frames are review evidence; scoring still comes from deterministic GLB geometry/material metadata, not image AI.
+
 ## Labs: generate candidate assets
 
 Need a model you don't have? `stereoframe gen` can create candidate GLBs via Meshy or fal.ai. Treat this as an input source for evaluation, not the main product promise:
@@ -187,6 +200,7 @@ Requires Node ≥ 20, ffmpeg, and [bun](https://bun.sh) (for building).
 
 **Evaluate generated and production GLBs**
 - `evaluate` — one or more GLBs → per-asset quality reports, heuristic scores, standardized comparison scene, optional frames, optional MP4, and `REPORT.md`.
+- `evaluate --audit` — one GLB → animated audit report (`report.html`/`report.mp4`) with whole-model evidence, part table, exploded/isolated part beats for separable assets, and single-mesh limitation warnings.
 - Quality reports — bounds/aspect/flatness/triangle count/single-mesh/off-origin warnings so generated assets can fail visibly instead of being hidden by polish.
 - Provider comparison workflow — use `gen --provider ... --quality-report` to create candidates, then `evaluate` to compare them under the same deterministic rig.
 
