@@ -65,6 +65,28 @@ describe("lint", () => {
     expect(rules(html)).toEqual([]);
   });
 
+  test("named states: clean when core=ir + matching state; flags unknown state", () => {
+    const ok = `
+      <sf-scene core="ir" initial="closed" duration="4">
+        <sf-mesh id="box" geometry="box"></sf-mesh>
+        <sf-state name="closed"><sf-set target="#box" position="0 0 0"></sf-set></sf-state>
+        <sf-state name="open"><sf-set target="#box" position="0 2 0"></sf-set></sf-state>
+        <sf-animate verb="to" state="open" start="1" duration="1"></sf-animate>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(ok)).toEqual([]);
+    const bad = ok.replace('state="open"', 'state="ajar"');
+    expect(rules(bad)).toContain("ir_unknown_state");
+  });
+
+  test("ir_state_requires_core flags <sf-state> on a non-IR scene", () => {
+    const html = `
+      <sf-scene duration="4">
+        <sf-mesh id="box" geometry="box"></sf-mesh>
+        <sf-state name="open"><sf-set target="#box" position="0 2 0"></sf-set></sf-state>
+      </sf-scene>${RUNTIME}`;
+    expect(rules(html)).toContain("ir_state_requires_core");
+  });
+
   test("ir_dangling_ref flags an orbit around a missing #id; valid ref is clean", () => {
     const bad = `
       <sf-scene duration="6">

@@ -11,6 +11,8 @@ export const ELEMENT_NAMES = [
   "sf-scene",
   "sf-camera",
   "sf-group", // transform container: groups content so a verb on it moves the subtree
+  "sf-state", // named state: a set of <sf-set> per-node overrides (core="ir")
+  "sf-set", // one per-node override inside <sf-state>
   "sf-model",
   "sf-mesh",
   "sf-light",
@@ -47,6 +49,7 @@ export const VERB_NAMES = [
   "explode",
   "isolate",
   "variant",
+  "to", // transition to a named <sf-state> (core="ir")
 ] as const;
 
 /** sf-* attributes whose value is a local asset path the renderer fetches. */
@@ -102,6 +105,7 @@ export const VERB_PARAMS: Record<string, readonly string[]> = {
   explode: ["distance"],
   isolate: ["part", "dim"],
   variant: [],
+  to: ["state"],
 };
 
 /** `stereoframe stage --preset` values. */
@@ -117,17 +121,17 @@ export const GEN_PROVIDERS = ["meshy", "fal"] as const;
 // lowering (ir/from-html.ts) and the render-free IR lint (cli/src/lint.ts), and
 // emitted by `stereoframe schema` so agents see the IR surface.
 
-export const IR_DRIVER_KINDS = ["orbit", "move", "dolly", "zoom", "bounce-in", "follow", "path"] as const;
+export const IR_DRIVER_KINDS = ["orbit", "move", "dolly", "zoom", "bounce-in", "fade-in", "variant", "tween", "follow", "path"] as const;
 export const IR_BEHAVIOR_KINDS = ["turntable", "float", "sway"] as const;
 export const IR_TIMELINE_KINDS = ["seq", "par", "stagger", "beat", "wait", "clip"] as const;
-export const IR_CHANNELS = ["position", "rotation", "scale", "fov"] as const;
+export const IR_CHANNELS = ["position", "rotation", "scale", "fov", "opacity", "material"] as const;
 
 /** Verbs lowered to a continuous, additive IR behavior. */
 export const IR_BEHAVIOR_VERBS = ["turntable", "float", "sway"] as const;
 
 /** Windowed verbs the IR models → the transform channel each writes. (Verbs not
  *  here are handled by the legacy fallthrough — see ir/backend.ts IR_VERBS.) */
-export const IR_VERB_CHANNEL: Record<string, "position" | "rotation" | "scale" | "fov"> = {
+export const IR_VERB_CHANNEL: Record<string, (typeof IR_CHANNELS)[number]> = {
   orbit: "position",
   move: "position",
   dolly: "position",
@@ -136,6 +140,8 @@ export const IR_VERB_CHANNEL: Record<string, "position" | "rotation" | "scale" |
   path: "position",
   zoom: "fov",
   "bounce-in": "scale",
+  "fade-in": "opacity",
+  variant: "material",
 };
 
 /** The node-reference attribute each verb resolves (for dangling-ref checks). */
@@ -161,4 +167,5 @@ export const VERB_DEFAULT_DURATION: Record<string, number> = {
   variant: 0.8,
   explode: 2.5,
   isolate: 0.8,
+  to: 1,
 };

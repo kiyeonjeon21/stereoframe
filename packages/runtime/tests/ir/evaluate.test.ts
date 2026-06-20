@@ -169,6 +169,71 @@ describe("evaluate — per-channel hold + dynamic refs", () => {
   });
 });
 
+describe("evaluate — entrance + material channels", () => {
+  const a: NodeBase = { id: "a", kind: "mesh", position: [0, 0, 0], rotation: [0, 0, 0], scale: [2, 2, 2] };
+
+  test("bounce-in holds scale 0 before its window, then scales to rest", () => {
+    const scene: SceneIR = {
+      nodes: [a],
+      behaviors: [],
+      timeline: { kind: "seq", children: [{ kind: "wait", duration: 1 }, { kind: "clip", ease: "linear", duration: 0.6, driver: { kind: "bounce-in", target: "a" } }] },
+    };
+    const c = compile(scene);
+    expect(evaluate(c, 0.5).nodes.get("a")!.scale).toEqual([0, 0, 0]); // before start = from(0)
+    expect(evaluate(c, 1.3).nodes.get("a")!.scale[0]).toBeCloseTo(1); // half → rest×0.5
+    expect(evaluate(c, 2).nodes.get("a")!.scale).toEqual([2, 2, 2]); // done = rest
+  });
+
+  test("fade-in holds opacity 0 before its window, then ramps to 1", () => {
+    const scene: SceneIR = {
+      nodes: [a],
+      behaviors: [],
+      timeline: { kind: "seq", children: [{ kind: "wait", duration: 1 }, { kind: "clip", ease: "linear", duration: 0.6, driver: { kind: "fade-in", target: "a" } }] },
+    };
+    const c = compile(scene);
+    expect(evaluate(c, 0.5).materials.get("a")!.opacity).toBe(0);
+    expect(evaluate(c, 1.3).materials.get("a")!.opacity).toBeCloseTo(0.5);
+    expect(evaluate(c, 2).materials.get("a")!.opacity).toBe(1);
+  });
+
+  test("variant chain: base before first, latest-active-wins, from=prev.to", () => {
+    const g: NodeBase = { id: "g", kind: "mesh", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
+    const v1: SceneIR["timeline"] = { kind: "clip", ease: "linear", duration: 1, driver: { kind: "variant", target: "g", from: { color: "#111111" }, to: { color: "#ff0000" } } };
+    const v2: SceneIR["timeline"] = { kind: "clip", ease: "linear", duration: 1, driver: { kind: "variant", target: "g", from: { color: "#ff0000" }, to: { color: "#00ff00" } } };
+    const scene: SceneIR = {
+      nodes: [g],
+      behaviors: [],
+      timeline: { kind: "seq", children: [{ kind: "wait", duration: 1 }, v1, { kind: "wait", duration: 1 }, v2] },
+    };
+    const c = compile(scene);
+    expect(evaluate(c, 0.5).materials.get("g")).toBeUndefined(); // before first variant (not an entrance)
+    expect(evaluate(c, 1).materials.get("g")!.color).toEqual({ from: "#111111", to: "#ff0000", mix: 0 });
+    expect(evaluate(c, 1.5).materials.get("g")!.color!.mix).toBeCloseTo(0.5);
+    expect(evaluate(c, 2.5).materials.get("g")!.color!.mix).toBe(1); // between v1 end and v2 start → v1 held at p=1
+    expect(evaluate(c, 3.5).materials.get("g")!.color).toEqual({ from: "#ff0000", to: "#00ff00", mix: 0.5 });
+  });
+
+  test("tween drives an arbitrary transform channel; state chain via held", () => {
+    const node: NodeBase = { id: "a", kind: "mesh", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
+    const scene: SceneIR = {
+      nodes: [node],
+      behaviors: [],
+      timeline: {
+        kind: "seq",
+        children: [
+          { kind: "clip", ease: "linear", duration: 1, driver: { kind: "tween", target: "a", channel: "rotation", from: [0, 0, 0], to: [0, Math.PI, 0] } },
+          { kind: "clip", ease: "linear", duration: 1, driver: { kind: "tween", target: "a", channel: "rotation", from: [0, Math.PI, 0], to: [0, 0, 0] } },
+        ],
+      },
+    };
+    const c = compile(scene);
+    expect(evaluate(c, 0.5).nodes.get("a")!.rotation[1]).toBeCloseTo(Math.PI / 2);
+    expect(evaluate(c, 1).nodes.get("a")!.rotation[1]).toBeCloseTo(Math.PI); // state A reached
+    expect(evaluate(c, 1.5).nodes.get("a")!.rotation[1]).toBeCloseTo(Math.PI / 2);
+    expect(evaluate(c, 2).nodes.get("a")!.rotation[1]).toBeCloseTo(0); // back to initial
+  });
+});
+
 describe("evaluate — determinism", () => {
   const scene: SceneIR = {
     nodes: [camera, product],

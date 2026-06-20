@@ -124,12 +124,23 @@ function makeOpacitySetter(obj: Object3D): (factor: number) => void {
  *   `core="ir"` hybrid: the IR drives the modeled verbs, legacy handles the
  *   long-tail (path/explode/variant/…) byte-identically until they migrate.
  */
-export function compileAnimations(compiled: CompiledScene, opts: { skip?: Set<string> } = {}): void {
+export function compileAnimations(
+  compiled: CompiledScene,
+  opts: { skip?: Set<string>; skip3d?: Set<string> } = {},
+): void {
   const skip = opts.skip;
+  const skip3d = opts.skip3d;
   const variantEls: Array<{ el: Element; timing: verbs.VerbTiming }> = [];
   for (const el of Array.from(compiled.host.querySelectorAll("sf-animate"))) {
     const verb = (el.getAttribute("verb") ?? "").toLowerCase();
     if (skip?.has(verb)) continue;
+    // skip3d: the IR handled this verb only for 3D targets (camera or a #id that
+    // resolves to a scene object); DOM-target instances still fall through here.
+    if (skip3d?.has(verb)) {
+      const t = el.getAttribute("target");
+      const is3d = t === "camera" || (!!t && t.startsWith("#") && compiled.objectsById.has(t.slice(1)));
+      if (is3d) continue;
+    }
 
     // Window verbs get a sensible default duration; continuous verbs
     // (turntable, float, follow) stay duration-less.
