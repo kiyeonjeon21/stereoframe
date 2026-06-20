@@ -15,6 +15,7 @@
  * the camera can orbit/track a moving subject (dynamic centers).
  */
 import { getEase } from "../ease";
+import { eulerToQuat, quatToEuler, slerp } from "./quat";
 import {
   isEntranceDriver,
   isReferenceDriver,
@@ -189,8 +190,14 @@ function applyDriver(driver: Driver, channel: Channel, t: number, seg: Segment, 
       return;
     }
     case "tween": {
-      // Generic transform tween (named-state transitions). Componentwise lerp.
+      // Generic transform tween (named-state transitions). Rotation slerps on the
+      // shortest arc (Euler→quat→slerp→Euler, no gimbal flips); position/scale lerp
+      // componentwise.
       if (!tr) return;
+      if (driver.channel === "rotation") {
+        tr.rotation = quatToEuler(slerp(eulerToQuat(driver.from), eulerToQuat(driver.to), p));
+        return;
+      }
       const v = tr[driver.channel];
       v[0] = driver.from[0] + (driver.to[0] - driver.from[0]) * p;
       v[1] = driver.from[1] + (driver.to[1] - driver.from[1]) * p;

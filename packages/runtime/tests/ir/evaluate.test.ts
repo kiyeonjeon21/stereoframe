@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { Euler, Quaternion } from "three";
 import { compile } from "../../src/ir/compile";
 import { evaluate } from "../../src/ir/evaluate";
-import type { NodeBase, SceneIR } from "../../src/ir/types";
+import type { NodeBase, SceneIR, Vec3 } from "../../src/ir/types";
 
 const camera: NodeBase = {
   id: "camera",
@@ -214,6 +215,7 @@ describe("evaluate — entrance + material channels", () => {
   });
 
   test("tween drives an arbitrary transform channel; state chain via held", () => {
+    // Single-axis angle (slerp ≡ linear in the angle here, no gimbal extraction).
     const node: NodeBase = { id: "a", kind: "mesh", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
     const scene: SceneIR = {
       nodes: [node],
@@ -221,16 +223,39 @@ describe("evaluate — entrance + material channels", () => {
       timeline: {
         kind: "seq",
         children: [
-          { kind: "clip", ease: "linear", duration: 1, driver: { kind: "tween", target: "a", channel: "rotation", from: [0, 0, 0], to: [0, Math.PI, 0] } },
-          { kind: "clip", ease: "linear", duration: 1, driver: { kind: "tween", target: "a", channel: "rotation", from: [0, Math.PI, 0], to: [0, 0, 0] } },
+          { kind: "clip", ease: "linear", duration: 1, driver: { kind: "tween", target: "a", channel: "rotation", from: [0, 0, 0], to: [0, 1, 0] } },
+          { kind: "clip", ease: "linear", duration: 1, driver: { kind: "tween", target: "a", channel: "rotation", from: [0, 1, 0], to: [0, 0, 0] } },
         ],
       },
     };
     const c = compile(scene);
-    expect(evaluate(c, 0.5).nodes.get("a")!.rotation[1]).toBeCloseTo(Math.PI / 2);
-    expect(evaluate(c, 1).nodes.get("a")!.rotation[1]).toBeCloseTo(Math.PI); // state A reached
-    expect(evaluate(c, 1.5).nodes.get("a")!.rotation[1]).toBeCloseTo(Math.PI / 2);
+    expect(evaluate(c, 0.5).nodes.get("a")!.rotation[1]).toBeCloseTo(0.5);
+    expect(evaluate(c, 1).nodes.get("a")!.rotation[1]).toBeCloseTo(1); // state A reached
+    expect(evaluate(c, 1.5).nodes.get("a")!.rotation[1]).toBeCloseTo(0.5);
     expect(evaluate(c, 2).nodes.get("a")!.rotation[1]).toBeCloseTo(0); // back to initial
+  });
+
+  test("rotation tween slerps (shortest arc), not componentwise Euler lerp", () => {
+    const node: NodeBase = { id: "a", kind: "mesh", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
+    const to: Vec3 = [Math.PI / 2, Math.PI / 2, 0];
+    const scene: SceneIR = {
+      nodes: [node],
+      behaviors: [],
+      timeline: { kind: "clip", ease: "linear", duration: 1, driver: { kind: "tween", target: "a", channel: "rotation", from: [0, 0, 0], to } },
+    };
+    const c = compile(scene);
+    const mid = evaluate(c, 0.5).nodes.get("a")!.rotation;
+    // Componentwise lerp would be [π/4, π/4, 0]; slerp takes a different (correct) arc.
+    const drift = Math.abs(mid[0] - Math.PI / 4) + Math.abs(mid[1] - Math.PI / 4) + Math.abs(mid[2]);
+    expect(drift).toBeGreaterThan(0.05);
+    // …and it matches THREE's quaternion slerp → Euler.
+    const ref = new Euler().setFromQuaternion(
+      new Quaternion().slerp(new Quaternion().setFromEuler(new Euler(to[0], to[1], to[2], "XYZ")), 0.5),
+      "XYZ",
+    );
+    expect(mid[0]).toBeCloseTo(ref.x, 9);
+    expect(mid[1]).toBeCloseTo(ref.y, 9);
+    expect(mid[2]).toBeCloseTo(ref.z, 9);
   });
 
   test("light-tween: intensity + color lerp resolved by the held model (day→night)", () => {
