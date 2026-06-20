@@ -1,6 +1,6 @@
 {
   "name": "stereoframe",
-  "version": "0.2.58",
+  "version": "0.2.59",
   "description": "Deterministic GLB evaluation and 3D video on three.js — inspect, compare, validate, and render assets built for AI agents.",
   "license": "MIT",
   "repository": {
