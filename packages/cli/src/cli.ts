@@ -23,6 +23,11 @@ import {
   FINISH_ATTRS,
   STAGE_PRESETS,
   GEN_PROVIDERS,
+  IR_DRIVER_KINDS,
+  IR_BEHAVIOR_KINDS,
+  IR_TIMELINE_KINDS,
+  IR_CHANNELS,
+  IR_VERB_CHANNEL,
 } from "stereoframe-runtime/vocab";
 import { addBlock, listBlocks } from "./blocks";
 import {
@@ -827,6 +832,13 @@ async function main(): Promise<void> {
           finishAttrs: FINISH_ATTRS,
           stagePresets: STAGE_PRESETS,
           genProviders: GEN_PROVIDERS,
+        },
+        ir: {
+          driverKinds: IR_DRIVER_KINDS,
+          behaviorKinds: IR_BEHAVIOR_KINDS,
+          timelineKinds: IR_TIMELINE_KINDS,
+          channels: IR_CHANNELS,
+          verbChannel: IR_VERB_CHANNEL,
         },
       };
       console.log(JSON.stringify(spec, null, 2));

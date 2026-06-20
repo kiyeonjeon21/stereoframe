@@ -7,11 +7,16 @@ import {
   GEOMETRY_KINDS,
   MATERIAL_KINDS,
   STAGE_PRESETS,
+  IR_DRIVER_KINDS,
+  IR_BEHAVIOR_KINDS,
+  IR_BEHAVIOR_VERBS,
+  IR_VERB_CHANNEL,
 } from "stereoframe-runtime/vocab";
 import { PRESETS } from "../src/stage";
 
 const sceneSrc = readFileSync(new URL("../../runtime/src/scene.ts", import.meta.url), "utf8");
 const cliSrc = readFileSync(new URL("../src/cli.ts", import.meta.url), "utf8");
+const irTypesSrc = readFileSync(new URL("../../runtime/src/ir/types.ts", import.meta.url), "utf8");
 
 describe("schema vocab consistency", () => {
   test("VERB_PARAMS has an entry for every verb (and no extras)", () => {
@@ -50,6 +55,23 @@ describe("schema ↔ source drift guards", () => {
     const names = [...cliSrc.matchAll(/name: "([a-z-]+)", summary:/g)].map((m) => m[1]!);
     expect(names.length).toBeGreaterThan(10);
     for (const n of names) expect(cliSrc).toContain(`stereoframe ${n}`);
+  });
+
+  test("IR driver/behavior kinds match the unions in ir/types.ts", () => {
+    for (const k of IR_DRIVER_KINDS) expect(irTypesSrc).toContain(`kind: "${k}"`);
+    for (const k of IR_BEHAVIOR_KINDS) expect(irTypesSrc).toContain(`kind: "${k}"`);
+  });
+
+  test("IR verb tables reference only real verbs", () => {
+    const verbs = new Set<string>(VERB_NAMES);
+    for (const v of Object.keys(IR_VERB_CHANNEL)) expect(verbs.has(v)).toBe(true);
+    for (const v of IR_BEHAVIOR_VERBS) expect(verbs.has(v)).toBe(true);
+  });
+
+  test("schema command emits the ir block", () => {
+    for (const key of ["driverKinds", "behaviorKinds", "timelineKinds", "channels", "verbChannel"]) {
+      expect(cliSrc).toContain(`${key}:`);
+    }
   });
 
   test("gen schema advertises implemented generation flags", () => {

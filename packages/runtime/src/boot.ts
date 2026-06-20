@@ -11,6 +11,7 @@
 import * as THREE from "three";
 import { compileAnimations } from "./animate";
 import { compileCallouts } from "./callout";
+import { installIR } from "./ir/backend";
 import { parseSeconds } from "./parse";
 import { compileScene, sceneDuration } from "./scene";
 import { installHfGate, installSeekListener, isStandalone, startPreviewLoop } from "./seek";
@@ -18,7 +19,7 @@ import { installHfGate, installSeekListener, isStandalone, startPreviewLoop } fr
 const STYLES = `
 sf-scene { display: block; line-height: 0; }
 sf-scene > canvas { display: block; }
-sf-camera, sf-model, sf-mesh, sf-light, sf-env, sf-animate, sf-particles, sf-sky, sf-ocean, sf-swarm, sf-metaball, sf-scatter, sf-baked, sf-shader, sf-callout { display: none; }
+sf-camera, sf-group, sf-model, sf-mesh, sf-light, sf-env, sf-animate, sf-particles, sf-sky, sf-ocean, sf-swarm, sf-metaball, sf-scatter, sf-baked, sf-shader, sf-callout { display: none; }
 `;
 
 function injectStyles(): void {
@@ -59,7 +60,10 @@ export async function boot(): Promise<void> {
 
   await Promise.all(scenes.map((s) => s.ready));
   for (const s of scenes) {
-    compileAnimations(s);
+    // Opt-in IR core (core="ir" on <sf-scene>): lower to the IR and drive seeks
+    // via evaluate(t) instead of the legacy verb writers. Same seek protocol.
+    if (s.host.getAttribute("core") === "ir") installIR(s);
+    else compileAnimations(s);
     compileCallouts(s);
   }
   runEscapeHatchScripts(scenes);

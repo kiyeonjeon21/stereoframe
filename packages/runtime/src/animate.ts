@@ -118,10 +118,18 @@ function makeOpacitySetter(obj: Object3D): (factor: number) => void {
   };
 }
 
-export function compileAnimations(compiled: CompiledScene): void {
+/**
+ * @param opts.skip verbs already handled elsewhere (the IR core owns
+ *   turntable/orbit/etc); legacy writers are built only for the rest. This is the
+ *   `core="ir"` hybrid: the IR drives the modeled verbs, legacy handles the
+ *   long-tail (path/explode/variant/…) byte-identically until they migrate.
+ */
+export function compileAnimations(compiled: CompiledScene, opts: { skip?: Set<string> } = {}): void {
+  const skip = opts.skip;
   const variantEls: Array<{ el: Element; timing: verbs.VerbTiming }> = [];
   for (const el of Array.from(compiled.host.querySelectorAll("sf-animate"))) {
     const verb = (el.getAttribute("verb") ?? "").toLowerCase();
+    if (skip?.has(verb)) continue;
 
     // Window verbs get a sensible default duration; continuous verbs
     // (turntable, float, follow) stay duration-less.
